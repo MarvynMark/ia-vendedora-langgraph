@@ -1,0 +1,34 @@
+{
+  "name": "claude-code-com-lucao",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "setup": "bun run src/db/setup.ts",
+    "visualize": "bun run src/visualize-graphs.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "NODE_ENV=test bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.18.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.1",
+    "@langchain/core": "^1.1.31",
+    "@langchain/langgraph": "^1.2.1",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
+    "@langchain/openai": "^1.2.12",
+    "elysia": "^1.4.27",
+    "googleapis": "^171.4.0",
+    "langfuse": "^3.38.6",
+    "langfuse-langchain": "^3.38.6",
+    "pg": "^8.20.0",
+    "zod": "^4.3.6"
+  }
+}
