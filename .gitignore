@@ -35,7 +35,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Generated
 *.png
-bun.lock
 
 *.local.md
 .mcp.json
