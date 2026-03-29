@@ -8,6 +8,7 @@ import { healthRouter } from "./routes/health.ts";
 import { setupRouter } from "./routes/setup.ts";
 import { webhookRouter } from "./routes/webhook.ts";
 import { followupRouter } from "./routes/followup.ts";
+import { pagamentoRouter } from "./routes/pagamento.ts";
 
 const app = new Elysia()
   .use(cors())
@@ -15,9 +16,10 @@ const app = new Elysia()
   .use(setupRouter)
   .use(webhookRouter)
   .use(followupRouter)
+  .use(pagamentoRouter)
   .listen(env.PORT);
 
-logger.info("server", `Clínica Moreira Agent rodando em http://localhost:${env.PORT}`);
+logger.info("server", `Vestigium Agent rodando em http://localhost:${env.PORT}`);
 
 async function shutdown() {
   logger.info("server", "Desligando...");

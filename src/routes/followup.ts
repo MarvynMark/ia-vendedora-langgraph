@@ -67,8 +67,9 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
   )?.current_value?.name?.toLowerCase()
     ?? payload.task.board_step.name.toLowerCase();
 
-  // Filtrar: apenas "Compareceu" e "No-show"
-  if (!newStepName.includes("compareceu") && !newStepName.includes("no-show") && !newStepName.includes("no show")) {
+  // Filtrar: apenas etapas que disparam ação automática
+  const etapasRastreadas = ["conexão", "conexao", "aguardando pagamento"];
+  if (!etapasRastreadas.some(e => newStepName.includes(e))) {
     return { status: "ignored", reason: "step_not_tracked" };
   }
 

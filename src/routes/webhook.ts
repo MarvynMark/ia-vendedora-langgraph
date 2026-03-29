@@ -124,12 +124,11 @@ export const webhookRouter = new Elysia()
 
       // Limpar atributos no Chatwoot
       await atualizarContato(idConta, idContato, {
-        procedimento_interesse: null,
-        preferencia_horario: null,
-        data_ultima_consulta: null,
-        profissional_preferido: null,
+        concurso_interesse: null,
+        plano_oferecido: null,
+        nivel_concurseiro: null,
       });
-      await atualizarAtributosConversa(idConta, idConversa, { motivo_cancelamento: null });
+      await atualizarAtributosConversa(idConta, idConversa, { motivo_perda: null });
       await enviarMensagem(idConta, idConversa, "Memória resetada ✅");
 
       return { status: "ok", action: "reset" };

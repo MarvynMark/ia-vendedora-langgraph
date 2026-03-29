@@ -284,6 +284,40 @@ export async function atualizarAtributosConversa(
   return res.json();
 }
 
+export async function buscarContatoPorQuery(
+  accountId: string | number,
+  query: string,
+): Promise<{ id: number; name: string; phone_number?: string; email?: string } | null> {
+  const url = `${urlConta(accountId)}/contacts/search?q=${encodeURIComponent(query)}&include_contacts=true`;
+  const res = await fetchComTimeout(url, { method: "GET", headers: headers() });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] buscarContatoPorQuery falhou (${res.status}): ${text}`);
+  }
+
+  const data = await res.json() as { payload: Array<{ id: number; name: string; phone_number?: string; email?: string }> };
+  return data.payload?.[0] ?? null;
+}
+
+export async function buscarConversasDoContato(
+  accountId: string | number,
+  contactId: number,
+): Promise<Array<{ id: number; inbox_id: number; kanban_task?: Record<string, unknown> }>> {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/contacts/${contactId}/conversations`,
+    { method: "GET", headers: headers() },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] buscarConversasDoContato falhou (${res.status}): ${text}`);
+  }
+
+  const data = await res.json() as { payload: Array<{ id: number; inbox_id: number; kanban_task?: Record<string, unknown> }> };
+  return data.payload ?? [];
+}
+
 export async function removerEtiquetas(
   accountId: string | number,
   conversationId: string | number,

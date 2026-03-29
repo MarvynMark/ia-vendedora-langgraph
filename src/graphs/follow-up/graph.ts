@@ -39,11 +39,11 @@ async function classificar(state: FollowUpStateType) {
 
   let tipoFollowup: "followup" | "lembrete" | "pos_consulta" | "ignorar";
 
-  if (stepName === "qualificado" || stepName === "no-show" || stepName === "no show") {
+  if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
-  } else if (stepName === "agendado") {
+  } else if (stepName === "aguardando pagamento") {
     tipoFollowup = "lembrete";
-  } else if (stepName === "compareceu") {
+  } else if (stepName === "ganho") {
     tipoFollowup = "pos_consulta";
   } else {
     tipoFollowup = "ignorar"; // default
