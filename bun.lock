@@ -10,6 +10,7 @@
         "@langchain/langgraph": "^1.2.1",
         "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
         "@langchain/openai": "^1.2.12",
+        "@sinclair/typebox": "^0.34.0",
         "elysia": "^1.4.27",
         "googleapis": "^171.4.0",
         "langfuse": "^3.38.6",
@@ -44,6 +45,8 @@
     "@langchain/openai": ["@langchain/openai@1.3.1", "", { "dependencies": { "js-tiktoken": "^1.0.12", "openai": "^6.27.0", "zod": "^3.25.76 || ^4" }, "peerDependencies": { "@langchain/core": "^1.1.36" } }, "sha512-6yN3XFRUKUsGREGk4VtCvnMp5NHh2gWujiuWdn/G7cCeHboYrdKLWnwGqopuFOm7Tivv423gtMN1GQ7EJ3kg+g=="],
 
     "@langchain/textsplitters": ["@langchain/textsplitters@0.1.0", "", { "dependencies": { "js-tiktoken": "^1.0.12" }, "peerDependencies": { "@langchain/core": ">=0.2.21 <0.4.0" } }, "sha512-djI4uw9rlkAb5iMhtLED+xJebDdAG935AdP4eRTB02R7OB/act55Bj9wsskhZsvuyQRpO4O1wQOp85s6T6GWmw=="],
+
+    "@sinclair/typebox": ["@sinclair/typebox@0.34.49", "", {}, "sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A=="],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
