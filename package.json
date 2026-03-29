@@ -24,6 +24,7 @@
     "@langchain/langgraph": "^1.2.1",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
     "@langchain/openai": "^1.2.12",
+    "@sinclair/typebox": "^0.34.0",
     "elysia": "^1.4.27",
     "googleapis": "^171.4.0",
     "langfuse": "^3.38.6",
