@@ -16,6 +16,9 @@ import {
   removerEtiquetas,
 } from "../services/chatwoot.ts";
 import { logger } from "../lib/logger.ts";
+import { env } from "../config/env.ts";
+
+const GRUPO_ESPERA_KEYWORDS = ["grupo de espera", "grupo de espero", "acesso ao grupo", "entrar no grupo"];
 
 const webhookPayloadSchema = z.object({
   message_type: z.union([z.number(), z.string()]),
@@ -71,6 +74,18 @@ export const webhookRouter = new Elysia()
       conversation_id: parsed.data.conversation.id,
       sender: parsed.data.sender.name,
     });
+
+    // Automação fixa: resposta do grupo de espera (funciona para qualquer conversa)
+    const contentLower = content.toLowerCase();
+    if (GRUPO_ESPERA_KEYWORDS.some(kw => contentLower.includes(kw))) {
+      logger.info("webhook", "Pedido de grupo de espera detectado");
+      const idConta = parsed.data.account.id.toString();
+      const idConversa = parsed.data.conversation.id.toString();
+      await enviarMensagem(idConta, idConversa,
+        `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
+      );
+      return { status: "ok", action: "grupo_espera" };
+    }
 
     // Filtro de ativação: só processar conversas com "agente-ativo"
     if (!labels.includes("agente-ativo")) {
