@@ -1,6 +1,6 @@
 import { pool } from "../db/pool.ts";
 import { env } from "../config/env.ts";
-import { enviarTemplate, contarMensagensIncoming } from "../services/chatwoot.ts";
+import { enviarTemplate, contarMensagensIncoming, buscarConversa, atualizarKanbanTask } from "../services/chatwoot.ts";
 import { logger } from "./logger.ts";
 
 export async function verificarTemplatesPendentes() {
@@ -42,6 +42,31 @@ export async function verificarTemplatesPendentes() {
         [row.id],
       );
       logger.info("template-timer", `Template enviado para conversa: ${row.conversation_id}`);
+
+      // Mover card para "Primeira mensagem" para iniciar sequência de follow-up
+      try {
+        const conversa = await buscarConversa(row.account_id, row.conversation_id) as {
+          kanban_task?: {
+            id: number;
+            board?: { steps?: Array<{ id: number; name: string }> };
+          };
+        };
+        const task = conversa.kanban_task;
+        if (task?.id) {
+          const steps = task.board?.steps ?? [];
+          const stepPrimeiraMensagem = steps.find(s =>
+            s.name.toLowerCase().includes("primeira mensagem")
+          );
+          if (stepPrimeiraMensagem) {
+            await atualizarKanbanTask(row.account_id, task.id, {
+              board_step_id: stepPrimeiraMensagem.id,
+            });
+            logger.info("template-timer", `Card movido para "Primeira mensagem" — conversa: ${row.conversation_id}`);
+          }
+        }
+      } catch (e) {
+        logger.warn("template-timer", "Erro ao mover card para Primeira mensagem:", e);
+      }
     } catch (e) {
       logger.error("template-timer", `Erro ao processar conversa ${row.conversation_id}:`, e);
     }
