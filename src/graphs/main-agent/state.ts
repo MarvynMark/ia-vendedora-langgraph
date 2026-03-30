@@ -21,6 +21,7 @@ export const MainAgentState = Annotation.Root({
   etiquetas: Annotation<string[]>,
   atributosContato: Annotation<Record<string, unknown>>,
   atributosConversa: Annotation<string>,
+  dadosFormulario: Annotation<string>,
   tarefa: Annotation<Record<string, unknown>>,
   funil: Annotation<Record<string, unknown>>,
 

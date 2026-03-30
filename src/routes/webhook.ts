@@ -6,6 +6,7 @@ import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila } from "../db/fila.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { limparHistorico } from "../db/memoria.ts";
+import { buscarDadosFormulario } from "../db/formulario.ts";
 import { pool } from "../db/pool.ts";
 import {
   adicionarEtiquetas,
@@ -175,6 +176,11 @@ export const webhookRouter = new Elysia()
         logger.error("webhook", "Erro ao buscar conversa:", e);
       }
 
+      const dadosFormulario = await buscarDadosFormulario(dados.telefone);
+      if (dadosFormulario) {
+        logger.info("webhook", "Dados do formulário encontrados", { telefone: dados.telefone });
+      }
+
       const g = await obterGrafo();
       logger.info("webhook", ">>> Invocando grafo principal", { thread_id: dados.telefone });
 
@@ -197,6 +203,7 @@ export const webhookRouter = new Elysia()
         etiquetas: dados.etiquetas,
         atributosContato: dados.atributosContato,
         atributosConversa: dados.atributosConversa,
+        dadosFormulario,
         tarefa,
         funil,
         mensagemProcessada: dados.mensagemProcessada,

@@ -4,7 +4,7 @@ interface ContextoPrompt {
   tarefa: Record<string, unknown>;
   etapasDescricao: string;
   dataHoraAtual: string;
-  atributosContato?: Record<string, unknown>;
+  dadosFormulario: string;
 }
 
 export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
@@ -17,17 +17,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   };
   const etapasDescricao = ctx.etapasDescricao;
   const dataHoraAtual = ctx.dataHoraAtual;
-  const attrs = ctx.atributosContato ?? {};
-
-  // Dados do formulário via custom attributes do contato
-  const dadosFormulario = [
-    attrs["qual_concurso"]      ? `Concurso: ${attrs["qual_concurso"]}` : null,
-    attrs["qual_formacao"]      ? `Formação: ${attrs["qual_formacao"]}` : null,
-    attrs["nivel_concurseiro"]  ? `Nível: ${attrs["nivel_concurseiro"]}` : null,
-    attrs["maior_dificuldade"]  ? `Maior dificuldade: ${attrs["maior_dificuldade"]}` : null,
-    attrs["espera_da_mentoria"] ? `Expectativa da mentoria: ${attrs["espera_da_mentoria"]}` : null,
-    attrs["notes"]              ? `Notas: ${attrs["notes"]}` : null,
-  ].filter(Boolean).join("\n  ") || "(não disponível)";
+  const dadosFormulario = ctx.dadosFormulario || "(não disponível)";
 
   return `# PAPEL
 
