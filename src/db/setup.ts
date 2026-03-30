@@ -59,6 +59,17 @@ export async function criarTabelas() {
         criado_em                   TIMESTAMPTZ DEFAULT NOW(),
         atualizado_em               TIMESTAMPTZ DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS leads_template_pendente (
+        id                SERIAL PRIMARY KEY,
+        conversation_id   INTEGER NOT NULL UNIQUE,
+        account_id        INTEGER NOT NULL,
+        phone             TEXT,
+        template_enviado  BOOLEAN NOT NULL DEFAULT FALSE,
+        criado_em         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_template_pendente_enviado ON leads_template_pendente(template_enviado, criado_em);
     `);
     logger.info("db", "Tabelas criadas com sucesso");
   } finally {

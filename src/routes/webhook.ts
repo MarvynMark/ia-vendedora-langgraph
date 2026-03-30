@@ -72,20 +72,10 @@ export const webhookRouter = new Elysia()
       sender: parsed.data.sender.name,
     });
 
-    // Comando /teste - adicionar label (antes dos filtros, pois a conversa pode não ter a label ainda)
-    if (content.trim() === "/teste") {
-      logger.info("webhook", "Comando /teste detectado");
-      const idConta = parsed.data.account.id.toString();
-      const idConversa = parsed.data.conversation.id.toString();
-      await adicionarEtiquetas(idConta, idConversa, ["testando-agente"]);
-      await enviarMensagem(idConta, idConversa, "Modo de teste habilitado.");
-      return { status: "ok", action: "label_added" };
-    }
-
-    // Filtro de ativação: só processar se "testando-agente"
-    if (!labels.includes("testando-agente")) {
-      logger.info("webhook", "Ignorado: label testando-agente ausente");
-      return { status: "ignored", reason: "no_testando-agente" };
+    // Filtro de ativação: só processar conversas com "agente-ativo"
+    if (!labels.includes("agente-ativo")) {
+      logger.info("webhook", "Ignorado: label agente-ativo ausente");
+      return { status: "ignored", reason: "no_agente-ativo" };
     }
 
     // Comando /reset (apenas se testando-agente ativo)
@@ -134,7 +124,7 @@ export const webhookRouter = new Elysia()
       return { status: "ok", action: "reset" };
     }
 
-    // Filtro de ativação: não processar se "agente-off"
+    // Filtro: não processar se "agente-off" (humano assumiu)
     if (labels.includes("agente-off")) {
       logger.info("webhook", "Ignorado: label agente-off presente");
       return { status: "ignored", reason: "agente-off" };

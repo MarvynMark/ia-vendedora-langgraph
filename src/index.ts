@@ -10,6 +10,7 @@ import { webhookRouter } from "./routes/webhook.ts";
 import { followupRouter } from "./routes/followup.ts";
 import { pagamentoRouter } from "./routes/pagamento.ts";
 import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
+import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 
 const app = new Elysia()
   .use(cors())
@@ -22,6 +23,15 @@ const app = new Elysia()
   .listen(env.PORT);
 
 logger.info("server", `Vestigium Agent rodando em http://localhost:${env.PORT}`);
+
+// Job: verificar leads aguardando template (a cada 60 segundos)
+setInterval(async () => {
+  try {
+    await verificarTemplatesPendentes();
+  } catch (e) {
+    logger.error("template-timer", "Erro no job de verificação:", e);
+  }
+}, 60_000);
 
 async function shutdown() {
   logger.info("server", "Desligando...");

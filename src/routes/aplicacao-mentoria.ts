@@ -3,7 +3,7 @@ import { z } from "zod";
 import { pool } from "../db/pool.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
-import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery } from "../services/chatwoot.ts";
+import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas } from "../services/chatwoot.ts";
 
 const KANBAN_BOARD_ID = 1;
 const KANBAN_STEP_NOVO_LEAD = 1;
@@ -157,4 +157,17 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     conversation_id: conversa.id,
   });
   logger.info("aplicacao", "Kanban task criada:", task.id);
+
+  // Adiciona labels de ativação do agente
+  await adicionarEtiquetas(accountId, conversa.id, ["agente-ativo", "lead-formulario"]);
+  logger.info("aplicacao", "Labels agente-ativo e lead-formulario adicionadas");
+
+  // Registra conversa para o timer de template (5 minutos)
+  await pool.query(
+    `INSERT INTO leads_template_pendente (conversation_id, account_id, phone)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (conversation_id) DO NOTHING`,
+    [conversa.id, Number(accountId), phoneE164 ?? null],
+  );
+  logger.info("aplicacao", "Lead registrado no timer de template");
 }

@@ -318,6 +318,42 @@ export async function buscarConversasDoContato(
   return data.payload ?? [];
 }
 
+export async function enviarTemplate(
+  accountId: string | number,
+  conversationId: string | number,
+  templateName: string,
+) {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/conversations/${conversationId}/messages`,
+    {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        message_type: "outgoing",
+        content_type: "template",
+        content_attributes: {
+          template: { name: templateName },
+        },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] enviarTemplate falhou (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function contarMensagensIncoming(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<number> {
+  const data = await listarMensagens(accountId, conversationId) as { payload?: Array<{ message_type: number }> };
+  const msgs = data.payload ?? [];
+  return msgs.filter(m => m.message_type === 0).length;
+}
+
 export async function criarContato(
   accountId: string | number,
   dados: { name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> },
