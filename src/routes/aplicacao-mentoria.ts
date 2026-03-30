@@ -90,11 +90,13 @@ export const aplicacaoRouter = new Elysia()
 
 async function lancarNoChatwoot(d: Record<string, string>) {
   const accountId = env.CHATWOOT_ACCOUNT_ID;
+  logger.debug("aplicacao", `Iniciando lançamento no Chatwoot — nome: ${d.nome_completo}, whatsapp: ${d.whatsapp}, email: ${d.email}`);
 
   // Formata o número de telefone para E.164
   const telefoneRaw = d.whatsapp ?? "";
   const telefone = telefoneRaw.replace(/\D/g, "");
   const phoneE164 = telefone ? `+${telefone.startsWith("55") ? telefone : `55${telefone}`}` : undefined;
+  logger.debug("aplicacao", `Telefone formatado: raw="${telefoneRaw}" limpo="${telefone}" E.164="${phoneE164}"`);
 
   // Verifica se contato já existe pelo telefone ou email
   let contatoId: number | null = null;
@@ -180,6 +182,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   logger.info("aplicacao", "Etiquetas adicionadas:", etiquetas);
 
   // Registra conversa para o timer de template (5 minutos)
+  logger.debug("aplicacao", `Registrando no timer de template: conversation_id=${conversa.id} account_id=${accountId} phone=${phoneE164 ?? "null"}`);
   await pool.query(
     `INSERT INTO leads_template_pendente (conversation_id, account_id, phone)
      VALUES ($1, $2, $3)

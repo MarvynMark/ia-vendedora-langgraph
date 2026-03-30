@@ -323,30 +323,37 @@ export async function enviarTemplate(
   conversationId: string | number,
   templateName: string,
 ) {
+  const payload = {
+    message_type: "outgoing",
+    content_type: "text",
+    content: " ",
+    template_params: {
+      name: templateName,
+      category: "MARKETING",
+      language: "pt_BR",
+      processed_params: {},
+    },
+  };
+  logger.debug("enviar-template", `Enviando template "${templateName}" para conversa ${conversationId} (account ${accountId})`);
+  logger.debug("enviar-template", `POST body=${JSON.stringify(payload)}`);
+
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/conversations/${conversationId}/messages`,
     {
       method: "POST",
       headers: headers(),
-      body: JSON.stringify({
-        message_type: "outgoing",
-        content_type: "text",
-        content: " ",
-        template_params: {
-          name: templateName,
-          category: "MARKETING",
-          language: "pt_BR",
-          processed_params: {},
-        },
-      }),
+      body: JSON.stringify(payload),
     },
   );
 
   if (!res.ok) {
     const text = await res.text();
+    logger.error("enviar-template", `Falha ao enviar template: status=${res.status} body=${text}`);
     throw new Error(`[chatwoot] enviarTemplate falhou (${res.status}): ${text}`);
   }
-  return res.json();
+  const result = await res.json();
+  logger.debug("enviar-template", `Template enviado com sucesso: ${JSON.stringify(result)}`);
+  return result;
 }
 
 export async function contarMensagensIncoming(
@@ -379,34 +386,48 @@ export async function vincularContatoInbox(
   contactId: number,
   inboxId: number,
 ): Promise<void> {
+  logger.debug("vincular-inbox", `Vinculando contato ${contactId} ao inbox ${inboxId} (account ${accountId})...`);
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/contacts/${contactId}/contact_inboxes`,
     { method: "POST", headers: headers(), body: JSON.stringify({ inbox_id: inboxId }) },
   );
   // Ignorar erro 422 (já vinculado)
-  if (!res.ok && res.status !== 422) {
+  if (res.status === 422) {
+    logger.debug("vincular-inbox", `Contato ${contactId} já vinculado ao inbox ${inboxId} (422 ignorado)`);
+    return;
+  }
+  if (!res.ok) {
     const text = await res.text();
+    logger.error("vincular-inbox", `Falha ao vincular contato ${contactId} ao inbox ${inboxId}: status=${res.status} body=${text}`);
     throw new Error(`[chatwoot] vincularContatoInbox falhou (${res.status}): ${text}`);
   }
+  logger.debug("vincular-inbox", `Contato ${contactId} vinculado ao inbox ${inboxId} com sucesso (status ${res.status})`);
 }
 
 export async function criarConversa(
   accountId: string | number,
   dados: { inbox_id: number; contact_id: number },
 ): Promise<{ id: number }> {
+  logger.debug("criar-conversa", `Criando conversa: contact_id=${dados.contact_id} inbox_id=${dados.inbox_id} account=${accountId}`);
+
   // Para inboxes WhatsApp o contato precisa estar vinculado antes
   await vincularContatoInbox(accountId, dados.contact_id, dados.inbox_id);
 
+  const body = JSON.stringify(dados);
+  logger.debug("criar-conversa", `POST /conversations body=${body}`);
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/conversations`,
-    { method: "POST", headers: headers(), body: JSON.stringify(dados) },
+    { method: "POST", headers: headers(), body },
   );
 
   if (!res.ok) {
     const text = await res.text();
+    logger.error("criar-conversa", `Falha ao criar conversa: status=${res.status} body=${text}`);
     throw new Error(`[chatwoot] criarConversa falhou (${res.status}): ${text}`);
   }
-  return res.json() as Promise<{ id: number }>;
+  const result = await res.json() as { id: number };
+  logger.debug("criar-conversa", `Conversa criada com sucesso: id=${result.id}`);
+  return result;
 }
 
 export async function criarKanbanTask(

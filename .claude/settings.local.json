@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__chatwoot__kanban_steps_update",
+      "mcp__chatwoot__kanban_steps_delete",
+      "mcp__chatwoot__kanban_steps_create",
+      "Bash(curl:*)",
+      "mcp__chatwoot__kanban_steps_list"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "chatwoot",
+    "postgres"
+  ]
+}

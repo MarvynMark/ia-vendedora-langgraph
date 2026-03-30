@@ -16,14 +16,21 @@ export async function verificarTemplatesPendentes() {
     [delayMs],
   );
 
-  if (result.rows.length === 0) return;
+  if (result.rows.length === 0) {
+    logger.debug("template-timer", "Nenhum lead pendente encontrado nesta verificação");
+    return;
+  }
 
   logger.info("template-timer", `Verificando ${result.rows.length} lead(s) pendente(s)...`);
+  logger.debug("template-timer", `Leads pendentes: ${JSON.stringify(result.rows)}`);
 
   for (const row of result.rows) {
     try {
+      logger.debug("template-timer", `Processando lead id=${row.id} conversa=${row.conversation_id} account=${row.account_id}`);
+
       // Verifica se o lead já enviou alguma mensagem
       const totalIncoming = await contarMensagensIncoming(row.account_id, row.conversation_id);
+      logger.debug("template-timer", `Mensagens incoming na conversa ${row.conversation_id}: ${totalIncoming}`);
 
       if (totalIncoming > 0) {
         // Lead já entrou em contato — marca como enviado sem precisar do template
@@ -36,6 +43,7 @@ export async function verificarTemplatesPendentes() {
       }
 
       // Nenhuma mensagem — envia o template
+      logger.debug("template-timer", `Enviando template "abertura_esta_estudando" para conversa ${row.conversation_id}...`);
       await enviarTemplate(row.account_id, row.conversation_id, "abertura_esta_estudando");
       await pool.query(
         "UPDATE leads_template_pendente SET template_enviado = TRUE WHERE id = $1",
