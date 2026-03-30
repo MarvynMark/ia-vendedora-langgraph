@@ -369,6 +369,7 @@ export async function criarContato(
   accountId: string | number,
   dados: { name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> },
 ): Promise<{ id: number; name: string }> {
+  logger.debug("criar-contato", `Criando contato: ${JSON.stringify(dados)} (account ${accountId})`);
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/contacts`,
     { method: "POST", headers: headers(), body: JSON.stringify(dados) },
@@ -376,9 +377,15 @@ export async function criarContato(
 
   if (!res.ok) {
     const text = await res.text();
+    logger.error("criar-contato", `Falha ao criar contato: status=${res.status} body=${text}`);
     throw new Error(`[chatwoot] criarContato falhou (${res.status}): ${text}`);
   }
-  return res.json() as Promise<{ id: number; name: string }>;
+  const raw = await res.json();
+  logger.debug("criar-contato", `Resposta criarContato: ${JSON.stringify(raw)}`);
+  // API pode retornar { payload: { contact: { id, name } } } ou { id, name } direto
+  const contato = (raw as { payload?: { contact?: { id: number; name: string } } }).payload?.contact ?? raw as { id: number; name: string };
+  logger.debug("criar-contato", `Contato extraído: id=${contato.id} name=${contato.name}`);
+  return contato;
 }
 
 export async function vincularContatoInbox(
