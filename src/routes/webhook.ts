@@ -21,6 +21,16 @@ import { env } from "../config/env.ts";
 
 const GRUPO_ESPERA_KEYWORDS = ["grupo de espera", "grupo de espero", "acesso ao grupo", "entrar no grupo"];
 
+// Deduplicação: evita processar a mesma mensagem duas vezes (Chatwoot dispara message_created + message_incoming)
+const mensagensProcessadas = new Set<string>();
+function jaProcessou(idMensagem: string): boolean {
+  if (mensagensProcessadas.has(idMensagem)) return true;
+  mensagensProcessadas.add(idMensagem);
+  // Limpa após 5 minutos para não crescer indefinidamente
+  setTimeout(() => mensagensProcessadas.delete(idMensagem), 5 * 60 * 1000);
+  return false;
+}
+
 const webhookPayloadSchema = z.object({
   message_type: z.union([z.number(), z.string()]),
   content: z.string().nullable().optional(),
@@ -58,6 +68,13 @@ export const webhookRouter = new Elysia()
     if (event !== "message_created") {
       logger.info("webhook", "Ignorado: event =", event);
       return { status: "ignored", reason: "not_message_created" };
+    }
+
+    // Deduplicação pelo ID da mensagem
+    const idMensagemRaw = String((body as Record<string, unknown>).id ?? "");
+    if (idMensagemRaw && jaProcessou(idMensagemRaw)) {
+      logger.info("webhook", "Ignorado: mensagem duplicada id =", idMensagemRaw);
+      return { status: "ignored", reason: "duplicate" };
     }
 
     const parsed = webhookPayloadSchema.safeParse(body);
