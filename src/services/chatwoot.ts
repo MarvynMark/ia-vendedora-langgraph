@@ -330,9 +330,13 @@ export async function enviarTemplate(
       headers: headers(),
       body: JSON.stringify({
         message_type: "outgoing",
-        content_type: "template",
-        content_attributes: {
-          template: { name: templateName },
+        content_type: "text",
+        content: " ",
+        template_params: {
+          name: templateName,
+          category: "MARKETING",
+          language: "pt_BR",
+          processed_params: {},
         },
       }),
     },
