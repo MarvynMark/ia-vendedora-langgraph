@@ -390,9 +390,14 @@ export async function criarKanbanTask(
   accountId: string | number,
   dados: { board_id: number; board_step_id: number; title: string; description?: string; conversation_id?: number },
 ): Promise<{ id: number }> {
+  const { conversation_id, ...rest } = dados;
+  const body = {
+    ...rest,
+    ...(conversation_id ? { conversation_ids: [conversation_id] } : {}),
+  };
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/kanban/tasks`,
-    { method: "POST", headers: headers(), body: JSON.stringify(dados) },
+    { method: "POST", headers: headers(), body: JSON.stringify(body) },
   );
 
   if (!res.ok) {
