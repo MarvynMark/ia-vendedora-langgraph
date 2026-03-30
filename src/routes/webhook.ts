@@ -52,6 +52,13 @@ export const webhookRouter = new Elysia()
       sender: ((body as Record<string, unknown>).sender as Record<string, unknown>)?.name,
     });
 
+    // Só processar evento message_created (evita duplicatas de message_incoming/message_updated)
+    const event = (body as Record<string, unknown>).event;
+    if (event !== "message_created") {
+      logger.info("webhook", "Ignorado: event =", event);
+      return { status: "ignored", reason: "not_message_created" };
+    }
+
     const parsed = webhookPayloadSchema.safeParse(body);
     if (!parsed.success) {
       logger.warn("webhook", "Schema parse falhou:", parsed.error.issues);
