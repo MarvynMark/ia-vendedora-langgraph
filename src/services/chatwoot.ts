@@ -370,10 +370,29 @@ export async function criarContato(
   return res.json() as Promise<{ id: number; name: string }>;
 }
 
+export async function vincularContatoInbox(
+  accountId: string | number,
+  contactId: number,
+  inboxId: number,
+): Promise<void> {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/contacts/${contactId}/contact_inboxes`,
+    { method: "POST", headers: headers(), body: JSON.stringify({ inbox_id: inboxId }) },
+  );
+  // Ignorar erro 422 (já vinculado)
+  if (!res.ok && res.status !== 422) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] vincularContatoInbox falhou (${res.status}): ${text}`);
+  }
+}
+
 export async function criarConversa(
   accountId: string | number,
   dados: { inbox_id: number; contact_id: number },
 ): Promise<{ id: number }> {
+  // Para inboxes WhatsApp o contato precisa estar vinculado antes
+  await vincularContatoInbox(accountId, dados.contact_id, dados.inbox_id);
+
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/conversations`,
     { method: "POST", headers: headers(), body: JSON.stringify(dados) },
