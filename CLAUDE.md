@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A LangGraph-based AI agent for Clínica Moreira (dental clinic), converted from n8n workflows. It handles WhatsApp appointment scheduling via Chatwoot webhooks, with audio transcription, TTS responses, and automated follow-ups.
+A LangGraph-based AI sales agent for Instituto Vestigium (Professor Perito Walker's mentorship program), converted from n8n workflows. It handles WhatsApp lead qualification and sales funnel management via Chatwoot webhooks, with audio transcription, TTS responses, and automated follow-ups.
 
 ## Commands
 
@@ -28,22 +28,32 @@ Two LangGraph StateGraphs handle all processing:
 Processes incoming Chatwoot webhook messages through a 16-node pipeline:
 `enfileirar → esperarDebounce(16s) → verificarStale → tentarLock [→ esperarRetry ↩] → buscarReferenciada → coletarMensagens → executarAgente → verificarNovasMsgs → [formatarSsml→gerarAudio→enviarAudio | formatarTexto→enviarTexto | enviarErroFallback] → liberarLock`
 
-The inner agent uses `createReactAgent` with 9 tools (scheduling, calendar, escalation, Kanban tasks, message reactions).
+The inner agent (Gusthavo, sales consultant) uses `createReactAgent` with 4 tools (escalation, Kanban tasks, message reactions, reflection).
 
 ### Follow-Up Graph (`src/graphs/follow-up/graph.ts`)
 Processes scheduled follow-up tasks through a 7-node pipeline:
 `buscarFunil → classificar → [agenteFollowup | agenteLembrete | agentePosConsulta] → enviarMensagem → [moverPosVenda]`
 
+Follow-up types are classified by Kanban step:
+- **agenteFollowup**: Conexão step — lead qualification follow-up
+- **agenteLembrete**: Aguardando Pagamento step — payment reminder
+- **agentePosConsulta**: Ganho step — welcome/onboarding message
+
+### Kanban Funnel (fazer.ai)
+`Novo Lead → Primeira mensagem → Conexão → Aguardando Pagamento → Ganho | Perdido`
+
 ### Key Subsystems
 - **Concurrency control**: Message queue (`db/fila.ts`) + conversation lock (`db/lock.ts`) with TTL + debounce prevent race conditions
 - **Response pipeline**: Agent output → SSML formatting → ElevenLabs TTS → audio message (falls back to text on audio failure)
 - **Checkpointing**: `@langchain/langgraph-checkpoint-postgres` persists agent state across requests
-- **Prompts**: Verbatim system prompts from original n8n workflows in `prompt.ts`/`prompts.ts` (~27k chars for main, ~13k for follow-up). Only `{{ }}` → `${}` substitutions were made.
+- **Prompts**: System prompts in `prompt.ts`/`prompts.ts`. Only `{{ }}` → `${}` substitutions were made from original n8n workflows.
 
 ### HTTP Routes
 - `GET /health` — health check
 - `POST /webhook/chatwoot` — main agent entry (handles `/reset`, `/teste` commands)
-- `POST /webhook/followup` — follow-up graph entry
+- `POST /webhook/followup` — follow-up graph entry (Kanban webhook)
+- `POST /webhook/pagamento` — payment webhook (Digital Manager Guru) — moves card to "Ganho"
+- `POST /webhook/cadastrar-lead-formulario-mentoria` — saves mentorship application form leads to DB
 - `POST /setup` — database table creation
 
 ## Code Conventions
@@ -59,4 +69,4 @@ Processes scheduled follow-up tasks through a 7-node pipeline:
 
 ## External Services
 
-OpenAI (GPT agent + Whisper transcription), Chatwoot (CRM/messaging), Google Calendar (appointments), ElevenLabs (TTS). All configured via environment variables (see `.env.example`).
+OpenAI (GPT agent + Whisper transcription), Chatwoot (CRM/messaging with fazer.ai Kanban), ElevenLabs (TTS), Digital Manager Guru (payment webhooks). All configured via environment variables (see `.env.example`).
