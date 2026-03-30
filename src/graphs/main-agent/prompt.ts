@@ -4,6 +4,7 @@ interface ContextoPrompt {
   tarefa: Record<string, unknown>;
   etapasDescricao: string;
   dataHoraAtual: string;
+  atributosContato?: Record<string, unknown>;
 }
 
 export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
@@ -16,6 +17,17 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   };
   const etapasDescricao = ctx.etapasDescricao;
   const dataHoraAtual = ctx.dataHoraAtual;
+  const attrs = ctx.atributosContato ?? {};
+
+  // Dados do formulário via custom attributes do contato
+  const dadosFormulario = [
+    attrs["qual_concurso"]      ? `Concurso: ${attrs["qual_concurso"]}` : null,
+    attrs["qual_formacao"]      ? `Formação: ${attrs["qual_formacao"]}` : null,
+    attrs["nivel_concurseiro"]  ? `Nível: ${attrs["nivel_concurseiro"]}` : null,
+    attrs["maior_dificuldade"]  ? `Maior dificuldade: ${attrs["maior_dificuldade"]}` : null,
+    attrs["espera_da_mentoria"] ? `Expectativa da mentoria: ${attrs["espera_da_mentoria"]}` : null,
+    attrs["notes"]              ? `Notas: ${attrs["notes"]}` : null,
+  ].filter(Boolean).join("\n  ") || "(não disponível)";
 
   return `# PAPEL
 
@@ -37,14 +49,12 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 # DADOS DO LEAD
 
 <dados-lead>
-  Os dados preenchidos pelo lead no formulário estão na descrição da tarefa abaixo. Use-os para personalizar cada mensagem:
-  - Nome completo
-  - Concurso de interesse (ex: PCDF, PF, IGP-RS, PCI-SC, PCRJ)
-  - Área de formação
-  - Maior dificuldade relatada
-  - Nível de concurseiro (Iniciante, Intermediário, Avançado)
-  - Tempo de estudo por dia
-  - Se trabalha ou estuda em período integral
+  Dados preenchidos pelo lead no formulário de aplicação:
+
+  ${dadosFormulario}
+
+  Dados adicionais na descrição da tarefa (se disponíveis):
+  ${tarefa.description || "(vazia)"}
 
   **REGRA**: Nunca pergunte algo que o lead já respondeu no formulário. Use essas informações para reagir com precisão.
 </dados-lead>
