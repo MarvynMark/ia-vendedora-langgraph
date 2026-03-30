@@ -245,7 +245,11 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   const formatado = await formatarTextoFn(state.outputAgente);
   const blocos = dividirMensagem(formatado);
   for (let i = 0; i < blocos.length; i++) {
-    if (i > 0) await new Promise(r => setTimeout(r, 1000 + i * 500));
+    if (i > 0) {
+      await atualizarPresenca(state.idConta, state.idConversa, "typing_on");
+      await new Promise(r => setTimeout(r, 5000));
+      await atualizarPresenca(state.idConta, state.idConversa, "typing_off");
+    }
     await enviarMensagem(state.idConta, state.idConversa, blocos[i]!);
   }
   await salvarMensagem(state.telefone, {
