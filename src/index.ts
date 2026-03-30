@@ -9,6 +9,7 @@ import { setupRouter } from "./routes/setup.ts";
 import { webhookRouter } from "./routes/webhook.ts";
 import { followupRouter } from "./routes/followup.ts";
 import { pagamentoRouter } from "./routes/pagamento.ts";
+import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 
 const app = new Elysia()
   .use(cors())
@@ -17,6 +18,7 @@ const app = new Elysia()
   .use(webhookRouter)
   .use(followupRouter)
   .use(pagamentoRouter)
+  .use(aplicacaoRouter)
   .listen(env.PORT);
 
 logger.info("server", `Vestigium Agent rodando em http://localhost:${env.PORT}`);

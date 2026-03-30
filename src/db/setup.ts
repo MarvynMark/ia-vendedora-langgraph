@@ -37,6 +37,28 @@ export async function criarTabelas() {
 
       CREATE INDEX IF NOT EXISTS idx_historico_session ON n8n_historico_mensagens(session_id);
       CREATE INDEX IF NOT EXISTS idx_historico_created ON n8n_historico_mensagens(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS leads_formulario_mentoria (
+        id                          SERIAL PRIMARY KEY,
+        nome_completo               VARCHAR(255)    NOT NULL,
+        whatsapp                    VARCHAR(20),
+        email                       VARCHAR(255),
+        idade                       VARCHAR(20),
+        area_graduacao              VARCHAR(255),
+        concurso_desejado           VARCHAR(100),
+        ja_foi_aluno                VARCHAR(100),
+        nivel_concurseiro           VARCHAR(100),
+        maior_dificuldade           TEXT,
+        motivo_mentoria             TEXT,
+        expectativa_mentoria        TEXT,
+        plano_b                     TEXT,
+        o_que_faltou                TEXT,
+        diferenca_com_mentor        TEXT,
+        disposto_investir           VARCHAR(50),
+        pronto_para_garantir        VARCHAR(50),
+        criado_em                   TIMESTAMPTZ DEFAULT NOW(),
+        atualizado_em               TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
     logger.info("db", "Tabelas criadas com sucesso");
   } finally {
