@@ -5,7 +5,8 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { gerarPromptFollowup, PROMPT_LEMBRETE, PROMPT_BOAS_VINDAS } from "./prompts.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { criarToolsFollowup } from "../../tools/factory.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
@@ -37,7 +38,7 @@ async function classificar(state: FollowUpStateType) {
   const stepName = state.board_step?.name?.toLowerCase() ?? "";
   logger.info("follow-up", "classificando step:", stepName);
 
-  let tipoFollowup: "followup" | "lembrete" | "boas_vindas" | "ignorar";
+  let tipoFollowup: "followup" | "lembrete" | "boas_vindas" | "template_abertura" | "ignorar";
 
   if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
@@ -45,8 +46,10 @@ async function classificar(state: FollowUpStateType) {
     tipoFollowup = "lembrete";
   } else if (stepName === "ganho") {
     tipoFollowup = "boas_vindas";
+  } else if (stepName === "primeira mensagem") {
+    tipoFollowup = "template_abertura";
   } else {
-    tipoFollowup = "ignorar"; // default
+    tipoFollowup = "ignorar";
   }
 
   logger.info("follow-up", "tipoFollowup:", tipoFollowup);
@@ -209,6 +212,81 @@ async function agenteBoasVindas(state: FollowUpStateType) {
   }
 }
 
+const SEQUENCIA_TEMPLATES = [
+  { nome: "ta_ai",              proximoDelayMs: 4 * 60 * 60 * 1000 },  // +4h
+  { nome: "corrido_followup",   proximoDelayMs: 24 * 60 * 60 * 1000 }, // +24h
+  { nome: "olhinho_followup",   proximoDelayMs: 24 * 60 * 60 * 1000 }, // +24h
+  { nome: "encerramento_02",    proximoDelayMs: 0 },                    // encerra
+];
+
+function lerContadorTemplates(description: string): number {
+  const match = description.match(/followup-templates:\s*(\d+)/i);
+  return match ? parseInt(match[1]!) : 0;
+}
+
+function atualizarContadorTemplates(description: string, novoValor: number): string {
+  const linha = `followup-templates: ${novoValor}`;
+  if (/followup-templates:\s*\d+/i.test(description)) {
+    return description.replace(/followup-templates:\s*\d+/i, linha);
+  }
+  return description ? `${description}\n${linha}` : linha;
+}
+
+async function agenteTemplateAbertura(state: FollowUpStateType) {
+  logger.info("follow-up", "executando template de abertura...");
+
+  // Verificar se o lead já respondeu — se sim, para a sequência
+  try {
+    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
+    if (totalIncoming > 0) {
+      logger.info("follow-up", "Lead já respondeu — encerrando sequência de templates");
+      return { respostaAgente: "" };
+    }
+  } catch (e) {
+    logger.warn("follow-up", "Erro ao verificar mensagens incoming:", e);
+  }
+
+  const contador = lerContadorTemplates(state.description ?? "");
+  const item = SEQUENCIA_TEMPLATES[contador];
+
+  if (!item) {
+    logger.info("follow-up", "Sequência de templates esgotada");
+    return { respostaAgente: "" };
+  }
+
+  logger.info("follow-up", `Enviando template ${item.nome} (${contador + 1}/${SEQUENCIA_TEMPLATES.length})`);
+
+  try {
+    await enviarTemplate(state.accountId, state.conversationId, item.nome);
+  } catch (e) {
+    logger.error("follow-up", `Erro ao enviar template ${item.nome}:`, e);
+    return { respostaAgente: "" };
+  }
+
+  const novoContador = contador + 1;
+  const descricaoAtualizada = atualizarContadorTemplates(state.description ?? "", novoContador);
+  const isUltimo = novoContador >= SEQUENCIA_TEMPLATES.length;
+
+  if (isUltimo) {
+    // Último template: mover para "Perdido"
+    logger.info("follow-up", "Último template enviado — movendo para Perdido");
+    await atualizarKanbanTask(state.accountId, state.taskId, {
+      board_step_id: state.idEtapaPerdido || undefined,
+      description: descricaoAtualizada,
+      due_date: undefined,
+    });
+  } else {
+    const proximaData = proximoHorarioComercial(new Date(), item.proximoDelayMs);
+    await atualizarKanbanTask(state.accountId, state.taskId, {
+      description: descricaoAtualizada,
+      due_date: proximaData.toISOString(),
+    });
+    logger.info("follow-up", `Próximo template agendado para: ${proximaData.toISOString()}`);
+  }
+
+  return { respostaAgente: "" };
+}
+
 async function enviarMensagemNo(state: FollowUpStateType) {
   if (!state.respostaAgente) {
     logger.info("follow-up", "sem resposta para enviar");
@@ -238,6 +316,7 @@ export function rotaClassificacao(state: FollowUpStateType): string {
     case "followup": return "agente_followup";
     case "lembrete": return "agente_lembrete";
     case "boas_vindas": return "agente_boas_vindas";
+    case "template_abertura": return "agente_template_abertura";
     case "ignorar": return "ignorar";
     default: return "ignorar";
   }
@@ -251,6 +330,7 @@ export async function criarGrafoFollowUp() {
     .addNode("agente_followup", agenteFollowup)
     .addNode("agente_lembrete", agenteLembrete)
     .addNode("agente_boas_vindas", agenteBoasVindas)
+    .addNode("agente_template_abertura", agenteTemplateAbertura)
     .addNode("enviar_mensagem", enviarMensagemNo)
 
     // Arestas
@@ -260,11 +340,13 @@ export async function criarGrafoFollowUp() {
       agente_followup: "agente_followup",
       agente_lembrete: "agente_lembrete",
       agente_boas_vindas: "agente_boas_vindas",
+      agente_template_abertura: "agente_template_abertura",
       ignorar: "__end__",
     })
     .addEdge("agente_followup", "enviar_mensagem")
     .addEdge("agente_lembrete", "enviar_mensagem")
     .addEdge("agente_boas_vindas", "enviar_mensagem")
+    .addEdge("agente_template_abertura", "__end__")
     .addEdge("enviar_mensagem", END);
 
   return grafo.compile({ checkpointer });

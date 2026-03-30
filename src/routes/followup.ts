@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ChatwootFollowUpPayload } from "../types/chatwoot.ts";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { atualizarKanbanTask } from "../services/chatwoot.ts";
+import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
 import { logger } from "../lib/logger.ts";
 
 const followupPayloadSchema = z.object({
@@ -68,22 +69,25 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
     ?? payload.task.board_step.name.toLowerCase();
 
   // Filtrar: apenas etapas que disparam ação automática
-  const etapasRastreadas = ["conexão", "conexao", "aguardando pagamento"];
+  const etapasRastreadas = ["conexão", "conexao", "aguardando pagamento", "primeira mensagem"];
   if (!etapasRastreadas.some(e => newStepName.includes(e))) {
     return { status: "ignored", reason: "step_not_tracked" };
   }
 
-  // Setar due_date para amanhã (agora + 1 dia) para disparar overdue
-  const amanha = new Date();
-  amanha.setDate(amanha.getDate() + 1);
+  // "Primeira mensagem": 2h em horário comercial. Demais: 24h
+  const isPrimeiraMensagem = newStepName.includes("primeira mensagem");
+  const delayMs = isPrimeiraMensagem ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const proximaData = isPrimeiraMensagem
+    ? proximoHorarioComercial(new Date(), delayMs)
+    : (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d; })();
 
   try {
     await atualizarKanbanTask(
       payload.account_id,
       payload.task.id,
-      { due_date: amanha.toISOString() },
+      { due_date: proximaData.toISOString() },
     );
-    logger.info("follow-up", "task_updated: due_date setada para", amanha.toISOString());
+    logger.info("follow-up", "task_updated: due_date setada para", proximaData.toISOString());
   } catch (e) {
     logger.error("follow-up", "Erro ao atualizar due_date:", e);
   }
