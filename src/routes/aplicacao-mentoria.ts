@@ -3,7 +3,7 @@ import { z } from "zod";
 import { pool } from "../db/pool.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
-import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas } from "../services/chatwoot.ts";
+import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas, atualizarContato } from "../services/chatwoot.ts";
 
 const KANBAN_BOARD_ID = 1;
 const KANBAN_STEP_NOVO_LEAD = 1;
@@ -107,22 +107,32 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     }
   }
 
-  // Cria contato se não existir
+  // Atributos do formulário para salvar no contato
+  const atributosFormulario = {
+    ...(d.concurso_desejado   ? { qual_concurso: d.concurso_desejado } : {}),
+    ...(d.area_graduacao      ? { qual_formacao: d.area_graduacao } : {}),
+    ...(d.maior_dificuldade   ? { maior_dificuldade: d.maior_dificuldade } : {}),
+    ...(d.expectativa_mentoria ? { espera_da_mentoria: d.expectativa_mentoria } : {}),
+    ...(d.nivel_concurseiro   ? { nivel_concurseiro: d.nivel_concurseiro } : {}),
+    ...(d.motivo_mentoria     ? { motivo_mentoria: d.motivo_mentoria } : {}),
+    ...(d.disposto_investir   ? { disposto_investir: d.disposto_investir } : {}),
+    ...(d.pronto_para_garantir ? { pronto_para_garantir: d.pronto_para_garantir } : {}),
+    ...(d.ja_foi_aluno        ? { ja_foi_aluno: d.ja_foi_aluno } : {}),
+  };
+
+  // Cria contato se não existir, ou atualiza atributos do existente
   if (!contatoId) {
     const novoContato = await criarContato(accountId, {
       name: d.nome_completo!,
       ...(phoneE164 ? { phone_number: phoneE164 } : {}),
       ...(d.email ? { email: d.email } : {}),
-      custom_attributes: {
-        ...(d.concurso_desejado ? { qual_concurso: d.concurso_desejado } : {}),
-        ...(d.area_graduacao ? { qual_formacao: d.area_graduacao } : {}),
-        ...(d.maior_dificuldade ? { maior_dificuldade: d.maior_dificuldade } : {}),
-        ...(d.expectativa_mentoria ? { espera_da_mentoria: d.expectativa_mentoria } : {}),
-        ...(d.nivel_concurseiro ? { nivel_concurseiro: d.nivel_concurseiro } : {}),
-      },
+      custom_attributes: atributosFormulario,
     });
     contatoId = novoContato.id;
     logger.info("aplicacao", "Contato criado no Chatwoot:", contatoId);
+  } else {
+    await atualizarContato(accountId, contatoId, { custom_attributes: atributosFormulario });
+    logger.info("aplicacao", "Atributos do contato atualizados:", contatoId);
   }
 
   // Cria conversa na inbox comercial
@@ -132,28 +142,20 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   });
   logger.info("aplicacao", "Conversa criada:", conversa.id);
 
-  // Monta descrição com os dados do formulário
-  const linhas = [
-    d.concurso_desejado     ? `Concurso: ${d.concurso_desejado}` : null,
-    d.area_graduacao        ? `Formação: ${d.area_graduacao}` : null,
-    d.nivel_concurseiro     ? `Nível: ${d.nivel_concurseiro}` : null,
-    d.maior_dificuldade     ? `Maior dificuldade: ${d.maior_dificuldade}` : null,
-    d.motivo_mentoria       ? `Motivo: ${d.motivo_mentoria}` : null,
-    d.expectativa_mentoria  ? `Expectativa: ${d.expectativa_mentoria}` : null,
-    d.disposto_investir     ? `Disposto a investir: ${d.disposto_investir}` : null,
-    d.pronto_para_garantir  ? `Pronto para garantir: ${d.pronto_para_garantir}` : null,
-    d.ja_foi_aluno          ? `Já foi aluno: ${d.ja_foi_aluno}` : null,
-    d.plano_b               ? `Plano B: ${d.plano_b}` : null,
-    d.o_que_faltou          ? `O que faltou: ${d.o_que_faltou}` : null,
-    d.diferenca_com_mentor  ? `Diferença com mentor: ${d.diferenca_com_mentor}` : null,
-  ].filter(Boolean).join("\n");
+  // Descrição operacional da tarefa (sem dados do formulário — estão nos atributos do contato)
+  const descricaoTarefa = [
+    "Origem: formulário de aplicação",
+    "Plano oferecido: (a definir)",
+    "Objeções: (nenhuma)",
+    "followup-templates: 0",
+  ].join("\n");
 
   // Cria task no Kanban na etapa "Novo Lead"
   const task = await criarKanbanTask(accountId, {
     board_id: KANBAN_BOARD_ID,
     board_step_id: KANBAN_STEP_NOVO_LEAD,
     title: d.nome_completo!,
-    description: linhas,
+    description: descricaoTarefa,
     conversation_id: conversa.id,
   });
   logger.info("aplicacao", "Kanban task criada:", task.id);
