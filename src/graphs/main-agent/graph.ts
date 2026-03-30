@@ -11,7 +11,7 @@ import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem } from "../../lib/response-formatter.ts";
-import { criarToolsAgenteClinica } from "../../tools/factory.ts";
+import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
 import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
@@ -112,7 +112,7 @@ async function executarAgente(state: MainAgentStateType) {
     dataHoraAtual,
   });
 
-  const tools = criarToolsAgenteClinica({
+  const tools = criarToolsAgenteVestigium({
     idMensagem: state.idMensagem,
     idConta: state.idConta,
     idConversa: state.idConversa,

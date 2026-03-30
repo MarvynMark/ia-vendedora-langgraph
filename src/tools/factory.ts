@@ -16,7 +16,7 @@ interface ContextoMainAgent {
   tarefa: Record<string, unknown>;
 }
 
-export function criarToolsAgenteClinica(contexto: ContextoMainAgent): StructuredToolInterface[] {
+export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): StructuredToolInterface[] {
   const tarefa = contexto.tarefa;
   const board = tarefa["board"] as { steps?: Array<{ id: number; name: string }> } | undefined;
   const etapas = board?.steps ?? [];

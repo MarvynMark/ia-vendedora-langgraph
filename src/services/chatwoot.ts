@@ -318,6 +318,54 @@ export async function buscarConversasDoContato(
   return data.payload ?? [];
 }
 
+export async function criarContato(
+  accountId: string | number,
+  dados: { name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> },
+): Promise<{ id: number; name: string }> {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/contacts`,
+    { method: "POST", headers: headers(), body: JSON.stringify(dados) },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] criarContato falhou (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<{ id: number; name: string }>;
+}
+
+export async function criarConversa(
+  accountId: string | number,
+  dados: { inbox_id: number; contact_id: number },
+): Promise<{ id: number }> {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/conversations`,
+    { method: "POST", headers: headers(), body: JSON.stringify(dados) },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] criarConversa falhou (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<{ id: number }>;
+}
+
+export async function criarKanbanTask(
+  accountId: string | number,
+  dados: { board_id: number; board_step_id: number; title: string; description?: string; conversation_id?: number },
+): Promise<{ id: number }> {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/kanban/tasks`,
+    { method: "POST", headers: headers(), body: JSON.stringify(dados) },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] criarKanbanTask falhou (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<{ id: number }>;
+}
+
 export async function removerEtiquetas(
   accountId: string | number,
   conversationId: string | number,

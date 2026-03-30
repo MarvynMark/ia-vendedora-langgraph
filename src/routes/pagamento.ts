@@ -186,7 +186,7 @@ async function processarPagamentoAprovado(dados: {
     return;
   }
 
-  // Disparar grafo de follow-up com tipo pos_consulta (boas-vindas)
+  // Disparar grafo de follow-up com tipo boas_vindas
   const telefone = dados.telefone ?? contato.phone_number ?? contato.email ?? String(contato.id);
 
   try {
@@ -206,7 +206,7 @@ async function processarPagamentoAprovado(dados: {
       displayId: conversaComTask.id,
       funilSteps,
       idEtapaPerdido: 0,
-      tipoFollowup: "pos_consulta" as const,
+      tipoFollowup: "boas_vindas" as const,
       respostaAgente: "",
     }, { configurable: { thread_id: `followup_${telefone}` } });
 

@@ -3,9 +3,9 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
-import { gerarPromptFollowup, PROMPT_LEMBRETE, PROMPT_POS_CONSULTA } from "./prompts.ts";
+import { gerarPromptFollowup, PROMPT_LEMBRETE, PROMPT_BOAS_VINDAS } from "./prompts.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, moverKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem } from "../../services/chatwoot.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { criarToolsFollowup } from "../../tools/factory.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
@@ -37,14 +37,14 @@ async function classificar(state: FollowUpStateType) {
   const stepName = state.board_step?.name?.toLowerCase() ?? "";
   logger.info("follow-up", "classificando step:", stepName);
 
-  let tipoFollowup: "followup" | "lembrete" | "pos_consulta" | "ignorar";
+  let tipoFollowup: "followup" | "lembrete" | "boas_vindas" | "ignorar";
 
   if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
   } else if (stepName === "aguardando pagamento") {
     tipoFollowup = "lembrete";
   } else if (stepName === "ganho") {
-    tipoFollowup = "pos_consulta";
+    tipoFollowup = "boas_vindas";
   } else {
     tipoFollowup = "ignorar"; // default
   }
@@ -91,14 +91,7 @@ async function agenteFollowup(state: FollowUpStateType) {
     return new AIMessage(m.content);
   });
 
-  // User message depende da etapa
-  const stepName = state.board_step?.name?.toLowerCase() ?? "";
-  let userMessage: string;
-  if (stepName === "no-show" || stepName === "no show") {
-    userMessage = "<paciente com agendamento não compareceu>";
-  } else {
-    userMessage = "<lead qualificado aguardando follow-up>";
-  }
+  const userMessage = "<lead qualificado aguardando follow-up>";
 
   const langfuseHandler = criarLangfuseHandler("follow-up", {
     sessionId: state.telefone,
@@ -171,8 +164,8 @@ async function agenteLembrete(state: FollowUpStateType) {
   }
 }
 
-async function agentePosConsulta(state: FollowUpStateType) {
-  logger.info("follow-up", "executando agente pós-consulta...");
+async function agenteBoasVindas(state: FollowUpStateType) {
+  logger.info("follow-up", "executando agente boas-vindas...");
 
   const model = new ChatOpenAI({
     modelName: env.OPENAI_MODEL,
@@ -187,17 +180,17 @@ async function agentePosConsulta(state: FollowUpStateType) {
     return new AIMessage(m.content);
   });
 
-  const langfuseHandler = criarLangfuseHandler("follow-up-pos-consulta", {
+  const langfuseHandler = criarLangfuseHandler("follow-up-boas-vindas", {
     sessionId: state.telefone,
     userId: state.telefone,
-    metadata: { taskId: state.taskId, tipoFollowup: "pos_consulta" },
-    tags: ["follow-up", "pos-consulta"],
+    metadata: { taskId: state.taskId, tipoFollowup: "boas_vindas" },
+    tags: ["follow-up", "boas-vindas"],
   });
 
   try {
     const resultado = await model.invoke(
       [
-        { role: "system", content: PROMPT_POS_CONSULTA },
+        { role: "system", content: PROMPT_BOAS_VINDAS },
         ...msgsHistorico.map(m => ({
           role: m._getType() === "human" ? "user" as const : "assistant" as const,
           content: m.content as string,
@@ -209,7 +202,7 @@ async function agentePosConsulta(state: FollowUpStateType) {
 
     return { respostaAgente: resultado.content as string };
   } catch (e) {
-    logger.error("follow-up", "Erro no agente pós-consulta:", e);
+    logger.error("follow-up", "Erro no agente boas-vindas:", e);
     return { respostaAgente: "" };
   } finally {
     await finalizarLangfuseHandler(langfuseHandler);
@@ -238,36 +231,16 @@ async function enviarMensagemNo(state: FollowUpStateType) {
   return {};
 }
 
-async function moverPosVenda(state: FollowUpStateType) {
-  logger.info("follow-up", "movendo para pós-venda...");
-  const stepPosVenda = state.funilSteps.find(s =>
-    s.name.toLowerCase().includes("pós-venda") || s.name.toLowerCase().includes("pos-venda")
-  );
-
-  if (stepPosVenda) {
-    await moverKanbanTask(
-      state.accountId,
-      state.taskId,
-      stepPosVenda.id,
-    );
-  }
-  return {};
-}
-
 // --- Construção do grafo ---
 
 export function rotaClassificacao(state: FollowUpStateType): string {
   switch (state.tipoFollowup) {
     case "followup": return "agente_followup";
     case "lembrete": return "agente_lembrete";
-    case "pos_consulta": return "agente_pos_consulta";
+    case "boas_vindas": return "agente_boas_vindas";
     case "ignorar": return "ignorar";
     default: return "ignorar";
   }
-}
-
-export function rotaPosEnvio(state: FollowUpStateType): string {
-  return state.tipoFollowup === "pos_consulta" ? "mover_pos_venda" : "end";
 }
 
 export async function criarGrafoFollowUp() {
@@ -277,9 +250,8 @@ export async function criarGrafoFollowUp() {
     .addNode("classificar", classificar)
     .addNode("agente_followup", agenteFollowup)
     .addNode("agente_lembrete", agenteLembrete)
-    .addNode("agente_pos_consulta", agentePosConsulta)
+    .addNode("agente_boas_vindas", agenteBoasVindas)
     .addNode("enviar_mensagem", enviarMensagemNo)
-    .addNode("mover_pos_venda", moverPosVenda)
 
     // Arestas
     .addEdge("__start__", "buscar_funil")
@@ -287,17 +259,13 @@ export async function criarGrafoFollowUp() {
     .addConditionalEdges("classificar", rotaClassificacao, {
       agente_followup: "agente_followup",
       agente_lembrete: "agente_lembrete",
-      agente_pos_consulta: "agente_pos_consulta",
+      agente_boas_vindas: "agente_boas_vindas",
       ignorar: "__end__",
     })
     .addEdge("agente_followup", "enviar_mensagem")
     .addEdge("agente_lembrete", "enviar_mensagem")
-    .addEdge("agente_pos_consulta", "enviar_mensagem")
-    .addConditionalEdges("enviar_mensagem", rotaPosEnvio, {
-      mover_pos_venda: "mover_pos_venda",
-      end: "__end__",
-    })
-    .addEdge("mover_pos_venda", END);
+    .addEdge("agente_boas_vindas", "enviar_mensagem")
+    .addEdge("enviar_mensagem", END);
 
   return grafo.compile({ checkpointer });
 }
