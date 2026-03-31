@@ -109,6 +109,70 @@ export const webhookRouter = new Elysia()
       await enviarMensagem(idConta, idConversa,
         `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
       );
+
+      // Para leads de formulário: disparar intro da IA após 2 minutos
+      if (labels.includes("lead-formulario")) {
+        logger.info("webhook", "Lead-formulario detectado: agendando intro em 2 minutos");
+        const introIdConta = idConta;
+        const introIdConversa = idConversa;
+        const introIdContato = parsed.data.sender.id.toString();
+        const introTelefone = parsed.data.sender.phone_number ?? "";
+        const introNome = parsed.data.sender.name;
+        const introIdInbox = String(
+          (payload.conversation as unknown as Record<string, unknown>).inbox_id ?? env.CHATWOOT_INBOX_ID
+        );
+        const introLabels = labels;
+
+        setTimeout(async () => {
+          try {
+            const conversa = await buscarConversa(introIdConta, introIdConversa) as Record<string, unknown>;
+            const tarefa = (conversa["kanban_task"] ?? {}) as Record<string, unknown>;
+            const funil = (conversa["kanban_board"] ?? {}) as Record<string, unknown>;
+            const dadosFormulario = await buscarDadosFormulario(introTelefone);
+
+            const g = await obterGrafo();
+            await g.invoke({
+              messages: [],
+              idMensagem: `intro_${Date.now()}`,
+              idMensagemReferenciada: null,
+              idConta: introIdConta,
+              idConversa: introIdConversa,
+              idContato: introIdContato,
+              idInbox: introIdInbox,
+              telefone: introTelefone,
+              nome: introNome,
+              mensagem: "[SISTEMA: O lead acabou de entrar no grupo de espera após preencher o formulário. Apresente-se como Gusthavo da equipe do Perito Walker, mencione que acabou de receber o formulário de aplicação dele e inicie a conversa conforme Etapa 1 do roteiro.]",
+              mensagemDeAudio: false,
+              timestamp: new Date().toISOString(),
+              tipoArquivo: null,
+              idAnexo: null,
+              urlArquivo: null,
+              etiquetas: introLabels,
+              atributosContato: {},
+              atributosConversa: "",
+              dadosFormulario,
+              tarefa,
+              funil,
+              mensagemProcessada: "[SISTEMA: Lead entrou no grupo de espera após formulário.]",
+              mensagemReferenciada: null,
+              mensagensAgregadas: "",
+              stale: false,
+              lockTentativas: 0,
+              locked: false,
+              erroFatal: false,
+              outputAgente: "",
+              novasMensagens: false,
+              respostaFormatada: "",
+              ssml: "",
+              audioBuffer: null,
+            }, { configurable: { thread_id: introTelefone } });
+            logger.info("webhook", "Intro automática enviada:", { telefone: introTelefone });
+          } catch (e) {
+            logger.error("webhook", "Erro ao enviar intro automática para lead-formulario:", e);
+          }
+        }, 2 * 60 * 1000);
+      }
+
       return { status: "ok", action: "grupo_espera" };
     }
 

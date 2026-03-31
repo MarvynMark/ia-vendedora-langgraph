@@ -1,14 +1,26 @@
 import { pool } from "../db/pool.ts";
 import { env } from "../config/env.ts";
 import { enviarTemplate, contarMensagensIncoming, buscarConversa, atualizarKanbanTask } from "../services/chatwoot.ts";
+import { salvarMensagem } from "../db/memoria.ts";
 import { logger } from "./logger.ts";
+
+// Conteúdo real dos templates enviados (para salvar na memória da conversa)
+const CONTEUDO_TEMPLATES: Record<string, string> = {
+  abertura_esta_estudando:
+    "Olá, tudo bem?\n\nAqui é o Gusthavo, da equipe do Perito Walker.\nAcabei de receber seu formulário de aplicação pra mentoria.\n\nMe diz uma coisa: você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
+  ta_ai: "Olá, tá por ai?",
+  corrido_followup: "Opa, sei que deve estar corrido por aí, mas você conseguiu ver minha mensagem anterior?",
+  olhinho_followup: "👀",
+  encerramento_02:
+    "Como você não respondeu, vou encerrar seu atendimento por aqui para organizar as prioridades.\nSe decidir começar sua preparação de forma estratégica, me chama aqui, ok?",
+};
 
 export async function verificarTemplatesPendentes() {
   const delayMs = env.TEMPLATE_DELAY_MS;
 
   // Busca conversas sem template enviado que já passaram do delay
-  const result = await pool.query<{ id: number; conversation_id: number; account_id: number }>(
-    `SELECT id, conversation_id, account_id
+  const result = await pool.query<{ id: number; conversation_id: number; account_id: number; phone: string | null }>(
+    `SELECT id, conversation_id, account_id, phone
      FROM leads_template_pendente
      WHERE template_enviado = FALSE
        AND criado_em <= NOW() - ($1 || ' milliseconds')::INTERVAL
@@ -43,13 +55,32 @@ export async function verificarTemplatesPendentes() {
       }
 
       // Nenhuma mensagem — envia o template
-      logger.debug("template-timer", `Enviando template "abertura_esta_estudando" para conversa ${row.conversation_id}...`);
-      await enviarTemplate(row.account_id, row.conversation_id, "abertura_esta_estudando");
+      const templateName = "abertura_esta_estudando";
+      logger.debug("template-timer", `Enviando template "${templateName}" para conversa ${row.conversation_id}...`);
+      await enviarTemplate(row.account_id, row.conversation_id, templateName);
       await pool.query(
         "UPDATE leads_template_pendente SET template_enviado = TRUE WHERE id = $1",
         [row.id],
       );
       logger.info("template-timer", `Template enviado para conversa: ${row.conversation_id}`);
+
+      // Salva conteúdo do template na memória da conversa (keyed pelo telefone)
+      const conteudoTemplate = CONTEUDO_TEMPLATES[templateName];
+      if (conteudoTemplate && row.phone) {
+        try {
+          await salvarMensagem(row.phone, {
+            type: "ai",
+            content: conteudoTemplate,
+            tool_calls: [],
+            additional_kwargs: {},
+            response_metadata: {},
+            invalid_tool_calls: [],
+          });
+          logger.debug("template-timer", `Conteúdo do template salvo na memória da conversa: ${row.phone}`);
+        } catch (e) {
+          logger.warn("template-timer", "Erro ao salvar conteúdo do template na memória:", e);
+        }
+      }
 
       // Mover card para "Primeira mensagem" para iniciar sequência de follow-up
       try {
