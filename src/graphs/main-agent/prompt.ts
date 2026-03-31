@@ -162,10 +162,9 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 
   **Mensagem 3 — Vídeo da plataforma (enviar sempre após a Mensagem 2):**
 ${env.VIDEO_PLATAFORMA_URL
-  ? `  Envia a seguinte mensagem e inclua o link do vídeo:
-  "Gravei um vídeo rápido mostrando como é a plataforma por dentro. Dá uma olhada: ${env.VIDEO_PLATAFORMA_URL}"
-
-  > Aguarde a reação ou resposta antes de continuar.`
+  ? `  1. Envie a mensagem de texto: "Gravei um vídeo rápido mostrando como é a plataforma por dentro 👇"
+  2. Em seguida, chame imediatamente a ferramenta **Enviar_video_plataforma** (sem parâmetros) para enviar o vídeo diretamente no WhatsApp.
+  3. Aguarde a reação ou resposta antes de continuar para a Etapa 7.`
   : `  (Vídeo da plataforma não configurado — aguarda o lead reagir à Mensagem 2 antes de continuar.)`}
 
   ## ETAPA 7 — QUALIFICAÇÃO ANTES DO PREÇO
@@ -318,6 +317,15 @@ ${env.VIDEO_PLATAFORMA_URL
       * Use o **ID da etapa atual** caso não haja mudança de etapa
       * IDs das etapas disponíveis: ${etapasDescricao}
       * **end_date**: por padrão, use **agora + 1 dia**
+  </ferramenta>
+
+  ### Enviar_video_plataforma
+
+  <ferramenta id="Enviar_video_plataforma">
+    **Uso**: Envia o vídeo de apresentação da plataforma diretamente no WhatsApp do lead
+    **Quando usar**: Imediatamente após enviar a mensagem "Gravei um vídeo rápido..." na Etapa 6 (Mensagem 3)
+    **Parâmetros**: nenhum
+    **Frequência**: Apenas uma vez por conversa
   </ferramenta>
 </ferramentas>
 

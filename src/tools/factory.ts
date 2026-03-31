@@ -3,6 +3,7 @@ import { refletir } from "./refletir.ts";
 import { criarToolEscalarHumano } from "./escalar-humano.ts";
 import { criarToolAtualizarTarefa, criarToolAtualizarTarefaFollowup } from "./atualizar-tarefa.ts";
 import { criarToolReagirMensagem } from "./reagir-mensagem.ts";
+import { criarToolEnviarVideo } from "./enviar-video.ts";
 
 interface ContextoMainAgent {
   idMensagem: string;
@@ -38,6 +39,10 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idInbox: contexto.idInbox,
       idConversa: contexto.idConversa,
       idMensagem: contexto.idMensagem,
+    }),
+    criarToolEnviarVideo({
+      idConta: contexto.idConta,
+      idConversa: contexto.idConversa,
     }),
   ];
 }
