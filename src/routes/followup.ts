@@ -5,6 +5,7 @@ import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { atualizarKanbanTask } from "../services/chatwoot.ts";
 import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
 import { logger } from "../lib/logger.ts";
+import { env } from "../config/env.ts";
 
 const followupPayloadSchema = z.object({
   event: z.enum(["kanban_task_overdue", "kanban_task_updated"]),
@@ -96,6 +97,10 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
 }
 
 async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
+  if (env.MODO_TESTE) {
+    logger.info("follow-up", "Modo teste ativo — follow-up overdue bloqueado");
+    return { status: "ignored", reason: "modo_teste" };
+  }
   const task = payload.task;
   const conversa = task.conversations?.[0];
 

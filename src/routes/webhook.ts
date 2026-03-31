@@ -182,6 +182,12 @@ export const webhookRouter = new Elysia()
       return { status: "ignored", reason: "no_agente-ativo" };
     }
 
+    // Modo teste: só processa conversas com "testando-agente"
+    if (env.MODO_TESTE && !labels.includes("testando-agente")) {
+      logger.info("webhook", "Modo teste ativo — ignorado: label testando-agente ausente");
+      return { status: "ignored", reason: "modo_teste" };
+    }
+
     // Comando /reset (apenas se testando-agente ativo)
     if (content.trim() === "/reset") {
       const telefone = payload.sender.phone_number ??

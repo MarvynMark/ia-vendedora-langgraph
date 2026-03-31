@@ -1,11 +1,16 @@
 import { pool } from "../db/pool.ts";
 import { env } from "../config/env.ts";
-import { enviarTemplate, contarMensagensIncoming, buscarConversa, atualizarKanbanTask } from "../services/chatwoot.ts";
+import { enviarTemplate, enviarMensagem, contarMensagensIncoming, buscarConversa, atualizarKanbanTask } from "../services/chatwoot.ts";
 import { salvarMensagem } from "../db/memoria.ts";
 import { logger } from "./logger.ts";
 import { CONTEUDO_TEMPLATES } from "./templates.ts";
 
 export async function verificarTemplatesPendentes() {
+  if (env.MODO_TESTE) {
+    logger.debug("template-timer", "Modo teste ativo — verificação de templates bloqueada");
+    return;
+  }
+
   const delayMs = env.TEMPLATE_DELAY_MS;
 
   // Busca conversas sem template enviado que já passaram do delay
