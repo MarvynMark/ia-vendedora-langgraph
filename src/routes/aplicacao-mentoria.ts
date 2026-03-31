@@ -7,7 +7,6 @@ import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, ad
 
 const KANBAN_BOARD_ID = 1;
 const KANBAN_STEP_NOVO_LEAD = 1;
-const INBOX_ID = 11;
 
 // Mapeamento: chave do formulário → coluna da tabela
 const CAMPO_MAP: Record<string, string> = {
@@ -139,7 +138,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
 
   // Cria conversa na inbox comercial
   const conversa = await criarConversa(accountId, {
-    inbox_id: INBOX_ID,
+    inbox_id: env.CHATWOOT_INBOX_ID,
     contact_id: contatoId,
   });
   logger.info("aplicacao", "Conversa criada:", conversa.id);
