@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { adicionarEtiquetas, enviarMensagem } from "../services/chatwoot.ts";
+import { removerEtiquetas, enviarMensagem } from "../services/chatwoot.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -17,8 +17,8 @@ export function criarToolEscalarHumano(contexto: ContextoEscalarHumano) {
   return tool(
     async (input) => {
       try {
-        // Adicionar label "agente-off" na conversa
-        await adicionarEtiquetas(contexto.idConta, contexto.idConversa, ["agente-off"]);
+        // Remove "agente-on" para desativar o agente na conversa
+        await removerEtiquetas(contexto.idConta, contexto.idConversa, ["agente-on"]);
 
         // Enviar alerta na conversa de alerta
         const nomeDisplay = contexto.nome || "(usuario nao cadastrado)";

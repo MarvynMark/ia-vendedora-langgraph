@@ -111,8 +111,8 @@ export const webhookRouter = new Elysia()
       );
 
       // Para leads de formulário: disparar intro da IA após 2 minutos
-      if (labels.includes("lead-formulario")) {
-        logger.info("webhook", "Lead-formulario detectado: agendando intro em 2 minutos");
+      if (labels.includes("sim") || labels.includes("nao")) {
+        logger.info("webhook", "Lead de formulário detectado (sim/nao): agendando intro em 2 minutos");
         const introIdConta = idConta;
         const introIdConversa = idConversa;
         const introIdContato = parsed.data.sender.id.toString();
@@ -168,7 +168,7 @@ export const webhookRouter = new Elysia()
             }, { configurable: { thread_id: introTelefone } });
             logger.info("webhook", "Intro automática enviada:", { telefone: introTelefone });
           } catch (e) {
-            logger.error("webhook", "Erro ao enviar intro automática para lead-formulario:", e);
+            logger.error("webhook", "Erro ao enviar intro automática para lead de formulário:", e);
           }
         }, 2 * 60 * 1000);
       }
@@ -176,19 +176,19 @@ export const webhookRouter = new Elysia()
       return { status: "ok", action: "grupo_espera" };
     }
 
-    // Filtro de ativação: só processar conversas com "agente-ativo"
-    if (!labels.includes("agente-ativo")) {
-      logger.info("webhook", "Ignorado: label agente-ativo ausente");
-      return { status: "ignored", reason: "no_agente-ativo" };
+    // Filtro de ativação: só processar conversas com "agente-on"
+    if (!labels.includes("agente-on")) {
+      logger.info("webhook", "Ignorado: label agente-on ausente");
+      return { status: "ignored", reason: "no_agente-on" };
     }
 
-    // Modo teste: só processa conversas com "testando-agente"
-    if (env.MODO_TESTE && !labels.includes("testando-agente")) {
-      logger.info("webhook", "Modo teste ativo — ignorado: label testando-agente ausente");
+    // Modo teste: só processa conversas com "teste-agente"
+    if (env.MODO_TESTE && !labels.includes("teste-agente")) {
+      logger.info("webhook", "Modo teste ativo — ignorado: label teste-agente ausente");
       return { status: "ignored", reason: "modo_teste" };
     }
 
-    // Comando /reset (apenas se testando-agente ativo)
+    // Comando /reset
     if (content.trim() === "/reset") {
       const telefone = payload.sender.phone_number ??
         payload.conversation.contact_inbox?.source_id ?? "";
@@ -216,7 +216,7 @@ export const webhookRouter = new Elysia()
         }
 
         try {
-          await removerEtiquetas(idConta, idConversa, ["retorno", "agente-off"]);
+          await removerEtiquetas(idConta, idConversa, ["retorno"]);
         } catch (e) {
           logger.error("webhook", "Erro ao remover etiquetas:", e);
         }
@@ -234,11 +234,8 @@ export const webhookRouter = new Elysia()
       return { status: "ok", action: "reset" };
     }
 
-    // Filtro: não processar se "agente-off" (humano assumiu)
-    if (labels.includes("agente-off")) {
-      logger.info("webhook", "Ignorado: label agente-off presente");
-      return { status: "ignored", reason: "agente-off" };
-    }
+    // Filtro: não processar se "agente-on" foi removido (humano assumiu)
+    // (a ausência de agente-on já foi checada acima)
 
     // Processar mensagem assincronamente
     logger.info("webhook", ">>> Iniciando processamento async");
