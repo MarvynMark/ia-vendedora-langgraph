@@ -48,5 +48,4 @@ export const env = {
 
   GRUPO_ESPERA_LINK: process.env["GRUPO_ESPERA_LINK"] ?? "https://chat.whatsapp.com/BFRcUIZD4tp85KfF1rNCHU",
   TEMPLATE_DELAY_MS: Number(process.env["TEMPLATE_DELAY_MS"] ?? "300000"), // 5 minutos
-  VIDEO_PLATAFORMA_URL: process.env["VIDEO_PLATAFORMA_URL"] ?? "",
 } as const;

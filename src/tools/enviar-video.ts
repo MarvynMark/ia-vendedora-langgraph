@@ -2,8 +2,10 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { enviarArquivo } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
-import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
+
+// URL de download direto do vídeo de apresentação da plataforma
+const VIDEO_PLATAFORMA_URL = "https://drive.usercontent.google.com/download?id=1BVRCrzNoC_sKdh9uEC0KE84b--vCgvcL&export=download&confirm=t";
 
 interface ContextoEnviarVideo {
   idConta: string;
@@ -13,11 +15,7 @@ interface ContextoEnviarVideo {
 export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
   return tool(
     async () => {
-      const url = env.VIDEO_PLATAFORMA_URL;
-      if (!url) {
-        logger.warn("tool:enviar-video", "VIDEO_PLATAFORMA_URL não configurado");
-        return "Vídeo não configurado no momento.";
-      }
+      const url = VIDEO_PLATAFORMA_URL;
 
       try {
         logger.info("tool:enviar-video", "Baixando vídeo de:", url);

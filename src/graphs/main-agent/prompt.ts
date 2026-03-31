@@ -161,11 +161,9 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   🧠 Metodologia de estudos, revisão ativa e aproveitamento de questões
 
   **Mensagem 3 — Vídeo da plataforma (enviar sempre após a Mensagem 2):**
-${env.VIDEO_PLATAFORMA_URL
-  ? `  1. Envie a mensagem de texto: "Gravei um vídeo rápido mostrando como é a plataforma por dentro 👇"
+  1. Envie a mensagem de texto: "Gravei um vídeo rápido mostrando como é a plataforma por dentro 👇"
   2. Em seguida, chame imediatamente a ferramenta **Enviar_video_plataforma** (sem parâmetros) para enviar o vídeo diretamente no WhatsApp.
-  3. Aguarde a reação ou resposta antes de continuar para a Etapa 7.`
-  : `  (Vídeo da plataforma não configurado — aguarda o lead reagir à Mensagem 2 antes de continuar.)`}
+  3. Aguarde a reação ou resposta antes de continuar para a Etapa 7.
 
   ## ETAPA 7 — QUALIFICAÇÃO ANTES DO PREÇO
 
