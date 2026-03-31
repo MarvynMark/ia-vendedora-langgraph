@@ -3,17 +3,7 @@ import { env } from "../config/env.ts";
 import { enviarTemplate, contarMensagensIncoming, buscarConversa, atualizarKanbanTask } from "../services/chatwoot.ts";
 import { salvarMensagem } from "../db/memoria.ts";
 import { logger } from "./logger.ts";
-
-// Conteúdo real dos templates enviados (para salvar na memória da conversa)
-const CONTEUDO_TEMPLATES: Record<string, string> = {
-  abertura_esta_estudando:
-    "Olá, tudo bem?\n\nAqui é o Gusthavo, da equipe do Perito Walker.\nAcabei de receber seu formulário de aplicação pra mentoria.\n\nMe diz uma coisa: você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
-  ta_ai: "Olá, tá por ai?",
-  corrido_followup: "Opa, sei que deve estar corrido por aí, mas você conseguiu ver minha mensagem anterior?",
-  olhinho_followup: "👀",
-  encerramento_02:
-    "Como você não respondeu, vou encerrar seu atendimento por aqui para organizar as prioridades.\nSe decidir começar sua preparação de forma estratégica, me chama aqui, ok?",
-};
+import { CONTEUDO_TEMPLATES } from "./templates.ts";
 
 export async function verificarTemplatesPendentes() {
   const delayMs = env.TEMPLATE_DELAY_MS;

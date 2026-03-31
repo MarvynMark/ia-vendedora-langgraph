@@ -365,6 +365,27 @@ export async function contarMensagensIncoming(
   return msgs.filter(m => m.message_type === 0).length;
 }
 
+// Verifica se o lead enviou mensagem nas últimas 24h (janela ativa do WhatsApp)
+export async function verificarJanela24h(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<boolean> {
+  try {
+    const data = await listarMensagens(accountId, conversationId) as {
+      payload?: Array<{ message_type: number; created_at: number }>;
+    };
+    const msgs = data.payload ?? [];
+    const incomings = msgs.filter(m => m.message_type === 0);
+    if (incomings.length === 0) return false;
+    const ultima = incomings.sort((a, b) => b.created_at - a.created_at)[0]!;
+    const agoraSegundos = Date.now() / 1000;
+    return (agoraSegundos - ultima.created_at) < 24 * 60 * 60;
+  } catch (e) {
+    logger.warn("chatwoot", "verificarJanela24h erro:", e);
+    return false;
+  }
+}
+
 export async function criarContato(
   accountId: string | number,
   dados: { name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> },

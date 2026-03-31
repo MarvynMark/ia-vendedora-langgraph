@@ -5,7 +5,8 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { gerarPromptFollowup, PROMPT_LEMBRETE, PROMPT_BOAS_VINDAS } from "./prompts.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { criarToolsFollowup } from "../../tools/factory.ts";
@@ -254,12 +255,27 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
     return { respostaAgente: "" };
   }
 
-  logger.info("follow-up", `Enviando template ${item.nome} (${contador + 1}/${SEQUENCIA_TEMPLATES.length})`);
+  logger.info("follow-up", `Enviando mensagem ${item.nome} (${contador + 1}/${SEQUENCIA_TEMPLATES.length})`);
+
+  // Verifica janela de 24h: se o lead está ativo, envia mensagem normal (sem template)
+  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
 
   try {
-    await enviarTemplate(state.accountId, state.conversationId, item.nome);
+    if (dentroJanela) {
+      const conteudo = CONTEUDO_TEMPLATES[item.nome];
+      if (conteudo) {
+        logger.info("follow-up", `Janela 24h ativa — enviando mensagem normal ao invés de template: ${item.nome}`);
+        await enviarMensagem(state.accountId, state.conversationId, conteudo);
+      } else {
+        logger.warn("follow-up", `Conteúdo não encontrado para ${item.nome}, usando template mesmo dentro da janela`);
+        await enviarTemplate(state.accountId, state.conversationId, item.nome);
+      }
+    } else {
+      logger.info("follow-up", `Fora da janela 24h — enviando template: ${item.nome}`);
+      await enviarTemplate(state.accountId, state.conversationId, item.nome);
+    }
   } catch (e) {
-    logger.error("follow-up", `Erro ao enviar template ${item.nome}:`, e);
+    logger.error("follow-up", `Erro ao enviar mensagem/template ${item.nome}:`, e);
     return { respostaAgente: "" };
   }
 

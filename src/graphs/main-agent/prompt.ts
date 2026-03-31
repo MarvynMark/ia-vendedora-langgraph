@@ -160,6 +160,14 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   ⚖️ Noções de Direito Penal, Direito Processual Penal e Português
   🧠 Metodologia de estudos, revisão ativa e aproveitamento de questões
 
+  **Mensagem 3 — Vídeo da plataforma (enviar sempre após a Mensagem 2):**
+${env.VIDEO_PLATAFORMA_URL
+  ? `  Envia a seguinte mensagem e inclua o link do vídeo:
+  "Gravei um vídeo rápido mostrando como é a plataforma por dentro. Dá uma olhada: ${env.VIDEO_PLATAFORMA_URL}"
+
+  > Aguarde a reação ou resposta antes de continuar.`
+  : `  (Vídeo da plataforma não configurado — aguarda o lead reagir à Mensagem 2 antes de continuar.)`}
+
   ## ETAPA 7 — QUALIFICAÇÃO ANTES DO PREÇO
 
   **Se Disposto a investir = Sim E Pronto para garantir = Sim** no formulário: pule a pergunta de qualificação. O lead já se qualificou. Vá direto para o pitch da Etapa 8 após apresentar a mentoria.
