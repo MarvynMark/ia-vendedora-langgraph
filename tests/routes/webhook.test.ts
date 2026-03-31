@@ -23,7 +23,7 @@ mock.module("../../src/lib/message-processor.ts", () => ({
     tipoArquivo: null,
     idAnexo: null,
     urlArquivo: null,
-    etiquetas: ["testando-agente"],
+    etiquetas: ["teste-agente"],
     atributosContato: {},
     atributosConversa: "{}",
     idMensagemReferenciada: null,
@@ -84,7 +84,7 @@ const basePayload = {
   message_type: 0,
   created_at: Date.now() / 1000,
   account: { id: 8 },
-  conversation: { id: 100, inbox_id: 1, labels: ["testando-agente"] },
+  conversation: { id: 100, inbox_id: 1, labels: ["teste-agente"] },
   sender: { id: 1, name: "Test", phone_number: "+5511999999999" },
 };
 
@@ -97,18 +97,18 @@ describe("webhook /webhook/chatwoot", () => {
     expect(data.reason).toBe("not_incoming");
   });
 
-  test("ignora mensagens com label agente-off", async () => {
+  test("ignora mensagens com label agente-on", async () => {
     const payload = {
       ...basePayload,
-      conversation: { ...basePayload.conversation, labels: ["agente-off"] },
+      conversation: { ...basePayload.conversation, labels: ["agente-on"] },
     };
     const res = await webhookRouter.handle(makeRequest(payload));
     const data = await res.json() as { status: string; reason: string };
     expect(data.status).toBe("ignored");
-    expect(data.reason).toBe("agente-off");
+    expect(data.reason).toBe("agente-on");
   });
 
-  test("ignora mensagens sem label testando-agente", async () => {
+  test("ignora mensagens sem label teste-agente", async () => {
     const payload = {
       ...basePayload,
       conversation: { ...basePayload.conversation, labels: [] },
@@ -116,7 +116,7 @@ describe("webhook /webhook/chatwoot", () => {
     const res = await webhookRouter.handle(makeRequest(payload));
     const data = await res.json() as { status: string; reason: string };
     expect(data.status).toBe("ignored");
-    expect(data.reason).toBe("no_testando-agente");
+    expect(data.reason).toBe("no_teste-agente");
   });
 
   test("/teste adiciona label antes dos filtros de ativação", async () => {
@@ -131,7 +131,7 @@ describe("webhook /webhook/chatwoot", () => {
     expect(data.action).toBe("label_added");
   });
 
-  test("/reset retorna ok quando há label testando-agente", async () => {
+  test("/reset retorna ok quando há label teste-agente", async () => {
     const payload = {
       ...basePayload,
       content: "/reset",
@@ -142,20 +142,20 @@ describe("webhook /webhook/chatwoot", () => {
     expect(data.action).toBe("reset");
   });
 
-  test("mensagem válida com testando-agente é aceita para processamento", async () => {
+  test("mensagem válida com teste-agente é aceita para processamento", async () => {
     const res = await webhookRouter.handle(makeRequest(basePayload));
     const data = await res.json() as { status: string };
     expect(data.status).toBe("accepted");
   });
 
-  test("agente-off tem prioridade mesmo com testando-agente", async () => {
+  test("agente-on tem prioridade mesmo com teste-agente", async () => {
     const payload = {
       ...basePayload,
-      conversation: { ...basePayload.conversation, labels: ["testando-agente", "agente-off"] },
+      conversation: { ...basePayload.conversation, labels: ["teste-agente", "agente-on"] },
     };
     const res = await webhookRouter.handle(makeRequest(payload));
     const data = await res.json() as { status: string; reason: string };
     expect(data.status).toBe("ignored");
-    expect(data.reason).toBe("agente-off");
+    expect(data.reason).toBe("agente-on");
   });
 });

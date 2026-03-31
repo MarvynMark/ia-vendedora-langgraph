@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 describe("criarToolEscalarHumano", () => {
-  test("adiciona etiqueta agente-off na conversa", async () => {
+  test("adiciona etiqueta agente-on na conversa", async () => {
     const tool = criarToolEscalarHumano(contexto);
     await tool.invoke({ resumoConversa: "paciente quer agendar urgência" });
     const labelCall = mockFetch.mock.calls.find(c => {
@@ -30,7 +30,7 @@ describe("criarToolEscalarHumano", () => {
     });
     expect(labelCall).toBeDefined();
     const body = JSON.parse((labelCall as [string, RequestInit])[1]!.body as string);
-    expect(body.labels).toContain("agente-off");
+    expect(body.labels).toContain("agente-on");
   });
 
   test("envia alerta para conversa de alerta", async () => {

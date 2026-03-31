@@ -105,7 +105,7 @@ describe("chatwoot service", () => {
       mockFetch.mockImplementationOnce(async () =>
         new Response(JSON.stringify({ labels: ["existente"] }), { status: 200 })
       );
-      await adicionarEtiquetas("8", "100", ["testando-agente"]);
+      await adicionarEtiquetas("8", "100", ["teste-agente"]);
 
       // Second call is the POST to /labels with merged set
       const labelCall = mockFetch.mock.calls.find(c => {
@@ -115,7 +115,7 @@ describe("chatwoot service", () => {
       expect(labelCall).toBeDefined();
       const body = JSON.parse((labelCall as [string, RequestInit])[1]!.body as string);
       expect(body.labels).toContain("existente");
-      expect(body.labels).toContain("testando-agente");
+      expect(body.labels).toContain("teste-agente");
     });
   });
 

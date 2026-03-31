@@ -15,7 +15,7 @@ describe("ChatwootWebhookPayload type", () => {
       conversation: {
         id: 1,
         inbox_id: 1,
-        labels: ["testando-agente"],
+        labels: ["teste-agente"],
       },
       sender: {
         id: 1,
