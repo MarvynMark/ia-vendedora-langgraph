@@ -26,6 +26,12 @@ export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
           throw new Error(`Download falhou: ${res.status}`);
         }
 
+        // Google Drive às vezes retorna página HTML de confirmação — detecta e aborta
+        const resContentType = res.headers.get("content-type") ?? "";
+        if (resContentType.includes("text/html")) {
+          throw new Error("URL retornou HTML em vez do arquivo. Verifique se VIDEO_PLATAFORMA_URL é um link de download direto.");
+        }
+
         const buffer = await res.arrayBuffer();
         const dados = new Uint8Array(buffer);
 
