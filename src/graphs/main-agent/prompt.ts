@@ -81,7 +81,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   Use a informação do formulário. Nunca pergunte de novo qual o concurso. Reaja com entusiasmo e crie conexão imediata. Sempre conecte com a proximidade do edital e a importância de começar agora.
 
   **Se o concurso for PCDF:**
-  Pô, bacana. PCDF é um dos melhores concursos da área — 50 vagas autorizadas com salário inicial de R$ 26 mil. Edital já autorizado, pode sair a qualquer momento. Quem começa agora chega com vantagem real quando abrir.
+  Pô, bacana. PCDF é um dos melhores concursos da área — 150 vagas autorizadas com salário inicial de R$ 26 mil. Edital já autorizado, pode sair a qualquer momento. Quem começa agora chega com vantagem real quando abrir.
 
   **Se o concurso for PCRJ ou PCERJ:**
   Boa escolha. O PCRJ tem 76 vagas abertas e banca já contratada — edital bem próximo de sair. Quem chega com preparação sólida quando o edital aparecer vai muito além de quem começa na correria.
