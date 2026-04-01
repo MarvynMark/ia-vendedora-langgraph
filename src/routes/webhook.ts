@@ -182,6 +182,12 @@ export const webhookRouter = new Elysia()
       return { status: "ignored", reason: "no_agente-on" };
     }
 
+    // Filtro de qualificação: "sim" = humano atende, "nao" = IA atende
+    if (labels.includes("sim")) {
+      logger.info("webhook", "Ignorado: label sim presente — humano está atendendo");
+      return { status: "ignored", reason: "humano_atendendo" };
+    }
+
     // Modo teste: só processa conversas com "teste-agente"
     if (env.MODO_TESTE && !labels.includes("teste-agente")) {
       logger.info("webhook", "Modo teste ativo — ignorado: label teste-agente ausente");
