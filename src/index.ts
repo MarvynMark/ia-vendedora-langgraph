@@ -11,6 +11,7 @@ import { followupRouter } from "./routes/followup.ts";
 import { pagamentoRouter } from "./routes/pagamento.ts";
 import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
+import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
 
 const app = new Elysia()
   .use(cors())
@@ -32,6 +33,15 @@ setInterval(async () => {
     logger.error("template-timer", "Erro no job de verificação:", e);
   }
 }, 60_000);
+
+// Job: verificar follow-ups vencidos e agendar novos (a cada 5 minutos)
+setInterval(async () => {
+  try {
+    await verificarFollowupsPendentes();
+  } catch (e) {
+    logger.error("followup-timer", "Erro no job de follow-ups:", e);
+  }
+}, 5 * 60_000);
 
 async function shutdown() {
   logger.info("server", "Desligando...");

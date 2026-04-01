@@ -322,11 +322,12 @@ export async function enviarTemplate(
   accountId: string | number,
   conversationId: string | number,
   templateName: string,
+  conteudo?: string,
 ) {
   const payload = {
     message_type: "outgoing",
     content_type: "text",
-    content: " ",
+    content: conteudo ?? " ",
     template_params: {
       name: templateName,
       category: "MARKETING",
@@ -456,6 +457,41 @@ export async function criarConversa(
   const result = await res.json() as { id: number };
   logger.debug("criar-conversa", `Conversa criada com sucesso: id=${result.id}`);
   return result;
+}
+
+export interface KanbanTaskResumo {
+  id: number;
+  board_step_id: number;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  date_status: "overdue" | "due_soon" | null;
+  conversation_ids: number[];
+  conversations: Array<{
+    id: number;
+    display_id: number;
+    status: string;
+    inbox: { id: number; name: string };
+    contact: { id: number; name: string };
+  }>;
+}
+
+export async function listarKanbanTasks(
+  accountId: string | number,
+  boardId: number,
+  stepId: number,
+  page = 1,
+): Promise<KanbanTaskResumo[]> {
+  const url = `${urlConta(accountId)}/kanban/tasks?board_id=${boardId}&step_id=${stepId}&page=${page}`;
+  const res = await fetchComTimeout(url, { method: "GET", headers: headers() });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] listarKanbanTasks falhou (${res.status}): ${text}`);
+  }
+
+  const data = await res.json() as { tasks: KanbanTaskResumo[]; meta: { has_more: boolean } };
+  return data.tasks ?? [];
 }
 
 export async function criarKanbanTask(
