@@ -4,8 +4,7 @@ import { enviarArquivo } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
-// URL de download direto do vídeo de apresentação da plataforma
-const VIDEO_PLATAFORMA_URL = "https://drive.usercontent.google.com/download?id=1BVRCrzNoC_sKdh9uEC0KE84b--vCgvcL&export=download&confirm=t";
+export const VIDEO_PLATAFORMA_URL = "https://drive.usercontent.google.com/download?id=1ZKTwSLHIsPNWM2TPZxn4uBMgDVFOlKQ5&export=download&confirm=t";
 
 interface ContextoEnviarVideo {
   idConta: string;
@@ -15,34 +14,21 @@ interface ContextoEnviarVideo {
 export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
   return tool(
     async () => {
-      const url = VIDEO_PLATAFORMA_URL;
-
       try {
-        logger.info("tool:enviar-video", "Baixando vídeo de:", url);
-        const res = await fetchComTimeout(url, { method: "GET", timeout: 60_000 });
-        if (!res.ok) {
-          throw new Error(`Download falhou: ${res.status}`);
-        }
+        logger.info("tool:enviar-video", "Baixando vídeo de:", VIDEO_PLATAFORMA_URL);
+        const res = await fetchComTimeout(VIDEO_PLATAFORMA_URL, { method: "GET", timeout: 60_000 });
+        if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
 
-        // Google Drive às vezes retorna página HTML de confirmação — detecta e aborta
         const resContentType = res.headers.get("content-type") ?? "";
         if (resContentType.includes("text/html")) {
-          throw new Error("URL retornou HTML em vez do arquivo. Verifique se VIDEO_PLATAFORMA_URL é um link de download direto.");
+          throw new Error("URL retornou HTML — verifique se o link do Drive é público e direto.");
         }
 
         const buffer = await res.arrayBuffer();
         const dados = new Uint8Array(buffer);
 
-        // Detecta extensão e content-type pela URL
-        const urlLower = url.toLowerCase();
-        const isWebm = urlLower.endsWith(".webm");
-        const isMov = urlLower.endsWith(".mov");
-        const contentType = isWebm ? "video/webm" : isMov ? "video/quicktime" : "video/mp4";
-        const extensao = isWebm ? ".webm" : isMov ? ".mov" : ".mp4";
-        const nomeArquivo = `apresentacao-plataforma${extensao}`;
-
-        logger.info("tool:enviar-video", `Enviando vídeo (${dados.length} bytes, ${contentType})...`);
-        await enviarArquivo(contexto.idConta, contexto.idConversa, dados, nomeArquivo, contentType);
+        logger.info("tool:enviar-video", `Enviando vídeo (${dados.length} bytes)...`);
+        await enviarArquivo(contexto.idConta, contexto.idConversa, dados, "apresentacao-plataforma.mp4", "video/mp4");
 
         return "Vídeo enviado com sucesso.";
       } catch (e) {
