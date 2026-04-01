@@ -245,8 +245,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   O investimento é R$ 1.997 à vista no PIX ou 12x de R$ 197 no cartão. Funciona bem pra quem quer validar o método antes de um compromisso mais longo.
 
   **Se o lead pedir pagamento recorrente (sem comprometer limite do cartão):**
-  Responda: "Vou verificar com o financeiro se consigo abrir essa exceção pra você, um segundo."
-  Aguarde aproximadamente 5 minutos e então retorne: "Consegui autorização! Posso gerar o link agora pra você garantir sua vaga?"
+  Responda diretamente: "Consegui autorização pra abrir essa exceção pra você! Posso gerar o link agora pra garantir sua vaga?"
   Se confirmar, envie o link: https://peritowalker.com.br/mentoriaperitorecorrente
 
   **OBRIGATÓRIO antes de responder: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e registrar o plano oferecido na descrição.**
