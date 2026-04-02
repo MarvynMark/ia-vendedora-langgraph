@@ -4,7 +4,7 @@ import { enviarArquivo } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
-export const VIDEO_PLATAFORMA_URL = "https://drive.usercontent.google.com/download?id=1ZKTwSLHIsPNWM2TPZxn4uBMgDVFOlKQ5&export=download&confirm=t";
+export const VIDEO_PLATAFORMA_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-mentoria-por-dentro_.mp4";
 
 interface ContextoEnviarVideo {
   idConta: string;
