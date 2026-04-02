@@ -6,6 +6,7 @@ import {
   buscarConversasDoContato,
   atualizarKanbanTask,
   buscarKanbanBoard,
+  adicionarEtiquetas,
 } from "../services/chatwoot.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
@@ -185,6 +186,16 @@ async function processarPagamentoAprovado(dados: {
   } catch (e) {
     logger.error("pagamento", "Erro ao mover card para Ganho:", e);
     return;
+  }
+
+  // Adicionar etiqueta "mentoria" se produto for Mentoria Vestigium
+  if (dados.nomeProduto.toLowerCase().includes("mentoria")) {
+    try {
+      await adicionarEtiquetas(accountId, conversaComTask.id, ["mentoria"]);
+      logger.info("pagamento", "Etiqueta 'mentoria' adicionada à conversa:", conversaComTask.id);
+    } catch (e) {
+      logger.warn("pagamento", "Erro ao adicionar etiqueta mentoria:", e);
+    }
   }
 
   // Disparar grafo de follow-up com tipo boas_vindas
