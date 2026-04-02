@@ -11,38 +11,25 @@ import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 
-// Payload da Digital Manager Guru
-// Referência: https://developers.digitalmanager.guru/reference/webhooks
+// Payload real da Digital Manager Guru (formato pubsub/webhook)
 const dmGuruPayloadSchema = z.object({
-  event: z.string(),
-  data: z.object({
-    id: z.string().or(z.number()).optional(),
-    status: z.string().optional(),
-    customer: z.object({
+  payload: z.object({
+    contact: z.object({
       name: z.string().optional(),
       email: z.string().optional(),
-      phone_number: z.string().optional(),
-    }).optional(),
-    subscriber: z.object({
-      name: z.string().optional(),
-      email: z.string().optional(),
+      phone_local_code: z.string().optional(),
       phone_number: z.string().optional(),
     }).optional(),
     product: z.object({
       name: z.string().optional(),
+      offer: z.object({
+        name: z.string().optional(),
+      }).optional(),
     }).optional(),
-    plan: z.object({
-      name: z.string().optional(),
-    }).optional(),
+    status: z.string().optional(),
+    webhook_type: z.string().optional(),
   }),
 });
-
-const EVENTOS_APROVADOS = [
-  "purchase.approved",
-  "purchase.complete",
-  "purchase.completed",
-  "subscription.activated",
-];
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
 async function obterGrafoFollowup() {
@@ -52,9 +39,8 @@ async function obterGrafoFollowup() {
 
 export const pagamentoRouter = new Elysia()
   .post("/webhook/pagamento", async ({ body }) => {
-    const eventoRaw = String((body as Record<string, unknown>).event ?? "");
-    logger.info("pagamento", ">>> Webhook recebido", { event: eventoRaw });
-    registrarWebhook("/webhook/pagamento", body, eventoRaw || "recebido");
+    logger.info("pagamento", ">>> Webhook recebido");
+    registrarWebhook("/webhook/pagamento", body, "recebido");
 
     const parsed = dmGuruPayloadSchema.safeParse(body);
     if (!parsed.success) {
@@ -62,35 +48,43 @@ export const pagamentoRouter = new Elysia()
       return { status: "error", reason: "invalid_payload" };
     }
 
-    const { event, data } = parsed.data;
+    const { payload } = parsed.data;
 
-    if (!EVENTOS_APROVADOS.includes(event)) {
-      logger.info("pagamento", "Ignorado: evento não é de aprovação:", event);
-      return { status: "ignored", reason: "event_not_approved" };
+    // Só processar transações aprovadas
+    if (payload.status !== "approved") {
+      logger.info("pagamento", "Ignorado: status não é approved:", payload.status);
+      return { status: "ignored", reason: "not_approved" };
     }
 
-    // Suporta tanto "customer" quanto "subscriber" (DM Guru usa os dois em contextos diferentes)
-    const comprador = data.customer ?? data.subscriber;
-    const nomeProduto = data.product?.name ?? data.plan?.name ?? "";
-
-    if (!comprador) {
-      logger.error("pagamento", "Nenhum dado de comprador encontrado");
-      return { status: "error", reason: "no_customer_data" };
+    const contato = payload.contact;
+    if (!contato) {
+      logger.error("pagamento", "Nenhum dado de contato encontrado");
+      return { status: "error", reason: "no_contact_data" };
     }
+
+    // Montar telefone E.164: phone_local_code + phone_number
+    const phoneLocal = contato.phone_local_code ?? "55";
+    const phoneNum = (contato.phone_number ?? "").replace(/\D/g, "");
+    const telefoneE164 = phoneNum ? `+${phoneLocal}${phoneNum}` : undefined;
+
+    const nomeProduto = payload.product?.name ?? "";
+    const nomeOferta = payload.product?.offer?.name ?? ""; // ex: "Mentoria Vestigium - Perito Criminal - 6 meses"
 
     logger.info("pagamento", "Compra aprovada:", {
-      nome: comprador.name,
-      email: comprador.email,
-      telefone: comprador.phone_number,
+      nome: contato.name,
+      email: contato.email,
+      telefone: telefoneE164,
       produto: nomeProduto,
+      oferta: nomeOferta,
     });
 
     // Processar em background
     const processamento = processarPagamentoAprovado({
-      nome: comprador.name,
-      email: comprador.email,
-      telefone: comprador.phone_number,
+      nome: contato.name,
+      email: contato.email,
+      telefone: telefoneE164,
       nomeProduto,
+      nomeOferta,
     });
 
     void processamento;
@@ -102,6 +96,7 @@ async function processarPagamentoAprovado(dados: {
   email?: string;
   telefone?: string;
   nomeProduto: string;
+  nomeOferta: string;
 }) {
   const accountId = Number(env.CHATWOOT_ACCOUNT_ID);
 
@@ -181,7 +176,10 @@ async function processarPagamentoAprovado(dados: {
     await atualizarKanbanTask(accountId, task.id, {
       board_step_id: etapaGanho.id,
       due_date: new Date().toISOString(),
-      description: `${task.description ?? ""}\nProduto adquirido: ${dados.nomeProduto}`.trim(),
+      description: [
+        task.description ?? "",
+        `💳 - Plano: ${dados.nomeOferta || dados.nomeProduto}`,
+      ].filter(Boolean).join("\n"),
     });
     logger.info("pagamento", "Card movido para Ganho. TaskId:", task.id);
   } catch (e) {
