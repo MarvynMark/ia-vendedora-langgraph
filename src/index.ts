@@ -12,6 +12,7 @@ import { pagamentoRouter } from "./routes/pagamento.ts";
 import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
+import { obterLogs } from "./lib/webhook-logger.ts";
 
 const app = new Elysia()
   .use(cors())
@@ -21,6 +22,10 @@ const app = new Elysia()
   .use(followupRouter)
   .use(pagamentoRouter)
   .use(aplicacaoRouter)
+  .get("/webhook/logs", ({ query }) => {
+    const limite = Math.min(Number(query.limite ?? 50), 100);
+    return obterLogs(limite);
+  })
   .listen(env.PORT);
 
 logger.info("server", `Vestigium Agent rodando em http://localhost:${env.PORT}`);

@@ -18,6 +18,7 @@ import {
 } from "../services/chatwoot.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
+import { registrarWebhook } from "../lib/webhook-logger.ts";
 
 const GRUPO_ESPERA_KEYWORDS = ["grupo de espera", "grupo de espero", "acesso ao grupo", "entrar no grupo"];
 
@@ -63,8 +64,11 @@ export const webhookRouter = new Elysia()
       sender: ((body as Record<string, unknown>).sender as Record<string, unknown>)?.name,
     });
 
-    // Só processar evento message_created (evita duplicatas de message_incoming/message_updated)
+    // Registrar chegada do webhook para debug
     const event = (body as Record<string, unknown>).event;
+    registrarWebhook("/webhook/chatwoot", body, event !== "message_created" ? `ignored:${event}` : "processing");
+
+    // Só processar evento message_created (evita duplicatas de message_incoming/message_updated)
     if (event !== "message_created") {
       logger.info("webhook", "Ignorado: event =", event);
       return { status: "ignored", reason: "not_message_created" };

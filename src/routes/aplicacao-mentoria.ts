@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../db/pool.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
+import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas, atualizarContato } from "../services/chatwoot.ts";
 
 const KANBAN_BOARD_ID = 1;
@@ -46,6 +47,8 @@ function parsearFormulario(raw: Record<string, string>): Record<string, string> 
 
 export const aplicacaoRouter = new Elysia()
   .post("/webhook/cadastrar-lead-formulario-mentoria", async ({ body }) => {
+    registrarWebhook("/webhook/cadastrar-lead-formulario-mentoria", body, "recebido");
+
     const parsed = formularioSchema.safeParse(body);
     if (!parsed.success) {
       logger.warn("aplicacao", "Payload inválido:", parsed.error.issues);

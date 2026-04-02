@@ -9,6 +9,7 @@ import {
 } from "../services/chatwoot.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
+import { registrarWebhook } from "../lib/webhook-logger.ts";
 
 // Payload da Digital Manager Guru
 // Referência: https://developers.digitalmanager.guru/reference/webhooks
@@ -51,7 +52,9 @@ async function obterGrafoFollowup() {
 
 export const pagamentoRouter = new Elysia()
   .post("/webhook/pagamento", async ({ body }) => {
-    logger.info("pagamento", ">>> Webhook recebido", { event: (body as Record<string, unknown>).event });
+    const eventoRaw = String((body as Record<string, unknown>).event ?? "");
+    logger.info("pagamento", ">>> Webhook recebido", { event: eventoRaw });
+    registrarWebhook("/webhook/pagamento", body, eventoRaw || "recebido");
 
     const parsed = dmGuruPayloadSchema.safeParse(body);
     if (!parsed.success) {
