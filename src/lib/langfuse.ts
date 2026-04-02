@@ -1,8 +1,11 @@
 import { CallbackHandler } from "langfuse-langchain";
 import { env } from "../config/env.ts";
+import { logger } from "./logger.ts";
 
 const langfuseAtivo =
   !!env.LANGFUSE_SECRET_KEY && !!env.LANGFUSE_PUBLIC_KEY;
+
+logger.info("langfuse", `Langfuse ativo: ${langfuseAtivo} | baseUrl: ${env.LANGFUSE_BASEURL} | publicKey: ${env.LANGFUSE_PUBLIC_KEY?.substring(0, 10)}...`);
 
 export interface LangfuseTraceOpts {
   sessionId?: string;
@@ -19,8 +22,12 @@ export function criarLangfuseHandler(
   traceName: string,
   opts: LangfuseTraceOpts = {},
 ): CallbackHandler | undefined {
-  if (!langfuseAtivo) return undefined;
+  if (!langfuseAtivo) {
+    logger.debug("langfuse", `Handler NÃO criado (chaves ausentes) para trace: ${traceName}`);
+    return undefined;
+  }
 
+  logger.debug("langfuse", `Criando handler para trace: ${traceName} | session: ${opts.sessionId}`);
   return new CallbackHandler({
     secretKey: env.LANGFUSE_SECRET_KEY,
     publicKey: env.LANGFUSE_PUBLIC_KEY,
@@ -39,6 +46,12 @@ export async function finalizarLangfuseHandler(
   handler: CallbackHandler | undefined,
 ): Promise<void> {
   if (handler) {
-    await handler.shutdownAsync();
+    logger.debug("langfuse", "Finalizando handler (shutdownAsync)...");
+    try {
+      await handler.shutdownAsync();
+      logger.debug("langfuse", "Handler finalizado com sucesso");
+    } catch (e) {
+      logger.error("langfuse", "Erro ao finalizar handler:", e);
+    }
   }
 }
