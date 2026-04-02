@@ -164,8 +164,9 @@ const PROMPT_FORMATAR_TEXTO = `# PAPEL
 
   ### Limites
 
-  * **NUNCA divida a mensagem em mais de 5 partes**
-  * **NUNCA quebre listas em múltiplas mensagens** — mantenha todos os itens de lista no mesmo bloco
+  * **NUNCA divida a mensagem em mais de 10 partes**
+  * **NUNCA quebre listas em múltiplas mensagens** — mantenha TODOS os itens de lista (com emojis, números ou marcadores) juntos em um único bloco. O bloco começa no texto introdutório e termina após o último item da lista.
+  * Se houver uma lista de itens, o bloco deve conter: frase introdutória + todos os itens, sem exceção
 
   ### Marcador de quebra
 
@@ -314,5 +315,5 @@ export async function formatarTexto(texto: string): Promise<string> {
 
 export function dividirMensagem(texto: string): string[] {
   const blocos = texto.split("\n\n").filter(b => b.trim());
-  return blocos.slice(0, 5);
+  return blocos.slice(0, 10);
 }

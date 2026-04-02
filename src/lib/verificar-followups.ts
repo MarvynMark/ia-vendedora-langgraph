@@ -4,11 +4,12 @@ import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { proximoHorarioComercial } from "./horario-comercial.ts";
 import { logger } from "./logger.ts";
 
-// Etapas rastreadas: Primeira mensagem (7), Conexao (10), Aguardando Pagamento (8)
+// Etapas rastreadas: Primeira mensagem (7), Conexao (10), Aguardando Pagamento (8), Nutrir (12)
 const STEPS_RASTREADOS = [
-  { id: 7, name: "Primeira mensagem", delayMs: 2 * 60 * 60 * 1000 },
-  { id: 10, name: "Conexao", delayMs: 24 * 60 * 60 * 1000 },
-  { id: 8, name: "Aguardando Pagamento", delayMs: 24 * 60 * 60 * 1000 },
+  { id: 7,  name: "Primeira mensagem",    delayMs: 2  * 60 * 60 * 1000,       tipoFollowup: "followup"  as const },
+  { id: 10, name: "Conexao",              delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "followup"  as const },
+  { id: 8,  name: "Aguardando Pagamento", delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "lembrete"  as const },
+  { id: 12, name: "Nutrir",               delayMs: 3  * 24 * 60 * 60 * 1000,  tipoFollowup: "nutrir"    as const },
 ];
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -97,7 +98,7 @@ export async function verificarFollowupsPendentes() {
               displayId: conversa.display_id,
               funilSteps: [],
               idEtapaPerdido: 0,
-              tipoFollowup: "followup" as const,
+              tipoFollowup: step.tipoFollowup,
               respostaAgente: "",
             }, { configurable: { thread_id: `followup_${telefone}` } });
           } catch (e) {

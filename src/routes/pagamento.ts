@@ -115,11 +115,11 @@ async function processarPagamentoAprovado(dados: {
     try {
       contato = await buscarContatoPorQuery(accountId, query);
       if (contato) {
-        logger.info("pagamento", "Contato encontrado via query:", query, "→ id:", contato.id);
+        logger.info("pagamento", "Contato encontrado via query", { query, id: contato.id });
         break;
       }
     } catch (e) {
-      logger.warn("pagamento", "Falha ao buscar contato com query:", query, e);
+      logger.warn("pagamento", "Falha ao buscar contato com query", { query, erro: String(e) });
     }
   }
 

@@ -38,10 +38,16 @@ async function buscarFunil(state: FollowUpStateType) {
 }
 
 async function classificar(state: FollowUpStateType) {
-  const stepName = state.board_step?.name?.toLowerCase() ?? "";
-  logger.info("follow-up", "classificando step:", stepName);
+  // Se tipoFollowup já foi definido pelo chamador (verificar-followups.ts), usa direto
+  if (state.tipoFollowup && state.tipoFollowup !== "ignorar") {
+    logger.info("follow-up", "tipoFollowup pré-definido:", state.tipoFollowup);
+    return { tipoFollowup: state.tipoFollowup };
+  }
 
-  let tipoFollowup: "followup" | "lembrete" | "boas_vindas" | "template_abertura" | "ignorar";
+  const stepName = state.board_step?.name?.toLowerCase() ?? "";
+  logger.info("follow-up", "classificando pelo step:", stepName);
+
+  let tipoFollowup: "followup" | "lembrete" | "boas_vindas" | "template_abertura" | "nutrir" | "ignorar";
 
   if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
@@ -51,6 +57,8 @@ async function classificar(state: FollowUpStateType) {
     tipoFollowup = "boas_vindas";
   } else if (stepName === "primeira mensagem") {
     tipoFollowup = "template_abertura";
+  } else if (stepName === "nutrir") {
+    tipoFollowup = "nutrir";
   } else {
     tipoFollowup = "ignorar";
   }
@@ -352,6 +360,127 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
+function lerContadorNutrir(description: string): number {
+  const match = description.match(/🔁\s*-\s*Follow-ups:\s*(\d+)/i) ?? description.match(/follow-ups?\s*enviados?:\s*(\d+)/i);
+  return match ? parseInt(match[1]!) : 0;
+}
+
+function atualizarContadorNutrir(description: string, novoValor: number): string {
+  if (/🔁\s*-\s*Follow-ups:\s*\d+/i.test(description)) {
+    return description.replace(/🔁\s*-\s*Follow-ups:\s*\d+/i, `🔁 - Follow-ups: ${novoValor}`);
+  }
+  if (/follow-ups?\s*enviados?:\s*\d+/i.test(description)) {
+    return description.replace(/follow-ups?\s*enviados?:\s*\d+/i, `🔁 - Follow-ups: ${novoValor}`);
+  }
+  return description ? `${description}\n🔁 - Follow-ups: ${novoValor}` : `🔁 - Follow-ups: ${novoValor}`;
+}
+
+const SEQUENCIA_NUTRIR = [
+  {
+    abordagem: "reengajamento",
+    prompt: `Você é o Gusthavo, consultor de vendas da equipe do Perito Walker. Este lead estava em negociação mas não seguiu em frente. Envie uma mensagem de reengajamento suave — sem pitch, sem pressão. Apenas retome o contato de forma humana e curiosa. Máximo 2 linhas. Não mencione produto nenhum agora.`,
+    proximoDelayDias: 7,
+  },
+  {
+    abordagem: "oferta_imlc",
+    prompt: `Você é o Gusthavo, consultor de vendas da equipe do Perito Walker. Este lead não comprou a mentoria. Faça um mini-pitch do curso IMLC (Medicina Legal e Criminalística do Walker) como porta de entrada. Fale que é o conteúdo que está nos bônus da mentoria, vendido separado por R$797 ou 12x de R$82,43. Encerre perguntando se quer o link. Máximo 3 linhas. Link: https://pay.hotmart.com/D74620718B?off=ev53mav4&checkoutMode=10&split=12&sck=geral`,
+    proximoDelayDias: 7,
+  },
+  {
+    abordagem: "oferta_clube",
+    prompt: `Você é o Gusthavo, consultor de vendas da equipe do Perito Walker. Este lead não comprou a mentoria nem o IMLC. Faça um mini-pitch do Clube da Aprovação: planejamento de estudos + plataforma de aulas gravadas do Walker por R$97/mês. Diga que dá pra testar por um mês e cancelar quando quiser. Encerre perguntando se quer o link. Máximo 3 linhas. Link: https://pay.plataformatutory.com.br/checkout/4f888bbd-5e7c-41a9-8dba-402f5fe2ea16`,
+    proximoDelayDias: 14,
+  },
+  {
+    abordagem: "ebook",
+    prompt: `Você é o Gusthavo, consultor de vendas da equipe do Perito Walker. Este lead não converteu em nenhum produto. Envie o link do e-book gratuito como gesto de valor. Diga que é um material do Walker pra quem quer entrar na área de perícia. Curto, sem pressão. Link: https://www.csiacademy.com.br/ebooks`,
+    proximoDelayDias: 30,
+  },
+];
+
+async function agenteNutrir(state: FollowUpStateType) {
+  logger.info("follow-up", "executando agente nutrir...");
+
+  // Verifica se o lead já respondeu recentemente
+  try {
+    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
+    if (totalIncoming > 0) {
+      logger.info("follow-up", "Lead já respondeu — pausando nurturing");
+      // Agenda próximo contato em 30 dias
+      const proxima = proximoHorarioComercial(new Date(), 30 * 24 * 60 * 60 * 1000);
+      await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
+      return { respostaAgente: "" };
+    }
+  } catch (e) {
+    logger.warn("follow-up", "Erro ao verificar incoming:", e);
+  }
+
+  const contador = lerContadorNutrir(state.description ?? "");
+  const item = SEQUENCIA_NUTRIR[contador];
+
+  if (!item) {
+    // Sequência esgotada — agenda contato passivo em 90 dias
+    logger.info("follow-up", "Sequência de nurturing esgotada — agendando contato passivo em 90 dias");
+    const proxima = proximoHorarioComercial(new Date(), 90 * 24 * 60 * 60 * 1000);
+    await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
+    return { respostaAgente: "" };
+  }
+
+  logger.info("follow-up", `Nurturing ${item.abordagem} (${contador + 1}/${SEQUENCIA_NUTRIR.length})`);
+
+  const historico = await buscarHistorico(state.telefone, 30);
+  const msgsHistorico = historico.map((m) => {
+    if (m.type === "human") return new HumanMessage(m.content);
+    return new AIMessage(m.content);
+  });
+
+  const model = new ChatOpenAI({
+    modelName: env.OPENAI_MODEL,
+    openAIApiKey: env.OPENAI_API_KEY,
+    temperature: 0.8,
+  });
+
+  const langfuseHandler = criarLangfuseHandler("follow-up-nutrir", {
+    sessionId: state.telefone,
+    userId: state.telefone,
+    metadata: { taskId: state.taskId, abordagem: item.abordagem, contador },
+    tags: ["follow-up", "nutrir"],
+  });
+
+  let resposta = "";
+  try {
+    const resultado = await model.invoke(
+      [
+        { role: "system", content: item.prompt },
+        ...msgsHistorico.map(m => ({
+          role: m._getType() === "human" ? "user" as const : "assistant" as const,
+          content: m.content as string,
+        })),
+        { role: "user", content: "<retomar contato com lead>" },
+      ],
+      langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
+    );
+    resposta = resultado.content as string;
+  } catch (e) {
+    logger.error("follow-up", "Erro no agente nutrir:", e);
+    return { respostaAgente: "" };
+  } finally {
+    await finalizarLangfuseHandler(langfuseHandler);
+  }
+
+  // Atualiza contador e agenda próximo follow-up
+  const novoContador = contador + 1;
+  const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
+  const proxima = proximoHorarioComercial(new Date(), item.proximoDelayDias * 24 * 60 * 60 * 1000);
+  await atualizarKanbanTask(state.accountId, state.taskId, {
+    description: descricaoAtualizada,
+    due_date: proxima.toISOString(),
+  });
+  logger.info("follow-up", `Próximo nurturing agendado para: ${proxima.toISOString()}`);
+
+  return { respostaAgente: resposta };
+}
+
 async function enviarMensagemNo(state: FollowUpStateType) {
   if (!state.respostaAgente) {
     logger.info("follow-up", "sem resposta para enviar");
@@ -389,6 +518,7 @@ export function rotaClassificacao(state: FollowUpStateType): string {
     case "lembrete": return "agente_lembrete";
     case "boas_vindas": return "agente_boas_vindas";
     case "template_abertura": return "agente_template_abertura";
+    case "nutrir": return "agente_nutrir";
     case "ignorar": return "ignorar";
     default: return "ignorar";
   }
@@ -403,6 +533,7 @@ export async function criarGrafoFollowUp() {
     .addNode("agente_lembrete", agenteLembrete)
     .addNode("agente_boas_vindas", agenteBoasVindas)
     .addNode("agente_template_abertura", agenteTemplateAbertura)
+    .addNode("agente_nutrir", agenteNutrir)
     .addNode("enviar_mensagem", enviarMensagemNo)
 
     // Arestas
@@ -413,12 +544,14 @@ export async function criarGrafoFollowUp() {
       agente_lembrete: "agente_lembrete",
       agente_boas_vindas: "agente_boas_vindas",
       agente_template_abertura: "agente_template_abertura",
+      agente_nutrir: "agente_nutrir",
       ignorar: "__end__",
     })
     .addEdge("agente_followup", "enviar_mensagem")
     .addEdge("agente_lembrete", "enviar_mensagem")
     .addEdge("agente_boas_vindas", "enviar_mensagem")
     .addEdge("agente_template_abertura", "__end__")
+    .addEdge("agente_nutrir", "enviar_mensagem")
     .addEdge("enviar_mensagem", END);
 
   return grafo.compile({ checkpointer });

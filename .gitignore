@@ -36,5 +36,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Generated
 *.png
 
+# Assets de mídia (não versionar binários grandes)
+src/assets/
+
 *.local.md
 .mcp.json

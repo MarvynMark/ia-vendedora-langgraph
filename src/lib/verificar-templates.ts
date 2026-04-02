@@ -51,8 +51,9 @@ export async function verificarTemplatesPendentes() {
 
       // Nenhuma mensagem — envia o template
       const templateName = "abertura_esta_estudando";
+      const conteudoTemplate = CONTEUDO_TEMPLATES[templateName];
       logger.debug("template-timer", `Enviando template "${templateName}" para conversa ${row.conversation_id}...`);
-      await enviarTemplate(row.account_id, row.conversation_id, templateName);
+      await enviarTemplate(row.account_id, row.conversation_id, templateName, conteudoTemplate);
       await pool.query(
         "UPDATE leads_template_pendente SET template_enviado = TRUE WHERE id = $1",
         [row.id],
@@ -60,7 +61,6 @@ export async function verificarTemplatesPendentes() {
       logger.info("template-timer", `Template enviado para conversa: ${row.conversation_id}`);
 
       // Salva conteúdo do template na memória da conversa (keyed pelo telefone)
-      const conteudoTemplate = CONTEUDO_TEMPLATES[templateName];
       if (conteudoTemplate && row.phone) {
         try {
           await salvarMensagem(row.phone, {
