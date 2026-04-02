@@ -95,12 +95,14 @@ export const webhookRouter = new Elysia()
       return { status: "ignored", reason: "not_incoming" };
     }
 
-    // Ignorar mensagens enviadas pelo bot/agente (sender sem phone_number)
-    // Chatwoot dispara message_created com message_type:0 para mensagens do bot também,
-    // mas o sender do bot não tem phone_number (é um perfil de agente, não contato)
-    const senderPhone = parsed.data.sender.phone_number;
-    if (!senderPhone) {
-      logger.info("webhook", "Ignorado: sender sem phone_number (mensagem do bot/agente)");
+    // Ignorar mensagens enviadas pelo bot/agente:
+    // Chatwoot dispara message_created com message_type:0 para mensagens do bot também.
+    // O sender do contato tem id == contact_inbox.contact_id.
+    // O sender do agente/bot tem id diferente do contact_id.
+    const senderId = parsed.data.sender.id;
+    const contactId = payload.conversation?.contact_inbox?.contact_id;
+    if (contactId !== undefined && senderId !== contactId) {
+      logger.info("webhook", "Ignorado: sender não é o contato da conversa (mensagem do bot/agente)");
       return { status: "ignored", reason: "agent_message" };
     }
 
