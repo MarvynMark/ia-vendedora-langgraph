@@ -177,8 +177,13 @@ async function executarAgente(state: MainAgentStateType) {
       langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
     );
     const msgs = resultado.messages ?? [];
-    const lastAi = msgs.filter((m: { _getType: () => string }) => m._getType() === "ai").pop();
-    const output = lastAi ? (lastAi.content as string) : "";
+    // Concatenar conteúdo de TODAS as mensagens AI (não só a última)
+    // Evita perder texto escrito antes de uma tool call (ex: lista de bônus na Etapa 6)
+    const output = msgs
+      .filter((m: { _getType: () => string }) => m._getType() === "ai")
+      .map((m: { content: unknown }) => (typeof m.content === "string" ? m.content : ""))
+      .filter(s => s.trim().length > 0)
+      .join("\n\n");
 
     // Salvar user message no histórico
     await salvarMensagem(state.telefone, {
