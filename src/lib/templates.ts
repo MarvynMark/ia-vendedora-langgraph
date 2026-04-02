@@ -2,7 +2,7 @@
 // quando o lead já está dentro da janela de 24h (template não é necessário)
 export const CONTEUDO_TEMPLATES: Record<string, string> = {
   abertura_esta_estudando:
-    "Olá, tudo bem?\n\nAqui é o Gusthavo, da equipe do Perito Walker.\nAcabei de receber seu formulário de aplicação pra mentoria.\n\nMe diz uma coisa: você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
+    "Olá, tudo bem?\n\nAqui é o Pedro, do time do Perito Walker.\nAcabei de ver sua aplicação pra mentoria e preciso confirmar uma informação rapidinho antes de seguir com a análise.\n\nHoje você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
   ta_ai: "Olá, tá por ai?",
   corrido_followup: "Opa, sei que deve estar corrido por aí, mas você conseguiu ver minha mensagem anterior?",
   olhinho_followup: "👀",
