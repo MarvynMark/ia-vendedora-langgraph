@@ -143,12 +143,14 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   });
   logger.info("aplicacao", "Conversa criada:", conversa.id);
 
-  // Descrição operacional da tarefa (sem dados do formulário — estão nos atributos do contato)
+  // Descrição no novo formato de 3 linhas
+  const dispostoInvestir = (d.disposto_investir ?? "").toLowerCase();
+  const emojiAtendimento = (dispostoInvestir.includes("sim") || dispostoInvestir.includes("quero")) ? "🟢" : "🟣";
+  const concursoDescricao = d.qual_concurso ?? "não informado";
   const descricaoTarefa = [
-    "Origem: formulário de aplicação",
-    "Plano oferecido: (a definir)",
-    "Objeções: (nenhuma)",
-    "followup-templates: 0",
+    `${emojiAtendimento} - Concurso: ${concursoDescricao}`,
+    "🔁 - Follow-ups: 0",
+    "👤 - Descrição: inicio",
   ].join("\n");
 
   // Cria task no Kanban na etapa "Novo Lead"
