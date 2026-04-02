@@ -32,10 +32,12 @@ export function criarLangfuseHandler(
     secretKey: env.LANGFUSE_SECRET_KEY,
     publicKey: env.LANGFUSE_PUBLIC_KEY,
     baseUrl: env.LANGFUSE_BASEURL,
+    traceName,
     sessionId: opts.sessionId,
     userId: opts.userId,
-    metadata: { ...opts.metadata, traceName },
+    metadata: opts.metadata,
     tags: opts.tags,
+    debug: true,
   });
 }
 
