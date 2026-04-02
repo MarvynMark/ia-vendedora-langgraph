@@ -247,6 +247,12 @@ async function gerarAudio(state: MainAgentStateType) {
 }
 
 async function enviarTextoComHistorico(state: MainAgentStateType) {
+  // Salvar histórico ANTES de enviar — evita que resposta do lead durante o envio
+  // (que pode levar 30s+ com múltiplos blocos) cause reinício da conversa por falta de contexto
+  await salvarMensagem(state.telefone, {
+    type: "ai", content: state.outputAgente,
+    tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
+  });
   const formatado = await formatarTextoFn(state.outputAgente);
   const blocos = dividirMensagem(formatado);
   for (let i = 0; i < blocos.length; i++) {
@@ -257,25 +263,13 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     }
     await enviarMensagem(state.idConta, state.idConversa, blocos[i]!);
   }
-  await salvarMensagem(state.telefone, {
-    type: "ai", content: state.outputAgente,
-    tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
-  });
 }
 
 export async function enviarAudioNo(state: MainAgentStateType) {
   if (state.audioBuffer) {
     logger.info("main-agent", "enviando áudio...");
     try {
-      await enviarArquivo(
-        state.idConta,
-        state.idConversa,
-        state.audioBuffer,
-        "resposta.mp3",
-        "audio/mpeg",
-        { isRecordedAudio: true, transcribedText: state.outputAgente },
-      );
-      // Salvar resposta no histórico
+      // Salvar histórico ANTES de enviar o áudio pelo mesmo motivo que o texto
       await salvarMensagem(state.telefone, {
         type: "ai",
         content: state.outputAgente,
@@ -284,6 +278,14 @@ export async function enviarAudioNo(state: MainAgentStateType) {
         response_metadata: {},
         invalid_tool_calls: [],
       });
+      await enviarArquivo(
+        state.idConta,
+        state.idConversa,
+        state.audioBuffer,
+        "resposta.mp3",
+        "audio/mpeg",
+        { isRecordedAudio: true, transcribedText: state.outputAgente },
+      );
       return {};
     } catch (e) {
       logger.error("main-agent", "Erro ao enviar áudio, fallback para texto:", e);
