@@ -28,9 +28,19 @@ export async function verificarFollowupsPendentes() {
   const boardId = env.KANBAN_BOARD_ID;
 
   for (const step of STEPS_RASTREADOS) {
-    let tasks;
+    // Buscar todas as páginas (API retorna 25 por página)
+    let tasks: Awaited<ReturnType<typeof listarKanbanTasks>> = [];
     try {
-      tasks = await listarKanbanTasks(accountId, boardId, step.id);
+      let page = 1;
+      while (true) {
+        const pagina = await listarKanbanTasks(accountId, boardId, step.id, page);
+        tasks = tasks.concat(pagina);
+        if (pagina.length < 25) break; // última página
+        page++;
+      }
+      // Filtrar client-side pois o step_id da API não filtra corretamente
+      tasks = tasks.filter(t => t.board_step_id === step.id);
+      logger.info("followup-timer", `Step ${step.name}: ${tasks.length} tasks encontradas`);
     } catch (e) {
       logger.error("followup-timer", `Erro ao listar tasks do step ${step.name}:`, e);
       continue;
