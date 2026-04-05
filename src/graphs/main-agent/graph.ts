@@ -106,13 +106,41 @@ async function executarAgente(state: MainAgentStateType) {
     timeZone: env.TZ,
   });
 
-  const systemPrompt = gerarPromptAgentePrincipal({
+  // Carregar histórico antes de montar o system prompt para poder injetar contexto de continuação
+  const historico = await buscarHistorico(state.telefone, 50);
+  const mensagensHistorico = historico
+    .map((m) => {
+      if (m.type === "human") {
+        return new HumanMessage(m.content);
+      }
+      return new AIMessage(m.content);
+    })
+    .filter((m) => {
+      // Filtrar mensagens SISTEMA do histórico: o LLM não deve ver "Apresente-se" em conversas já iniciadas
+      if (m._getType() !== "human") return true;
+      const content = typeof m.content === "string" ? m.content : "";
+      return !content.startsWith("[SISTEMA:");
+    });
+
+  const temHistoricoAI = mensagensHistorico.some(m => m._getType() === "ai");
+
+  let systemPrompt = gerarPromptAgentePrincipal({
     tarefa,
     etapasDescricao,
     dataHoraAtual,
     dadosFormulario: state.dadosFormulario,
     atributosContato: state.atributosContato,
   });
+
+  // Injetar no system prompt quando a conversa já está em andamento
+  // (mais autoritativo que injeção no userMessage — o LLM prioriza system prompt)
+  if (temHistoricoAI) {
+    const lastAi = mensagensHistorico.filter(m => m._getType() === "ai").at(-1);
+    const ultimaResposta = typeof lastAi?.content === "string"
+      ? lastAi.content.substring(0, 100)
+      : "";
+    systemPrompt = `⚠️ ESTADO DA CONVERSA: Esta conversa JÁ foi iniciada. Você JÁ enviou a Mensagem 1A e se apresentou. NÃO repita a apresentação. NÃO envie "Olá" nem se reapresente. Sua última mensagem foi: "${ultimaResposta}". Responda diretamente ao que o lead disse, continuando de onde parou.\n\n` + systemPrompt;
+  }
 
   const tools = criarToolsAgenteVestigium({
     idMensagem: state.idMensagem,
@@ -138,29 +166,11 @@ async function executarAgente(state: MainAgentStateType) {
     prompt: systemPrompt,
   });
 
-  // Carregar histórico da memória
-  const historico = await buscarHistorico(state.telefone, 50);
-  const mensagensHistorico = historico
-    .map((m) => {
-      if (m.type === "human") {
-        return new HumanMessage(m.content);
-      }
-      return new AIMessage(m.content);
-    })
-    .filter((m) => {
-      // Filtrar mensagens SISTEMA do histórico: o LLM não deve ver "Apresente-se" em conversas já iniciadas
-      if (m._getType() !== "human") return true;
-      const content = typeof m.content === "string" ? m.content : "";
-      return !content.startsWith("[SISTEMA:");
-    });
-
   // Montar user message
   let userMessage = state.mensagensAgregadas || state.mensagemProcessada;
   if (state.mensagemReferenciada) {
     userMessage = `<mensagem-referenciada>\n${state.mensagemReferenciada}\n</mensagem-referenciada>\n\n${userMessage}`;
   }
-
-  const temHistoricoAI = mensagensHistorico.some(m => m._getType() === "ai");
 
   // Bloquear execução se for trigger SISTEMA e a conversa já foi iniciada
   // (cobre o caso de dois timers dispararem simultaneamente — o segundo é descartado após o primeiro salvar no histórico)
@@ -168,15 +178,6 @@ async function executarAgente(state: MainAgentStateType) {
   if (temHistoricoAI && mensagemOriginal.startsWith("[SISTEMA:")) {
     logger.info("main-agent", "Trigger SISTEMA ignorado: conversa já iniciada, pulando apresentação duplicada");
     return { outputAgente: "" };
-  }
-
-  // Injeção estrutural: se há histórico AI, avisar explicitamente que a conversa já está em andamento
-  if (temHistoricoAI) {
-    const lastAi = mensagensHistorico.filter(m => m._getType() === "ai").at(-1);
-    const ultimaResposta = typeof lastAi?.content === "string"
-      ? lastAi.content.substring(0, 100)
-      : "";
-    userMessage = `[CONTEXTO OBRIGATÓRIO DO SISTEMA: Você JÁ se apresentou para este lead. A conversa está em andamento. Sua última mensagem enviada foi: "${ultimaResposta}". NÃO envie a Mensagem 1 nem se reapresente. Responda DIRETAMENTE ao que o lead disse abaixo.]\n\n${userMessage}`;
   }
 
   const messages = [

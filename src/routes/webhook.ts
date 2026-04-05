@@ -125,15 +125,18 @@ export const webhookRouter = new Elysia()
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
 
-      // Verificar se o link já foi enviado nessa conversa — funciona cross-process (não usa Map in-memory)
+      // Verificar se o link já foi enviado nessa conversa nos últimos 10 minutos — funciona cross-process (não usa Map in-memory)
       const msgsChatwoot = await listarMensagens(idConta, idConversa) as {
-        payload?: Array<{ message_type: number; content?: string | null }>;
+        payload?: Array<{ message_type: number; content?: string | null; created_at?: number }>;
       };
+      const agora = Date.now() / 1000;
       const linkJaEnviado = (msgsChatwoot.payload ?? []).some(
-        m => m.message_type !== 0 && (m.content ?? "").includes("grupo de espera")
+        m => m.message_type !== 0
+          && (m.content ?? "").includes("grupo de espera")
+          && (m.created_at === undefined || agora - m.created_at < 600)
       );
       if (linkJaEnviado) {
-        logger.info("webhook", "Link do grupo já enviado nesta conversa — ignorado");
+        logger.info("webhook", "Link do grupo já enviado nesta conversa nos últimos 10min — ignorado");
         return { status: "ignored", reason: "grupo_espera_duplicado" };
       }
 
