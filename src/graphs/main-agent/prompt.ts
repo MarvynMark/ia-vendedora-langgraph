@@ -143,7 +143,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   **FALLBACK — Se o vídeo não chegar:**
   - Se a ferramenta retornar erro OU se o lead disser que não recebeu: NÃO insista que enviou. NÃO tente reenviar.
-  - Responda: "O arquivo ficou pesado pra chegar por aqui. Dá uma olhada direto nesse link: https://aluno.mentoriavestigium.com.br/dash"
+  - Responda: "O arquivo ficou pesado pra chegar por aqui. Dá uma olhada direto nesse link: https://drive.google.com/file/d/1ZKTwSLHIsPNWM2TPZxn4uBMgDVFOlKQ5/view?usp=drive_link"
   - Continue normalmente para a Mensagem 5c.
 
   > Aguarde confirmação de que assistiu antes de continuar.
