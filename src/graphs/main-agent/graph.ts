@@ -160,8 +160,17 @@ async function executarAgente(state: MainAgentStateType) {
     userMessage = `<mensagem-referenciada>\n${state.mensagemReferenciada}\n</mensagem-referenciada>\n\n${userMessage}`;
   }
 
-  // Injeção estrutural: se há histórico AI, avisar explicitamente que a conversa já está em andamento
   const temHistoricoAI = mensagensHistorico.some(m => m._getType() === "ai");
+
+  // Bloquear execução se for trigger SISTEMA e a conversa já foi iniciada
+  // (cobre o caso de dois timers dispararem simultaneamente — o segundo é descartado após o primeiro salvar no histórico)
+  const mensagemOriginal = state.mensagensAgregadas || state.mensagemProcessada;
+  if (temHistoricoAI && mensagemOriginal.startsWith("[SISTEMA:")) {
+    logger.info("main-agent", "Trigger SISTEMA ignorado: conversa já iniciada, pulando apresentação duplicada");
+    return { outputAgente: "" };
+  }
+
+  // Injeção estrutural: se há histórico AI, avisar explicitamente que a conversa já está em andamento
   if (temHistoricoAI) {
     const lastAi = mensagensHistorico.filter(m => m._getType() === "ai").at(-1);
     const ultimaResposta = typeof lastAi?.content === "string"
@@ -203,15 +212,17 @@ async function executarAgente(state: MainAgentStateType) {
       .filter(s => s.trim().length > 0)
       .join("\n\n");
 
-    // Salvar user message no histórico
-    await salvarMensagem(state.telefone, {
-      type: "human",
-      content: userMessage,
-      tool_calls: [],
-      additional_kwargs: {},
-      response_metadata: {},
-      invalid_tool_calls: [],
-    });
+    // Salvar user message no histórico (não salvar mensagens SISTEMA — elas confundem o LLM ao reaparecer)
+    if (!mensagemOriginal.startsWith("[SISTEMA:")) {
+      await salvarMensagem(state.telefone, {
+        type: "human",
+        content: userMessage,
+        tool_calls: [],
+        additional_kwargs: {},
+        response_metadata: {},
+        invalid_tool_calls: [],
+      });
+    }
 
     logger.info("main-agent", "output do agente:", output.substring(0, 100) + "...");
 
