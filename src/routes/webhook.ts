@@ -32,6 +32,17 @@ function jaProcessou(idMensagem: string): boolean {
   return false;
 }
 
+// Rate limiter para grupo de espera: impede envio duplicado para a mesma conversa em 60s
+const grupoEsperaEnviado = new Map<string, number>();
+function jaEnviouGrupoEspera(idConversa: string): boolean {
+  const ultimoEnvio = grupoEsperaEnviado.get(idConversa);
+  const agora = Date.now();
+  if (ultimoEnvio && agora - ultimoEnvio < 60_000) return true;
+  grupoEsperaEnviado.set(idConversa, agora);
+  setTimeout(() => grupoEsperaEnviado.delete(idConversa), 60_000);
+  return false;
+}
+
 const webhookPayloadSchema = z.object({
   message_type: z.union([z.number(), z.string()]),
   content: z.string().nullable().optional(),
@@ -121,6 +132,12 @@ export const webhookRouter = new Elysia()
       logger.info("webhook", "Pedido de grupo de espera detectado");
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
+
+      if (jaEnviouGrupoEspera(idConversa)) {
+        logger.info("webhook", "Grupo de espera já enviado para esta conversa nos últimos 60s — ignorado");
+        return { status: "ignored", reason: "grupo_espera_duplicado" };
+      }
+
       await enviarMensagem(idConta, idConversa,
         `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
       );
