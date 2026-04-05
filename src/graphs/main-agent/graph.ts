@@ -140,12 +140,19 @@ async function executarAgente(state: MainAgentStateType) {
 
   // Carregar histórico da memória
   const historico = await buscarHistorico(state.telefone, 50);
-  const mensagensHistorico = historico.map((m) => {
-    if (m.type === "human") {
-      return new HumanMessage(m.content);
-    }
-    return new AIMessage(m.content);
-  });
+  const mensagensHistorico = historico
+    .map((m) => {
+      if (m.type === "human") {
+        return new HumanMessage(m.content);
+      }
+      return new AIMessage(m.content);
+    })
+    .filter((m) => {
+      // Filtrar mensagens SISTEMA do histórico: o LLM não deve ver "Apresente-se" em conversas já iniciadas
+      if (m._getType() !== "human") return true;
+      const content = typeof m.content === "string" ? m.content : "";
+      return !content.startsWith("[SISTEMA:");
+    });
 
   // Montar user message
   let userMessage = state.mensagensAgregadas || state.mensagemProcessada;
@@ -158,9 +165,9 @@ async function executarAgente(state: MainAgentStateType) {
   if (temHistoricoAI) {
     const lastAi = mensagensHistorico.filter(m => m._getType() === "ai").at(-1);
     const ultimaResposta = typeof lastAi?.content === "string"
-      ? lastAi.content.substring(0, 80)
+      ? lastAi.content.substring(0, 100)
       : "";
-    userMessage = `[INSTRUÇÃO: conversa em andamento — sua última mensagem foi: "${ultimaResposta}". NÃO se reapresente. Responda diretamente ao lead.]\n\n${userMessage}`;
+    userMessage = `[CONTEXTO OBRIGATÓRIO DO SISTEMA: Você JÁ se apresentou para este lead. A conversa está em andamento. Sua última mensagem enviada foi: "${ultimaResposta}". NÃO envie a Mensagem 1 nem se reapresente. Responda DIRETAMENTE ao que o lead disse abaixo.]\n\n${userMessage}`;
   }
 
   const messages = [
