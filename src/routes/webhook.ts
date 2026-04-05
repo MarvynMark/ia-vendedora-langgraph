@@ -12,10 +12,12 @@ import {
   adicionarEtiquetas,
   buscarConversa,
   enviarMensagem,
+  listarMensagens,
   atualizarContato,
   atualizarAtributosConversa,
   removerEtiquetas,
 } from "../services/chatwoot.ts";
+import { buscarHistorico } from "../db/memoria.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
@@ -32,16 +34,6 @@ function jaProcessou(idMensagem: string): boolean {
   return false;
 }
 
-// Rate limiter para grupo de espera: impede envio duplicado para a mesma conversa em 60s
-const grupoEsperaEnviado = new Map<string, number>();
-function jaEnviouGrupoEspera(idConversa: string): boolean {
-  const ultimoEnvio = grupoEsperaEnviado.get(idConversa);
-  const agora = Date.now();
-  if (ultimoEnvio && agora - ultimoEnvio < 60_000) return true;
-  grupoEsperaEnviado.set(idConversa, agora);
-  setTimeout(() => grupoEsperaEnviado.delete(idConversa), 60_000);
-  return false;
-}
 
 const webhookPayloadSchema = z.object({
   message_type: z.union([z.number(), z.string()]),
@@ -133,8 +125,15 @@ export const webhookRouter = new Elysia()
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
 
-      if (jaEnviouGrupoEspera(idConversa)) {
-        logger.info("webhook", "Grupo de espera já enviado para esta conversa nos últimos 60s — ignorado");
+      // Verificar se o link já foi enviado nessa conversa — funciona cross-process (não usa Map in-memory)
+      const msgsChatwoot = await listarMensagens(idConta, idConversa) as {
+        payload?: Array<{ message_type: number; content?: string | null }>;
+      };
+      const linkJaEnviado = (msgsChatwoot.payload ?? []).some(
+        m => m.message_type !== 0 && (m.content ?? "").includes("grupo de espera")
+      );
+      if (linkJaEnviado) {
+        logger.info("webhook", "Link do grupo já enviado nesta conversa — ignorado");
         return { status: "ignored", reason: "grupo_espera_duplicado" };
       }
 
@@ -157,6 +156,13 @@ export const webhookRouter = new Elysia()
 
         setTimeout(async () => {
           try {
+            // Verificar se a conversa já foi iniciada (evita intro duplicada se dois timers dispararem)
+            const historicoExistente = await buscarHistorico(introTelefone, 3);
+            if (historicoExistente.some(m => m.type === "ai")) {
+              logger.info("webhook", "Intro automática ignorada: conversa já iniciada", { telefone: introTelefone });
+              return;
+            }
+
             const conversa = await buscarConversa(introIdConta, introIdConversa) as Record<string, unknown>;
             const tarefa = (conversa["kanban_task"] ?? {}) as Record<string, unknown>;
             const funil = (conversa["kanban_board"] ?? {}) as Record<string, unknown>;

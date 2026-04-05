@@ -153,6 +153,16 @@ async function executarAgente(state: MainAgentStateType) {
     userMessage = `<mensagem-referenciada>\n${state.mensagemReferenciada}\n</mensagem-referenciada>\n\n${userMessage}`;
   }
 
+  // Injeção estrutural: se há histórico AI, avisar explicitamente que a conversa já está em andamento
+  const temHistoricoAI = mensagensHistorico.some(m => m._getType() === "ai");
+  if (temHistoricoAI) {
+    const lastAi = mensagensHistorico.filter(m => m._getType() === "ai").at(-1);
+    const ultimaResposta = typeof lastAi?.content === "string"
+      ? lastAi.content.substring(0, 80)
+      : "";
+    userMessage = `[INSTRUÇÃO: conversa em andamento — sua última mensagem foi: "${ultimaResposta}". NÃO se reapresente. Responda diretamente ao lead.]\n\n${userMessage}`;
+  }
+
   const messages = [
     ...mensagensHistorico,
     new HumanMessage(userMessage),
