@@ -57,7 +57,7 @@ async function classificar(state: FollowUpStateType) {
     tipoFollowup = "boas_vindas";
   } else if (stepName === "primeira mensagem") {
     tipoFollowup = "template_abertura";
-  } else if (stepName === "nutrir") {
+  } else if (stepName === "nutrir" || stepName === "perdido") {
     tipoFollowup = "nutrir";
   } else {
     tipoFollowup = "ignorar";
@@ -69,6 +69,31 @@ async function classificar(state: FollowUpStateType) {
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando agente follow-up...");
+
+  // Se o lead já respondeu, apenas reagenda sem enviar mensagem
+  try {
+    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
+    if (totalIncoming > 0) {
+      logger.info("follow-up", "Lead já respondeu — reagendando follow-up sem enviar mensagem");
+      const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+      await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
+      return { respostaAgente: "" };
+    }
+  } catch (e) {
+    logger.warn("follow-up", "Erro ao verificar incoming:", e);
+  }
+
+  // Após 3 follow-ups sem resposta, mover para Perdido
+  const contador = lerContadorNutrir(state.description ?? "");
+  if (contador >= 3) {
+    logger.info("follow-up", `${contador} follow-ups sem resposta — movendo para Perdido`);
+    await atualizarKanbanTask(state.accountId, state.taskId, {
+      board_step_id: state.idEtapaPerdido || undefined,
+      description: atualizarContadorNutrir(state.description ?? "", contador),
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    return { respostaAgente: "" };
+  }
 
   const prompt = gerarPromptFollowup({
     funilSteps: state.funilSteps,
@@ -123,6 +148,18 @@ async function agenteFollowup(state: FollowUpStateType) {
     const msgs = resultado.messages ?? [];
     const last = msgs.filter((m: { _getType: () => string }) => m._getType() === "ai").pop();
     const resposta = last ? (last.content as string) : "";
+
+    // Incrementar contador de follow-ups e reagendar para 24h
+    if (resposta) {
+      const novoContador = contador + 1;
+      const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
+      const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+      await atualizarKanbanTask(state.accountId, state.taskId, {
+        description: descricaoAtualizada,
+        due_date: proxima.toISOString(),
+      });
+      logger.info("follow-up", `Follow-up ${novoContador}/3 enviado — próximo em 24h`);
+    }
 
     return { respostaAgente: resposta };
   } catch (e) {

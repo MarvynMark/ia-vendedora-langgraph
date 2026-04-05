@@ -111,6 +111,7 @@ async function executarAgente(state: MainAgentStateType) {
     etapasDescricao,
     dataHoraAtual,
     dadosFormulario: state.dadosFormulario,
+    atributosContato: state.atributosContato,
   });
 
   const tools = criarToolsAgenteVestigium({

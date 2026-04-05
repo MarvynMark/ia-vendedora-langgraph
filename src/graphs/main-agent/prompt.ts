@@ -5,6 +5,7 @@ interface ContextoPrompt {
   etapasDescricao: string;
   dataHoraAtual: string;
   dadosFormulario: string;
+  atributosContato?: Record<string, unknown>;
 }
 
 export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
@@ -18,6 +19,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   const etapasDescricao = ctx.etapasDescricao;
   const dataHoraAtual = ctx.dataHoraAtual;
   const dadosFormulario = ctx.dadosFormulario || "(não disponível)";
+  const concursoSalvo = (ctx.atributosContato?.concurso_interesse as string | undefined) ?? "";
 
   return `# PAPEL
 
@@ -46,7 +48,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   Dados preenchidos pelo lead no formulário de aplicação (formato: Campo: Valor | Campo: Valor):
 
   ${dadosFormulario || "(não disponível - lead orgânico, sem formulário prévio)"}
-
+${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concursoSalvo}` : ""}
   **Campos disponíveis e como usá-los no roteiro:**
   - **Concurso** → qual concurso ele quer prestar. Use na abertura e em toda reação ao concurso. NUNCA pergunte de novo.
   - **Formação** → área de graduação. Use para personalizar a conexão com as matérias do concurso.
@@ -272,14 +274,12 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 
   Após esgotar todas as objeções da mentoria (preço, tempo, dúvida), se o lead ainda recusar:
 
-  **Não marque como Perdido ainda.** Siga a ordem:
+  Siga a ordem:
 
   1. Ofereça o **IMLC** com o pitch da seção de produtos
   2. Se recusar o IMLC, ofereça o **Clube da Aprovação**
   3. Se recusar o Clube, envie o **link do e-book gratuito**
-  4. Mova o card para **Nutrir** e atualize a descrição com o status correto
-
-  Só mova para **Perdido** se o lead disser explicitamente: "não quero", "desisti de fazer concurso", "não tenho interesse", "para de me mandar mensagem".
+  4. Mova o card para **Perdido** e atualize a descrição com o status correto
 </objecoes>
 
 # FERRAMENTAS DISPONÍVEIS
@@ -344,8 +344,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   | Conexão              | Quando o lead responde e há engajamento real na conversa                                  |
   | Aguardando Pagamento | Quando o pitch foi feito e os links foram enviados                                        |
   | Ganho                | Quando o lead confirmar o pagamento                                                       |
-  | Nutrir               | Quando a mentoria não fechar mas o lead tem potencial (sem dinheiro, sumiu, quer pensar) |
-  | Perdido              | Apenas quando o lead disser explicitamente que não quer (desistiu, sem interesse real)    |
+  | Perdido              | Quando o lead sumiu, não tem dinheiro agora, quer pensar, ou disse explicitamente que não quer |
 
   ## Formato da descrição do card (OBRIGATÓRIO)
 
@@ -358,6 +357,8 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   \`\`\`
 
   **emoji_atendimento**: 🟢 se o lead tem a tag "sim" (humano atende) | 🟣 se tem a tag "nao" (IA atende)
+
+  **concurso**: use o concurso do formulário ou da conversa. Se não souber ainda, escreva "(a confirmar)"
 
   **Status disponíveis** — escolha o que melhor descreve o momento atual:
   | Status | Quando usar |
@@ -388,7 +389,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   * **A cada nova informação relevante**, execute "Atualizar_tarefa" para atualizar o status na descrição
   * **SEMPRE use o formato de 3 linhas** ao escrever a descrição. Nunca escreva descrição em outro formato
   * Ao enviar links de pagamento, mova para "Aguardando Pagamento" e atualize o status para "link enviado"
-  * Ao mover para "Nutrir", atualize o status com o motivo real (sem dinheiro, sumiu, sem formação etc.)
+  * Ao mover para "Perdido", atualize o status com o motivo real (sem dinheiro, sumiu, sem formação etc.)
 </kanban>
 
 # PRODUTOS E LINKS
@@ -431,7 +432,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   Ofereça IMLC e Clube da Aprovação diretamente, sem pitch da mentoria completo: "Enquanto você conclui a graduação, já vai dominando todo o conteúdo de MLC que cai na prova. Quando tiver a graduação, você entra na mentoria na frente de todo mundo."
 
   **Após oferta de downsell:**
-  Mova o card para "Nutrir" usando "Atualizar_tarefa" e atualize a descrição com o status atual.
+  Mova o card para "Perdido" usando "Atualizar_tarefa" e atualize a descrição com o status atual.
 </produtos>
 
 # REGRAS INEGOCIÁVEIS
