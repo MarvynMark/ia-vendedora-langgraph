@@ -167,7 +167,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   logger.info("aplicacao", "Kanban task criada:", task.id);
 
   // Monta lista de etiquetas dinâmicas com base nas respostas do formulário
-  const etiquetas = ["agente-on"];
+  const etiquetas: string[] = [];
 
   // medico: formação em Medicina (excluindo Biomedicina e Medicina Veterinária)
   const area = (d.area_graduacao ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -175,11 +175,13 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   if (ehMedico) etiquetas.push("medico");
 
   // sim / nao: disposição para investir
+  // agente-on só é adicionado para quem respondeu "não" — humano atende os que disseram "sim"
   const disposto = (d.disposto_investir ?? "").toLowerCase();
   if (disposto.includes("sim") || disposto.includes("quero")) {
     etiquetas.push("sim");
   } else if (disposto.includes("nao") || disposto.includes("não") || disposto.includes("talvez")) {
     etiquetas.push("nao");
+    etiquetas.push("agente-on");
   }
 
   await adicionarEtiquetas(accountId, conversa.id, etiquetas);
