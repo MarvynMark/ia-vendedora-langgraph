@@ -205,9 +205,10 @@ async function executarAgente(state: MainAgentStateType) {
       langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
     );
     const msgs = resultado.messages ?? [];
-    // Concatenar conteúdo de TODAS as mensagens AI (não só a última)
-    // Evita perder texto escrito antes de uma tool call (ex: lista de bônus na Etapa 6)
-    const output = msgs
+    // Pegar apenas mensagens NOVAS (geradas pelo agente), ignorando o histórico passado como input
+    // Sem isso, respostas anteriores do AI são re-concatenadas no output, causando snowball
+    const newMsgs = msgs.slice(messages.length);
+    const output = newMsgs
       .filter((m: { _getType: () => string }) => m._getType() === "ai")
       .map((m: { content: unknown }) => (typeof m.content === "string" ? m.content : ""))
       .filter(s => s.trim().length > 0)
