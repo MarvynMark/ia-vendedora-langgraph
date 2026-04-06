@@ -21,7 +21,10 @@ export function gerarPromptFollowup(ctx: ContextoFollowUpPrompt): string {
     timeZone: env.TZ,
   });
 
-  return `# PAPEL
+  // Extrair primeiro nome para substituição nos exemplos do prompt
+  const primeiroNome = title.split(" ")[0] ?? title;
+
+  return (`# PAPEL
 
 <papel>
   Você é o Gusthavo, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar uma mensagem de follow-up para um lead que estava em negociação mas parou de responder.
@@ -123,7 +126,7 @@ export function gerarPromptFollowup(ctx: ContextoFollowUpPrompt): string {
 <informacoes-sistema>
   **Data e Hora Atual**: ${dataHoraAtual}
 </informacoes-sistema>
-`;
+`).replace(/\[Nome\]/g, primeiroNome);
 }
 
 export const PROMPT_LEMBRETE = `# PAPEL

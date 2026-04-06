@@ -193,10 +193,13 @@ async function agenteLembrete(state: FollowUpStateType) {
     tags: ["follow-up", "lembrete"],
   });
 
+  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+  const promptLembrete = PROMPT_LEMBRETE.replace(/\[Nome\]/g, primeiroNome);
+
   try {
     const resultado = await model.invoke(
       [
-        { role: "system", content: PROMPT_LEMBRETE },
+        { role: "system", content: promptLembrete },
         ...msgsHistorico.map(m => ({
           role: m._getType() === "human" ? "user" as const : "assistant" as const,
           content: m.content as string,
