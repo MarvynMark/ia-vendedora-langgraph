@@ -144,8 +144,8 @@ export const webhookRouter = new Elysia()
         `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
       );
 
-      // Para leads de formulário: disparar intro da IA após 2 minutos
-      if (labels.includes("sim") || labels.includes("nao")) {
+      // Para leads de formulário: disparar intro da IA após 2 minutos (apenas "nao" — "sim" é atendido por humano)
+      if (labels.includes("nao") && !labels.includes("sim")) {
         logger.info("webhook", "Lead de formulário detectado (sim/nao): agendando intro em 2 minutos");
         const introIdConta = idConta;
         const introIdConversa = idConversa;
