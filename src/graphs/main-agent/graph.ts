@@ -135,11 +135,7 @@ async function executarAgente(state: MainAgentStateType) {
   // Injetar no system prompt quando a conversa já está em andamento
   // (mais autoritativo que injeção no userMessage — o LLM prioriza system prompt)
   if (temHistoricoAI) {
-    const lastAi = mensagensHistorico.filter(m => m._getType() === "ai").at(-1);
-    const ultimaResposta = typeof lastAi?.content === "string"
-      ? lastAi.content.substring(0, 100)
-      : "";
-    systemPrompt = `⚠️ ESTADO DA CONVERSA: Esta conversa JÁ foi iniciada. Você JÁ enviou a Mensagem 1A e se apresentou. NÃO repita a apresentação. NÃO envie "Olá" nem se reapresente. Sua última mensagem foi: "${ultimaResposta}". Responda diretamente ao que o lead disse, continuando de onde parou.\n\n` + systemPrompt;
+    systemPrompt = systemPrompt + `\n\n⚠️ INSTRUÇÃO CRÍTICA: Esta conversa JÁ está em andamento. Você JÁ se apresentou e enviou a Mensagem 1A. NÃO repita a apresentação. Responda apenas ao que o lead acabou de escrever.`;
   }
 
   const tools = criarToolsAgenteVestigium({
