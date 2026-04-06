@@ -88,6 +88,16 @@ export async function verificarFollowupsPendentes() {
 
         logger.info("followup-timer", `Disparando follow-up para task ${task.id} (${task.title}) — ${telefone}`);
 
+        // Avançar due_date imediatamente antes de disparar o grafo — evita re-disparo pelo próximo
+        // ciclo do cron (a cada 5 min) caso o grafo demore ou a task permaneça "overdue" na API
+        try {
+          const proximaProvisoria = proximoHorarioComercial(new Date(), step.delayMs);
+          await atualizarKanbanTask(accountId, task.id, { due_date: proximaProvisoria.toISOString() });
+          logger.info("followup-timer", `due_date avançada preventivamente para task ${task.id} → ${proximaProvisoria.toISOString()}`);
+        } catch (e) {
+          logger.warn("followup-timer", `Não foi possível avançar due_date para task ${task.id}:`, e);
+        }
+
         const stepInfo = { id: step.id, name: step.name };
 
         void (async () => {
