@@ -19,15 +19,17 @@ function ehFimDeSemana(diaSemana: number): boolean {
 
 /**
  * Dado um momento e um delay em ms, retorna quando a mensagem deve ser
- * enviada respeitando horário comercial (seg-sex, 8h-18h, fuso SP).
+ * enviada respeitando horário comercial (seg-sex, 8h-18h por padrão, fuso SP).
  * Se o alvo cair fora desse intervalo, avança para o próximo dia útil às 9h.
+ *
+ * @param horaFechamento - hora máxima (padrão 18). Use 20 para follow-ups dentro da janela de 24h.
  */
-export function proximoHorarioComercial(agora: Date, delayMs: number): Date {
+export function proximoHorarioComercial(agora: Date, delayMs: number, horaFechamento = HORA_FECHAMENTO): Date {
   const alvo = new Date(agora.getTime() + delayMs);
   const { hora, diaSemana } = getComponentesSP(alvo);
 
   // Já está dentro do expediente
-  if (!ehFimDeSemana(diaSemana) && hora >= HORA_ABERTURA && hora < HORA_FECHAMENTO) {
+  if (!ehFimDeSemana(diaSemana) && hora >= HORA_ABERTURA && hora < horaFechamento) {
     return alvo;
   }
 

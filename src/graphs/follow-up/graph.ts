@@ -1,9 +1,8 @@
 import { StateGraph, END } from "@langchain/langgraph";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
-import { gerarPromptFollowup, PROMPT_LEMBRETE } from "./prompts.ts";
+import { PROMPT_LEMBRETE } from "./prompts.ts";
 import { env } from "../../config/env.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
@@ -11,7 +10,6 @@ import { VIDEO_PLATAFORMA_URL } from "../../tools/enviar-video.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { criarToolsFollowup } from "../../tools/factory.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
 import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
@@ -25,7 +23,11 @@ async function buscarFunil(state: FollowUpStateType) {
       steps?: Array<{ id: number; name: string; cancelled?: boolean }>;
     };
     const steps = board.steps ?? [];
-    const idEtapaPerdido = steps.find(s => s.cancelled)?.id ?? 0;
+    // Busca por etapa marcada como "cancelled" (Perdido no Chatwoot), com fallback por nome
+    const idEtapaPerdido =
+      steps.find(s => s.cancelled)?.id ??
+      steps.find(s => s.name.toLowerCase().includes("perdido"))?.id ??
+      0;
 
     return {
       funilSteps: steps,
@@ -67,14 +69,24 @@ async function classificar(state: FollowUpStateType) {
   return { tipoFollowup };
 }
 
-async function agenteFollowup(state: FollowUpStateType) {
-  logger.info("follow-up", "executando agente follow-up...");
+// Sequência de recuperação para leads em Conexão (já conversaram mas pararam de responder)
+const SEQUENCIA_RECUPERACAO_CONEXAO = [
+  "conexao_followup_1",
+  "conexao_followup_2",
+  "conexao_followup_3",
+] as const;
 
-  // Se o lead já respondeu, apenas reagenda sem enviar mensagem
+// Quando fora da janela 24h, reutiliza templates aprovados da Primeira mensagem
+const TEMPLATE_FALLBACK_CONEXAO = ["ta_ai", "corrido_followup", "olhinho_followup"] as const;
+
+async function agenteFollowup(state: FollowUpStateType) {
+  logger.info("follow-up", "executando follow-up Conexão...");
+
+  // Se o lead já respondeu, apenas reagenda
   try {
     const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
     if (totalIncoming > 0) {
-      logger.info("follow-up", "Lead já respondeu — reagendando follow-up sem enviar mensagem");
+      logger.info("follow-up", "Lead já respondeu — reagendando follow-up Conexão");
       const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
       await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
       return { respostaAgente: "" };
@@ -83,10 +95,26 @@ async function agenteFollowup(state: FollowUpStateType) {
     logger.warn("follow-up", "Erro ao verificar incoming:", e);
   }
 
-  // Após 3 follow-ups sem resposta, mover para Perdido
+  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
   const contador = lerContadorNutrir(state.description ?? "");
-  if (contador >= 3) {
-    logger.info("follow-up", `${contador} follow-ups sem resposta — movendo para Perdido`);
+  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+
+  // Após 3 mensagens sem resposta: encerramento → Perdido
+  if (contador >= SEQUENCIA_RECUPERACAO_CONEXAO.length) {
+    logger.info("follow-up", `${contador} follow-ups Conexão sem resposta — encerrando`);
+    const conteudoEnc = (CONTEUDO_TEMPLATES["conexao_encerramento"] ?? "").replace(/\[Nome\]/g, primeiroNome);
+    try {
+      if (dentroJanela) {
+        await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
+        if (state.telefone) {
+          await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+        }
+      } else {
+        await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", CONTEUDO_TEMPLATES["encerramento_02"]);
+      }
+    } catch (e) {
+      logger.error("follow-up", "Erro ao enviar encerramento Conexão:", e);
+    }
     await atualizarKanbanTask(state.accountId, state.taskId, {
       board_step_id: state.idEtapaPerdido || undefined,
       description: atualizarContadorNutrir(state.description ?? "", contador),
@@ -95,79 +123,38 @@ async function agenteFollowup(state: FollowUpStateType) {
     return { respostaAgente: "" };
   }
 
-  const prompt = gerarPromptFollowup({
-    funilSteps: state.funilSteps,
-    board_step: state.board_step,
-    title: state.title,
-    description: state.description,
-    dueDate: state.dueDate,
-  });
+  const nomeMsg = SEQUENCIA_RECUPERACAO_CONEXAO[contador]!;
+  const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
+  const conteudo = conteudoRaw.replace(/\[Nome\]/g, primeiroNome);
 
-  const tools = criarToolsFollowup({
-    accountId: state.accountId,
-    boardId: state.boardId,
-    taskId: state.taskId,
-    funilSteps: state.funilSteps,
-    board_step: state.board_step,
-  });
-
-  const model = new ChatOpenAI({
-    modelName: env.OPENAI_MODEL,
-    openAIApiKey: env.OPENAI_API_KEY,
-    temperature: 0.7,
-  });
-
-  const agent = createReactAgent({
-    llm: model,
-    tools,
-    prompt,
-  });
-
-  // Carregar histórico da conversa
-  const historico = await buscarHistorico(state.telefone, 50);
-  const msgsHistorico = historico.map((m) => {
-    if (m.type === "human") return new HumanMessage(m.content);
-    return new AIMessage(m.content);
-  });
-
-  const userMessage = "<lead qualificado aguardando follow-up>";
-
-  const langfuseHandler = criarLangfuseHandler("follow-up", {
-    sessionId: state.telefone,
-    userId: state.telefone,
-    metadata: { taskId: state.taskId, boardId: state.boardId, tipoFollowup: "followup" },
-    tags: ["follow-up"],
-  });
+  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_RECUPERACAO_CONEXAO.length}) — janela: ${dentroJanela}`);
 
   try {
-    const resultado = await agent.invoke(
-      { messages: [...msgsHistorico, new HumanMessage(userMessage)] },
-      langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
-    );
-
-    const msgs = resultado.messages ?? [];
-    const last = msgs.filter((m: { _getType: () => string }) => m._getType() === "ai").pop();
-    const resposta = last ? (last.content as string) : "";
-
-    // Incrementar contador de follow-ups e reagendar para 24h
-    if (resposta) {
-      const novoContador = contador + 1;
-      const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
-      const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
-      await atualizarKanbanTask(state.accountId, state.taskId, {
-        description: descricaoAtualizada,
-        due_date: proxima.toISOString(),
-      });
-      logger.info("follow-up", `Follow-up ${novoContador}/3 enviado — próximo em 24h`);
+    if (dentroJanela) {
+      await enviarMensagem(state.accountId, state.conversationId, conteudo);
+      if (state.telefone) {
+        await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+      }
+    } else {
+      // Fora da janela: reutiliza templates aprovados (ta_ai, corrido_followup, olhinho_followup)
+      const templateFallback = TEMPLATE_FALLBACK_CONEXAO[contador] ?? "encerramento_02";
+      await enviarTemplate(state.accountId, state.conversationId, templateFallback, CONTEUDO_TEMPLATES[templateFallback]);
     }
-
-    return { respostaAgente: resposta };
   } catch (e) {
-    logger.error("follow-up", "Erro no agente follow-up:", e);
+    logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
     return { respostaAgente: "" };
-  } finally {
-    await finalizarLangfuseHandler(langfuseHandler);
   }
+
+  const novoContador = contador + 1;
+  const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
+  const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+  await atualizarKanbanTask(state.accountId, state.taskId, {
+    description: descricaoAtualizada,
+    due_date: proxima.toISOString(),
+  });
+  logger.info("follow-up", `Follow-up Conexão ${novoContador}/3 enviado — próximo em 24h`);
+
+  return { respostaAgente: "" };
 }
 
 async function agenteLembrete(state: FollowUpStateType) {
@@ -310,12 +297,15 @@ async function agenteBoasVindas(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
-const SEQUENCIA_TEMPLATES = [
-  { nome: "ta_ai",              proximoDelayMs: 4 * 60 * 60 * 1000 },  // +4h
-  { nome: "corrido_followup",   proximoDelayMs: 24 * 60 * 60 * 1000 }, // +24h
-  { nome: "olhinho_followup",   proximoDelayMs: 24 * 60 * 60 * 1000 }, // +24h
-  { nome: "encerramento_02",    proximoDelayMs: 0 },                    // encerra
-];
+// Sequência de recuperação para leads em "Primeira mensagem" (template inicial já enviado)
+const SEQUENCIA_RECUPERACAO_PM = ["ta_ai", "corrido_followup", "olhinho_followup"] as const;
+
+// Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual)
+// Dentro da janela 24h: 3 tentativas no mesmo dia (4h→2h→2h max 20h), encerramento 24h depois
+const DELAYS_DENTRO_JANELA_MS = [4 * 60 * 60 * 1000, 2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Fora da janela: uma por dia (Dia 1 → Dia 2 → Dia 3), encerramento Dia 4
+const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+const HORA_MAX_FOLLOWUP_JANELA = 20;
 
 function lerContadorTemplates(description: string): number {
   const match = description.match(/followup-templates:\s*(\d+)/i);
@@ -331,71 +321,83 @@ function atualizarContadorTemplates(description: string, novoValor: number): str
 }
 
 async function agenteTemplateAbertura(state: FollowUpStateType) {
-  logger.info("follow-up", "executando template de abertura...");
+  logger.info("follow-up", "executando sequência Primeira mensagem...");
 
   // Verificar se o lead já respondeu — se sim, para a sequência
   try {
     const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
     if (totalIncoming > 0) {
-      logger.info("follow-up", "Lead já respondeu — encerrando sequência de templates");
+      logger.info("follow-up", "Lead já respondeu — encerrando sequência Primeira mensagem");
       return { respostaAgente: "" };
     }
   } catch (e) {
     logger.warn("follow-up", "Erro ao verificar mensagens incoming:", e);
   }
 
+  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
   const contador = lerContadorTemplates(state.description ?? "");
-  const item = SEQUENCIA_TEMPLATES[contador];
 
-  if (!item) {
-    logger.info("follow-up", "Sequência de templates esgotada");
+  // Contador >= 3: todas as mensagens enviadas → enviar encerramento e mover para Perdido
+  if (contador >= SEQUENCIA_RECUPERACAO_PM.length) {
+    logger.info("follow-up", "Sequência Primeira mensagem esgotada — enviando encerramento");
+    const conteudoEnc = CONTEUDO_TEMPLATES["encerramento_02"];
+    try {
+      if (dentroJanela && conteudoEnc) {
+        await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
+        if (state.telefone) {
+          await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+        }
+      } else {
+        await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", conteudoEnc);
+      }
+    } catch (e) {
+      logger.error("follow-up", "Erro ao enviar encerramento Primeira mensagem:", e);
+    }
+    await atualizarKanbanTask(state.accountId, state.taskId, {
+      board_step_id: state.idEtapaPerdido || undefined,
+      description: atualizarContadorTemplates(state.description ?? "", contador),
+      due_date: undefined,
+    });
     return { respostaAgente: "" };
   }
 
-  logger.info("follow-up", `Enviando mensagem ${item.nome} (${contador + 1}/${SEQUENCIA_TEMPLATES.length})`);
+  const nomeMsg = SEQUENCIA_RECUPERACAO_PM[contador]!;
+  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_RECUPERACAO_PM.length}) — janela: ${dentroJanela}`);
 
-  // Verifica janela de 24h: se o lead está ativo, envia mensagem normal (sem template)
-  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
-
+  // Dentro da janela: mensagem normal (não cobra template). Fora: template aprovado.
+  const conteudo = CONTEUDO_TEMPLATES[nomeMsg];
   try {
-    if (dentroJanela) {
-      const conteudo = CONTEUDO_TEMPLATES[item.nome];
-      if (conteudo) {
-        logger.info("follow-up", `Janela 24h ativa — enviando mensagem normal ao invés de template: ${item.nome}`);
-        await enviarMensagem(state.accountId, state.conversationId, conteudo);
-      } else {
-        logger.warn("follow-up", `Conteúdo não encontrado para ${item.nome}, usando template mesmo dentro da janela`);
-        await enviarTemplate(state.accountId, state.conversationId, item.nome);
+    if (dentroJanela && conteudo) {
+      logger.info("follow-up", `Janela 24h ativa — mensagem normal: ${nomeMsg}`);
+      await enviarMensagem(state.accountId, state.conversationId, conteudo);
+      if (state.telefone) {
+        await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      logger.info("follow-up", `Fora da janela 24h — enviando template: ${item.nome}`);
-      await enviarTemplate(state.accountId, state.conversationId, item.nome);
+      logger.info("follow-up", `Fora da janela — template: ${nomeMsg}`);
+      await enviarTemplate(state.accountId, state.conversationId, nomeMsg, conteudo);
     }
   } catch (e) {
-    logger.error("follow-up", `Erro ao enviar mensagem/template ${item.nome}:`, e);
+    logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
     return { respostaAgente: "" };
   }
 
   const novoContador = contador + 1;
   const descricaoAtualizada = atualizarContadorTemplates(state.description ?? "", novoContador);
-  const isUltimo = novoContador >= SEQUENCIA_TEMPLATES.length;
 
-  if (isUltimo) {
-    // Último template: mover para "Perdido"
-    logger.info("follow-up", "Último template enviado — movendo para Perdido");
-    await atualizarKanbanTask(state.accountId, state.taskId, {
-      board_step_id: state.idEtapaPerdido || undefined,
-      description: descricaoAtualizada,
-      due_date: undefined,
-    });
-  } else {
-    const proximaData = proximoHorarioComercial(new Date(), item.proximoDelayMs);
-    await atualizarKanbanTask(state.accountId, state.taskId, {
-      description: descricaoAtualizada,
-      due_date: proximaData.toISOString(),
-    });
-    logger.info("follow-up", `Próximo template agendado para: ${proximaData.toISOString()}`);
-  }
+  // Calcular próxima data com timing diferente por status da janela
+  const delays = dentroJanela ? DELAYS_DENTRO_JANELA_MS : DELAYS_FORA_JANELA_MS;
+  const delayMs = delays[contador] ?? (dentroJanela ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
+  // Encerramento (msg 3, delay de 24h): usa horário padrão 18h. Msgs do mesmo dia (delays curtos): max 20h
+  const isEncerramentoAgendado = dentroJanela && contador === 2;
+  const horaMax = (!isEncerramentoAgendado && dentroJanela) ? HORA_MAX_FOLLOWUP_JANELA : 18;
+  const proximaData = proximoHorarioComercial(new Date(), delayMs, horaMax);
+
+  await atualizarKanbanTask(state.accountId, state.taskId, {
+    description: descricaoAtualizada,
+    due_date: proximaData.toISOString(),
+  });
+  logger.info("follow-up", `Próxima mensagem Primeira mensagem agendada para: ${proximaData.toISOString()} (janela: ${dentroJanela})`);
 
   return { respostaAgente: "" };
 }
@@ -550,17 +552,70 @@ async function enviarMensagemNo(state: FollowUpStateType) {
   return {};
 }
 
+// --- Nó: Template inicial (Novo Lead presos sem entrada em leads_template_pendente) ---
+
+async function agenteTemplateInicial(state: FollowUpStateType) {
+  logger.info("follow-up", "executando template inicial (Novo Lead)...");
+
+  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
+
+  // Se o lead já enviou mensagem: move para "Primeira mensagem" sem enviar template
+  try {
+    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
+    if (totalIncoming > 0) {
+      logger.info("follow-up", "Lead já enviou mensagem — pulando template inicial, movendo para Primeira mensagem");
+      const stepPM = state.funilSteps.find(s => s.name.toLowerCase().includes("primeira mensagem"));
+      if (stepPM) {
+        await atualizarKanbanTask(state.accountId, state.taskId, { board_step_id: stepPM.id });
+      }
+      return { respostaAgente: "" };
+    }
+  } catch (e) {
+    logger.warn("follow-up", "Erro ao verificar incoming:", e);
+  }
+
+  const conteudo = CONTEUDO_TEMPLATES["abertura_esta_estudando"];
+
+  try {
+    if (dentroJanela && conteudo) {
+      logger.info("follow-up", "Janela aberta — enviando mensagem normal (template inicial)");
+      await enviarMensagem(state.accountId, state.conversationId, conteudo);
+      if (state.telefone) {
+        await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+      }
+    } else {
+      logger.info("follow-up", "Enviando template inicial: abertura_esta_estudando");
+      await enviarTemplate(state.accountId, state.conversationId, "abertura_esta_estudando", conteudo);
+    }
+  } catch (e) {
+    logger.error("follow-up", "Erro ao enviar template inicial:", e);
+    return { respostaAgente: "" };
+  }
+
+  // Mover card para "Primeira mensagem"
+  const stepPM = state.funilSteps.find(s => s.name.toLowerCase().includes("primeira mensagem"));
+  if (stepPM) {
+    await atualizarKanbanTask(state.accountId, state.taskId, { board_step_id: stepPM.id });
+    logger.info("follow-up", `Card movido para "Primeira mensagem" (step ${stepPM.id})`);
+  } else {
+    logger.warn("follow-up", "Etapa 'Primeira mensagem' não encontrada no funil");
+  }
+
+  return { respostaAgente: "" };
+}
+
 // --- Construção do grafo ---
 
 export function rotaClassificacao(state: FollowUpStateType): string {
   switch (state.tipoFollowup) {
-    case "followup": return "agente_followup";
-    case "lembrete": return "agente_lembrete";
-    case "boas_vindas": return "agente_boas_vindas";
+    case "template_inicial":  return "agente_template_inicial";
+    case "followup":          return "agente_followup";
+    case "lembrete":          return "agente_lembrete";
+    case "boas_vindas":       return "agente_boas_vindas";
     case "template_abertura": return "agente_template_abertura";
-    case "nutrir": return "agente_nutrir";
-    case "ignorar": return "ignorar";
-    default: return "ignorar";
+    case "nutrir":            return "agente_nutrir";
+    case "ignorar":           return "ignorar";
+    default:                  return "ignorar";
   }
 }
 
@@ -569,6 +624,7 @@ export async function criarGrafoFollowUp() {
   const grafo = new StateGraph(FollowUpState)
     .addNode("buscar_funil", buscarFunil)
     .addNode("classificar", classificar)
+    .addNode("agente_template_inicial", agenteTemplateInicial)
     .addNode("agente_followup", agenteFollowup)
     .addNode("agente_lembrete", agenteLembrete)
     .addNode("agente_boas_vindas", agenteBoasVindas)
@@ -580,6 +636,7 @@ export async function criarGrafoFollowUp() {
     .addEdge("__start__", "buscar_funil")
     .addEdge("buscar_funil", "classificar")
     .addConditionalEdges("classificar", rotaClassificacao, {
+      agente_template_inicial: "agente_template_inicial",
       agente_followup: "agente_followup",
       agente_lembrete: "agente_lembrete",
       agente_boas_vindas: "agente_boas_vindas",
@@ -587,6 +644,7 @@ export async function criarGrafoFollowUp() {
       agente_nutrir: "agente_nutrir",
       ignorar: "__end__",
     })
+    .addEdge("agente_template_inicial", "__end__")
     .addEdge("agente_followup", "enviar_mensagem")
     .addEdge("agente_lembrete", "enviar_mensagem")
     .addEdge("agente_boas_vindas", "enviar_mensagem")

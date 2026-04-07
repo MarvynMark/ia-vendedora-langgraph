@@ -23,7 +23,7 @@ export const FollowUpState = Annotation.Root({
   idEtapaPerdido: Annotation<number>,
 
   // --- Classificação ---
-  tipoFollowup: Annotation<"followup" | "lembrete" | "boas_vindas" | "template_abertura" | "nutrir" | "ignorar">,
+  tipoFollowup: Annotation<"followup" | "lembrete" | "boas_vindas" | "template_abertura" | "template_inicial" | "nutrir" | "ignorar">,
 
   // --- Resposta ---
   respostaAgente: Annotation<string>,

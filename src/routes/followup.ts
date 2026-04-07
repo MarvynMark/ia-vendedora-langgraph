@@ -70,17 +70,20 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
     ?? payload.task.board_step.name.toLowerCase();
 
   // Filtrar: apenas etapas que disparam ação automática
-  const etapasRastreadas = ["conexão", "conexao", "aguardando pagamento", "primeira mensagem"];
+  const etapasRastreadas = ["novo lead", "conexão", "conexao", "aguardando pagamento", "primeira mensagem"];
   if (!etapasRastreadas.some(e => newStepName.includes(e))) {
     return { status: "ignored", reason: "step_not_tracked" };
   }
 
-  // "Primeira mensagem": 2h em horário comercial. Demais: 24h
-  const isPrimeiraMensagem = newStepName.includes("primeira mensagem");
-  const delayMs = isPrimeiraMensagem ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-  const proximaData = isPrimeiraMensagem
-    ? proximoHorarioComercial(new Date(), delayMs)
-    : (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d; })();
+  // Calcular due_date conforme a etapa
+  let proximaData: Date;
+  if (newStepName.includes("novo lead")) {
+    proximaData = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+  } else if (newStepName.includes("primeira mensagem")) {
+    proximaData = proximoHorarioComercial(new Date(), 2 * 60 * 60 * 1000); // 2h
+  } else {
+    const d = new Date(); d.setDate(d.getDate() + 1); proximaData = d; // amanhã
+  }
 
   try {
     await atualizarKanbanTask(
@@ -115,7 +118,27 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
     return { status: "error", reason: "no_phone" };
   }
 
-  logger.info("follow-up", "Processando overdue para:", telefone);
+  // Determina tipo de follow-up pelo nome da etapa atual
+  const stepName = task.board_step.name.toLowerCase();
+  type TipoFollowup = "template_inicial" | "template_abertura" | "followup" | "lembrete" | "boas_vindas" | "nutrir" | "ignorar";
+  let tipoFollowup: TipoFollowup;
+  if (stepName.includes("novo lead")) {
+    tipoFollowup = "template_inicial";
+  } else if (stepName.includes("primeira mensagem")) {
+    tipoFollowup = "template_abertura";
+  } else if (stepName === "conexão" || stepName === "conexao") {
+    tipoFollowup = "followup";
+  } else if (stepName.includes("aguardando pagamento")) {
+    tipoFollowup = "lembrete";
+  } else if (stepName === "ganho") {
+    tipoFollowup = "boas_vindas";
+  } else if (stepName === "nutrir" || stepName === "perdido") {
+    tipoFollowup = "nutrir";
+  } else {
+    tipoFollowup = "ignorar";
+  }
+
+  logger.info("follow-up", `Processando overdue para: ${telefone} — step: ${task.board_step.name} — tipo: ${tipoFollowup}`);
 
   const processamento = (async () => {
     try {
@@ -136,7 +159,7 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
         displayId: conversa.display_id,
         funilSteps: [],
         idEtapaPerdido: 0,
-        tipoFollowup: "followup" as const,
+        tipoFollowup,
         respostaAgente: "",
       }, { configurable: { thread_id: `followup_${telefone}` } });
     } catch (e) {

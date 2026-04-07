@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -33,7 +33,14 @@ export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
         return "Vídeo enviado com sucesso.";
       } catch (e) {
         logger.error("tool:enviar-video", "Erro ao enviar vídeo:", e);
-        return "Não consegui enviar o vídeo agora. Continue a conversa normalmente.";
+        try {
+          const fallback = "O arquivo ficou pesado pra chegar por aqui. Dá uma olhada direto nesse link: https://drive.google.com/file/d/1ZKTwSLHIsPNWM2TPZxn4uBMgDVFOlKQ5/view?usp=drive_link";
+          await enviarMensagem(contexto.idConta, contexto.idConversa, fallback);
+          logger.info("tool:enviar-video", "Link fallback enviado com sucesso.");
+        } catch (fallbackErr) {
+          logger.error("tool:enviar-video", "Erro ao enviar fallback:", fallbackErr);
+        }
+        return "Não consegui enviar o vídeo, mas enviei o link alternativo diretamente para o lead. Continue a conversa normalmente.";
       }
     },
     {
