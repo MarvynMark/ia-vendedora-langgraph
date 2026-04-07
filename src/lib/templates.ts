@@ -21,4 +21,11 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   conexao_followup_3: "👀",
   conexao_encerramento:
     "Oi [Nome], vou deixar o espaço livre por aqui. Se decidir avançar com a mentoria, é só me chamar. Sucesso nos estudos!",
+
+  // --- Sequência de lembrete: Aguardando Pagamento ---
+  lembrete_1: "Oi [Nome], o link ainda tá disponível se você quiser garantir sua vaga. Ficou alguma dúvida antes de confirmar?",
+  lembrete_2: "Ei [Nome], só passando pra saber se conseguiu ver as informações que te mandei.",
+  lembrete_3: "👀",
+  lembrete_encerramento:
+    "Oi [Nome], como não consegui retorno, vou liberar sua vaga por enquanto. Se decidir avançar com a mentoria depois, é só me chamar!",
 };

@@ -2,7 +2,6 @@ import { StateGraph, END } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
-import { PROMPT_LEMBRETE } from "./prompts.ts";
 import { env } from "../../config/env.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
@@ -157,52 +156,72 @@ async function agenteFollowup(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
+const SEQUENCIA_LEMBRETE = ["lembrete_1", "lembrete_2", "lembrete_3"] as const;
+// Templates aprovados fora da janela 24h (mesmo que Primeira mensagem)
+const TEMPLATE_FALLBACK_LEMBRETE = ["ta_ai", "corrido_followup", "olhinho_followup"] as const;
+
 async function agenteLembrete(state: FollowUpStateType) {
-  logger.info("follow-up", "executando agente lembrete...");
+  logger.info("follow-up", "executando lembrete pré-configurado...");
 
-  const model = new ChatOpenAI({
-    modelName: env.OPENAI_MODEL,
-    openAIApiKey: env.OPENAI_API_KEY,
-    temperature: 0.7,
-  });
-
-  // Carregar histórico
-  const historico = await buscarHistorico(state.telefone, 50);
-  const msgsHistorico = historico.map((m) => {
-    if (m.type === "human") return new HumanMessage(m.content);
-    return new AIMessage(m.content);
-  });
-
-  const langfuseHandler = criarLangfuseHandler("follow-up-lembrete", {
-    sessionId: state.telefone,
-    userId: state.telefone,
-    metadata: { taskId: state.taskId, tipoFollowup: "lembrete" },
-    tags: ["follow-up", "lembrete"],
-  });
-
+  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
+  const contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
-  const promptLembrete = PROMPT_LEMBRETE.replace(/\[Nome\]/g, primeiroNome);
+
+  // Após 3 lembretes sem resposta: encerramento → Perdido
+  if (contador >= SEQUENCIA_LEMBRETE.length) {
+    logger.info("follow-up", `${contador} lembretes sem resposta — encerrando`);
+    const conteudoEnc = (CONTEUDO_TEMPLATES["lembrete_encerramento"] ?? "").replace(/\[Nome\]/g, primeiroNome);
+    try {
+      if (dentroJanela) {
+        await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
+        if (state.telefone) {
+          await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+        }
+      } else {
+        await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", CONTEUDO_TEMPLATES["encerramento_02"]);
+      }
+    } catch (e) {
+      logger.error("follow-up", "Erro ao enviar encerramento lembrete:", e);
+    }
+    await atualizarKanbanTask(state.accountId, state.taskId, {
+      board_step_id: state.idEtapaPerdido || undefined,
+      description: atualizarContadorNutrir(state.description ?? "", contador),
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    return { respostaAgente: "" };
+  }
+
+  const nomeMsg = SEQUENCIA_LEMBRETE[contador]!;
+  const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
+  const conteudo = conteudoRaw.replace(/\[Nome\]/g, primeiroNome);
+
+  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_LEMBRETE.length}) — janela: ${dentroJanela}`);
 
   try {
-    const resultado = await model.invoke(
-      [
-        { role: "system", content: promptLembrete },
-        ...msgsHistorico.map(m => ({
-          role: m._getType() === "human" ? "user" as const : "assistant" as const,
-          content: m.content as string,
-        })),
-        { role: "user", content: "<lead qualificado aguardando follow-up>" },
-      ],
-      langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
-    );
-
-    return { respostaAgente: resultado.content as string };
+    if (dentroJanela) {
+      await enviarMensagem(state.accountId, state.conversationId, conteudo);
+      if (state.telefone) {
+        await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+      }
+    } else {
+      const templateFallback = TEMPLATE_FALLBACK_LEMBRETE[contador] ?? "encerramento_02";
+      await enviarTemplate(state.accountId, state.conversationId, templateFallback, CONTEUDO_TEMPLATES[templateFallback]);
+    }
   } catch (e) {
-    logger.error("follow-up", "Erro no agente lembrete:", e);
+    logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
     return { respostaAgente: "" };
-  } finally {
-    await finalizarLangfuseHandler(langfuseHandler);
   }
+
+  const novoContador = contador + 1;
+  const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
+  const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+  await atualizarKanbanTask(state.accountId, state.taskId, {
+    description: descricaoAtualizada,
+    due_date: proxima.toISOString(),
+  });
+  logger.info("follow-up", `Lembrete ${novoContador}/3 enviado — próximo em 24h`);
+
+  return { respostaAgente: "" };
 }
 
 async function enviarVideoPlataforma(accountId: number, conversationId: number): Promise<void> {
