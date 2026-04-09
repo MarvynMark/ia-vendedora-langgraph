@@ -28,6 +28,7 @@ const dmGuruPayloadSchema = z.object({
   }).optional(),
   status: z.string().optional(),
   webhook_type: z.string().optional(),
+  is_reissue: z.number().optional(), // 0 = nova compra, 1 = parcela recorrente
 });
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -51,6 +52,12 @@ export const pagamentoRouter = new Elysia()
     if (parsed.data.status !== "approved") {
       logger.info("pagamento", "Ignorado: status não é approved:", parsed.data.status);
       return { status: "ignored", reason: "not_approved" };
+    }
+
+    // Só processar nova compra — ignorar parcelas recorrentes
+    if (parsed.data.is_reissue === 1) {
+      logger.info("pagamento", "Ignorado: cobrança recorrente (is_reissue=1)");
+      return { status: "ignored", reason: "recurring_installment" };
     }
 
     const contato = parsed.data.contact;
