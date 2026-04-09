@@ -1,9 +1,9 @@
 // São Paulo é UTC-3 fixo (Brasil aboliu horário de verão em 2019)
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 
-const HORA_ABERTURA = 8;
-const HORA_FECHAMENTO = 18;
-const HORA_REABERTURA = 9; // hora para reagendar quando cai fora do expediente
+const HORA_ABERTURA = 7;
+const HORA_FECHAMENTO = 23;
+const HORA_REABERTURA = 7; // hora para reagendar quando cai fora do intervalo permitido
 
 function getComponentesSP(date: Date): { hora: number; diaSemana: number } {
   const spTime = new Date(date.getTime() - SP_OFFSET_MS);

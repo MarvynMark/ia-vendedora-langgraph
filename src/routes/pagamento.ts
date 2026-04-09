@@ -12,24 +12,22 @@ import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 
-// Payload real da Digital Manager Guru (formato pubsub/webhook)
+// Payload real da Digital Manager Guru — o corpo HTTP é diretamente os campos (sem wrapper "payload")
 const dmGuruPayloadSchema = z.object({
-  payload: z.object({
-    contact: z.object({
+  contact: z.object({
+    name: z.string().optional(),
+    email: z.string().optional(),
+    phone_local_code: z.string().optional(),
+    phone_number: z.string().optional(),
+  }).optional(),
+  product: z.object({
+    name: z.string().optional(),
+    offer: z.object({
       name: z.string().optional(),
-      email: z.string().optional(),
-      phone_local_code: z.string().optional(),
-      phone_number: z.string().optional(),
     }).optional(),
-    product: z.object({
-      name: z.string().optional(),
-      offer: z.object({
-        name: z.string().optional(),
-      }).optional(),
-    }).optional(),
-    status: z.string().optional(),
-    webhook_type: z.string().optional(),
-  }),
+  }).optional(),
+  status: z.string().optional(),
+  webhook_type: z.string().optional(),
 });
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -49,15 +47,13 @@ export const pagamentoRouter = new Elysia()
       return { status: "error", reason: "invalid_payload" };
     }
 
-    const { payload } = parsed.data;
-
     // Só processar transações aprovadas
-    if (payload.status !== "approved") {
-      logger.info("pagamento", "Ignorado: status não é approved:", payload.status);
+    if (parsed.data.status !== "approved") {
+      logger.info("pagamento", "Ignorado: status não é approved:", parsed.data.status);
       return { status: "ignored", reason: "not_approved" };
     }
 
-    const contato = payload.contact;
+    const contato = parsed.data.contact;
     if (!contato) {
       logger.error("pagamento", "Nenhum dado de contato encontrado");
       return { status: "error", reason: "no_contact_data" };
@@ -68,8 +64,8 @@ export const pagamentoRouter = new Elysia()
     const phoneNum = (contato.phone_number ?? "").replace(/\D/g, "");
     const telefoneE164 = phoneNum ? `+${phoneLocal}${phoneNum}` : undefined;
 
-    const nomeProduto = payload.product?.name ?? "";
-    const nomeOferta = payload.product?.offer?.name ?? ""; // ex: "Mentoria Vestigium - Perito Criminal - 6 meses"
+    const nomeProduto = parsed.data.product?.name ?? "";
+    const nomeOferta = parsed.data.product?.offer?.name ?? ""; // ex: "Mentoria Vestigium - Perito Criminal - 6 meses"
 
     logger.info("pagamento", "Compra aprovada:", {
       nome: contato.name,
@@ -101,14 +97,19 @@ async function processarPagamentoAprovado(dados: {
 }) {
   const accountId = Number(env.CHATWOOT_ACCOUNT_ID);
 
-  // Tentar localizar o contato no Chatwoot por telefone, depois email, depois nome
+  // Localizar contato no Chatwoot — prioriza telefone (múltiplos formatos) e email.
+  // Nome é propositalmente excluído: pode estar diferente entre DMG e Chatwoot.
   let contato: { id: number; name: string; phone_number?: string; email?: string } | null = null;
 
-  const tentativas = [
-    dados.telefone,
-    dados.email,
-    dados.nome,
-  ].filter(Boolean) as string[];
+  // Gerar variantes do telefone para aumentar chance de match
+  const variantesTelefone: string[] = [];
+  if (dados.telefone) {
+    const semPlus = dados.telefone.replace(/^\+/, "");          // 5562996171551
+    const semPais = semPlus.replace(/^55/, "");                  // 62996171551
+    variantesTelefone.push(dados.telefone, semPlus, semPais);
+  }
+
+  const tentativas = [...new Set([...variantesTelefone, dados.email].filter(Boolean))] as string[];
 
   for (const query of tentativas) {
     try {
@@ -123,7 +124,7 @@ async function processarPagamentoAprovado(dados: {
   }
 
   if (!contato) {
-    logger.error("pagamento", "Contato não encontrado no Chatwoot para:", dados);
+    logger.error("pagamento", "Contato não encontrado no Chatwoot", { tentativas, nome: dados.nome, email: dados.email, telefone: dados.telefone });
     return;
   }
 

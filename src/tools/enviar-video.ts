@@ -4,7 +4,11 @@ import { enviarArquivo, enviarMensagem } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
+// Vídeo de apresentação da plataforma por dentro — enviado durante a VENDA (Etapa 6, após lista de bônus)
 export const VIDEO_PLATAFORMA_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-mentoria-por-dentro_.mp4";
+
+// Vídeo de boas-vindas — enviado APENAS para alunos que acabaram de pagar (sequência de onboarding)
+export const VIDEO_BOAS_VINDAS_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fboas-vindas.mp4";
 
 interface ContextoEnviarVideo {
   idConta: string;

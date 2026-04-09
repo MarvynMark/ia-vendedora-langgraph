@@ -5,7 +5,7 @@ import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
-import { VIDEO_PLATAFORMA_URL } from "../../tools/enviar-video.ts";
+import { VIDEO_BOAS_VINDAS_URL } from "../../tools/enviar-video.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
@@ -227,7 +227,7 @@ async function agenteLembrete(state: FollowUpStateType) {
 async function enviarVideoPlataforma(accountId: number, conversationId: number): Promise<void> {
   try {
     logger.info("follow-up", "Baixando vídeo para boas-vindas...");
-    const res = await fetchComTimeout(VIDEO_PLATAFORMA_URL, { method: "GET", timeout: 60_000 });
+    const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_URL, { method: "GET", timeout: 60_000 });
     if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
 
     const resContentType = res.headers.get("content-type") ?? "";
@@ -324,7 +324,7 @@ const SEQUENCIA_RECUPERACAO_PM = ["ta_ai", "corrido_followup", "olhinho_followup
 const DELAYS_DENTRO_JANELA_MS = [4 * 60 * 60 * 1000, 2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fora da janela: uma por dia (Dia 1 → Dia 2 → Dia 3), encerramento Dia 4
 const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-const HORA_MAX_FOLLOWUP_JANELA = 20;
+const HORA_MAX_FOLLOWUP_JANELA = 23;
 
 function lerContadorTemplates(description: string): number {
   const match = description.match(/followup-templates:\s*(\d+)/i);
