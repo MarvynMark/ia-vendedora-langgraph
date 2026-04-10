@@ -523,18 +523,6 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   * **End Date atual**: ${tarefa.due_date || '(não definida)'}
 </tarefa-atual>
 
-# GRUPO DE ESPERA
-
-<grupo-espera>
-  Quando o lead pedir acesso ao grupo de espera ou mencionar o grupo de espera, responda **imediatamente** com a mensagem abaixo, sem qualificações antes:
-
-  "Clique no link abaixo para entrar no grupo de espera:
-
-  ${env.GRUPO_ESPERA_LINK}"
-
-  Após enviar o link, continue naturalmente para a etapa de qualificação.
-</grupo-espera>
-
 # INFORMAÇÕES DO SISTEMA
 
 <informacoes-sistema>
