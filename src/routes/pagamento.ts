@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import {
   buscarContatoPorQuery,
   buscarConversasDoContato,
@@ -30,12 +29,6 @@ const dmGuruPayloadSchema = z.object({
   webhook_type: z.string().optional(),
   is_reissue: z.number().optional(), // 0 = nova compra, 1 = parcela recorrente
 });
-
-let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
-async function obterGrafoFollowup() {
-  if (!grafoFollowup) grafoFollowup = await criarGrafoFollowUp();
-  return grafoFollowup;
-}
 
 export const pagamentoRouter = new Elysia()
   .post("/webhook/pagamento", async ({ body }) => {
@@ -206,32 +199,6 @@ async function processarPagamentoAprovado(dados: {
     }
   }
 
-  // Disparar grafo de follow-up com tipo boas_vindas
-  const telefone = dados.telefone ?? contato.phone_number ?? contato.email ?? String(contato.id);
-
-  try {
-    const g = await obterGrafoFollowup();
-    await g.invoke({
-      messages: [],
-      accountId,
-      boardId: task.board_id,
-      taskId: task.id,
-      board_step: etapaGanho,
-      title: task.title ?? contato.name,
-      description: task.description ?? "",
-      dueDate: new Date().toISOString(),
-      telefone,
-      conversationId: conversaComTask.id,
-      inboxId: conversaComTask.inbox_id,
-      displayId: conversaComTask.id,
-      funilSteps,
-      idEtapaPerdido: 0,
-      tipoFollowup: "boas_vindas" as const,
-      respostaAgente: "",
-    }, { configurable: { thread_id: `followup_${telefone}` } });
-
-    logger.info("pagamento", "Boas-vindas enviadas para:", telefone);
-  } catch (e) {
-    logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
-  }
+  // Boas-vindas será disparada automaticamente pelo webhook kanban_task_overdue
+  // (due_date foi setada para agora, então o Chatwoot dispara o overdue em seguida)
 }
