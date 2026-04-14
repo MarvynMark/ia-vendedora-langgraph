@@ -208,7 +208,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   ## PITCH DE PREÇO (após confirmação de urgência)
 
-  **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Conexão".**
+  **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Conexão" e incluir a linha "status: proposta_apresentada" na descrição da task (mantendo o restante da descrição existente).**
 
   **Para leads Médico (formação em Medicina):** apresente o plano Médico Legista em vez do Anual no bloco abaixo.
   Médico Legista: 6 meses de acompanhamento focado na sua formação. R$ 3.997 à vista no PIX ou 12x de R$ 394 no cartão.
@@ -223,7 +223,9 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   "Tem também o Semestral — 6 meses de acompanhamento. Ideal pra quem quer começar com um comprometimento menor ou tem o edital mais próximo. Sai R$ 333 por mês.
   No PIX à vista R$ 1.997 ou 12x de R$ 197 no cartão.
 
-  Qual faz mais sentido pra você hoje?"
+  Qual faz mais sentido pra você hoje?
+
+  As turmas fecham conforme as vagas vão sendo preenchidas — posso verificar se ainda tem disponível pra você essa semana?"
 
   **Regras de preço:**
   - O valor à vista no PIX já tem 10% de desconto aplicado. Não precisa mencionar o desconto.

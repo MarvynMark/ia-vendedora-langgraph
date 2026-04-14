@@ -75,8 +75,22 @@ const SEQUENCIA_RECUPERACAO_CONEXAO = [
   "conexao_followup_3",
 ] as const;
 
-// Quando fora da janela 24h, reutiliza templates aprovados da Primeira mensagem
-const TEMPLATE_FALLBACK_CONEXAO = ["ta_ai", "corrido_followup", "olhinho_followup"] as const;
+// Delays por posição: 3h → 24h → 24h (encerramento 24h depois)
+const DELAYS_CONEXAO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+
+// Quando fora da janela 24h, usa templates personalizados aprovados
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "olhinho_followup", "encerramento_02"] as const;
+
+// Sequência pós-preço: acionada quando lead viu o pitch e sumiu (description contém "status: proposta_apresentada")
+const SEQUENCIA_POS_PRECO = [
+  "pos_preco_followup_1",
+  "pos_preco_followup_2",
+  "pos_preco_followup_3",
+] as const;
+
+// Delays pós-preço: 30min → 1h → 24h → 48h (encerramento 72h depois)
+const DELAYS_POS_PRECO_MS = [30 * 60 * 1000, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_duvida", "olhinho_followup", "encerramento_02"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -97,11 +111,20 @@ async function agenteFollowup(state: FollowUpStateType) {
   const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
   const contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+  const isPosPreco = /status:\s*proposta_apresentada/i.test(state.description ?? "");
 
-  // Após 3 mensagens sem resposta: encerramento → Perdido
-  if (contador >= SEQUENCIA_RECUPERACAO_CONEXAO.length) {
-    logger.info("follow-up", `${contador} follow-ups Conexão sem resposta — encerrando`);
-    const conteudoEnc = (CONTEUDO_TEMPLATES["conexao_encerramento"] ?? "").replace(/\[Nome\]/g, primeiroNome);
+  // Seleciona sequência, fallbacks e delays conforme contexto
+  const sequencia = isPosPreco ? SEQUENCIA_POS_PRECO : SEQUENCIA_RECUPERACAO_CONEXAO;
+  const fallbacks = isPosPreco ? TEMPLATE_FALLBACK_POS_PRECO : TEMPLATE_FALLBACK_CONEXAO;
+  const delays = isPosPreco ? DELAYS_POS_PRECO_MS : DELAYS_CONEXAO_MS;
+  const nomeEncerramento = isPosPreco ? "pos_preco_encerramento" : "conexao_encerramento";
+
+  logger.info("follow-up", `Modo: ${isPosPreco ? "pós-preço" : "conexão"}, contador: ${contador}`);
+
+  // Após N mensagens sem resposta: encerramento → Perdido
+  if (contador >= sequencia.length) {
+    logger.info("follow-up", `${contador} follow-ups sem resposta — encerrando`);
+    const conteudoEnc = (CONTEUDO_TEMPLATES[nomeEncerramento] ?? "").replace(/\[Nome\]/g, primeiroNome);
     try {
       if (dentroJanela) {
         await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
@@ -112,21 +135,22 @@ async function agenteFollowup(state: FollowUpStateType) {
         await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", CONTEUDO_TEMPLATES["encerramento_02"]);
       }
     } catch (e) {
-      logger.error("follow-up", "Erro ao enviar encerramento Conexão:", e);
+      logger.error("follow-up", "Erro ao enviar encerramento:", e);
     }
+    const delayEncerramento = isPosPreco ? 72 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
     await atualizarKanbanTask(state.accountId, state.taskId, {
       board_step_id: state.idEtapaPerdido || undefined,
       description: atualizarContadorNutrir(state.description ?? "", contador),
-      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      due_date: new Date(Date.now() + delayEncerramento).toISOString(),
     });
     return { respostaAgente: "" };
   }
 
-  const nomeMsg = SEQUENCIA_RECUPERACAO_CONEXAO[contador]!;
+  const nomeMsg = sequencia[contador]!;
   const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
   const conteudo = conteudoRaw.replace(/\[Nome\]/g, primeiroNome);
 
-  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_RECUPERACAO_CONEXAO.length}) — janela: ${dentroJanela}`);
+  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${sequencia.length}) — janela: ${dentroJanela}`);
 
   try {
     if (dentroJanela) {
@@ -135,8 +159,7 @@ async function agenteFollowup(state: FollowUpStateType) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      // Fora da janela: reutiliza templates aprovados (ta_ai, corrido_followup, olhinho_followup)
-      const templateFallback = TEMPLATE_FALLBACK_CONEXAO[contador] ?? "encerramento_02";
+      const templateFallback = fallbacks[contador] ?? "encerramento_02";
       await enviarTemplate(state.accountId, state.conversationId, templateFallback, CONTEUDO_TEMPLATES[templateFallback]);
     }
   } catch (e) {
@@ -146,19 +169,22 @@ async function agenteFollowup(state: FollowUpStateType) {
 
   const novoContador = contador + 1;
   const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
-  const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+  const delayProximo = delays[contador] ?? 24 * 60 * 60 * 1000;
+  const proxima = proximoHorarioComercial(new Date(), delayProximo);
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,
     due_date: proxima.toISOString(),
   });
-  logger.info("follow-up", `Follow-up Conexão ${novoContador}/3 enviado — próximo em 24h`);
+  logger.info("follow-up", `Follow-up ${novoContador}/${sequencia.length} enviado — próximo em ${delayProximo / 60000}min`);
 
   return { respostaAgente: "" };
 }
 
-const SEQUENCIA_LEMBRETE = ["lembrete_1", "lembrete_2", "lembrete_3"] as const;
-// Templates aprovados fora da janela 24h (mesmo que Primeira mensagem)
-const TEMPLATE_FALLBACK_LEMBRETE = ["ta_ai", "corrido_followup", "olhinho_followup"] as const;
+const SEQUENCIA_LEMBRETE = ["lembrete_1", "lembrete_2", "lembrete_3", "lembrete_urgencia"] as const;
+// Delays: 30min → 1h → 24h → 48h (encerramento 48h depois)
+const DELAYS_LEMBRETE_MS = [30 * 60 * 1000, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
+// Templates aprovados fora da janela 24h
+const TEMPLATE_FALLBACK_LEMBRETE = ["ta_ai", "lembrete_acesso", "olhinho_followup", "lembrete_urgencia_meta"] as const;
 
 async function agenteLembrete(state: FollowUpStateType) {
   logger.info("follow-up", "executando lembrete pré-configurado...");
@@ -167,7 +193,7 @@ async function agenteLembrete(state: FollowUpStateType) {
   const contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
 
-  // Após 3 lembretes sem resposta: encerramento → Perdido
+  // Após 4 lembretes sem resposta: encerramento → Perdido
   if (contador >= SEQUENCIA_LEMBRETE.length) {
     logger.info("follow-up", `${contador} lembretes sem resposta — encerrando`);
     const conteudoEnc = (CONTEUDO_TEMPLATES["lembrete_encerramento"] ?? "").replace(/\[Nome\]/g, primeiroNome);
@@ -214,12 +240,13 @@ async function agenteLembrete(state: FollowUpStateType) {
 
   const novoContador = contador + 1;
   const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
-  const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+  const delayProximo = DELAYS_LEMBRETE_MS[contador] ?? 24 * 60 * 60 * 1000;
+  const proxima = proximoHorarioComercial(new Date(), delayProximo);
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,
     due_date: proxima.toISOString(),
   });
-  logger.info("follow-up", `Lembrete ${novoContador}/3 enviado — próximo em 24h`);
+  logger.info("follow-up", `Lembrete ${novoContador}/${SEQUENCIA_LEMBRETE.length} enviado — próximo em ${delayProximo / 60000}min`);
 
   return { respostaAgente: "" };
 }
@@ -321,7 +348,7 @@ const SEQUENCIA_RECUPERACAO_PM = ["ta_ai", "corrido_followup", "olhinho_followup
 
 // Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual)
 // Dentro da janela 24h: 3 tentativas no mesmo dia (4h→2h→2h max 20h), encerramento 24h depois
-const DELAYS_DENTRO_JANELA_MS = [4 * 60 * 60 * 1000, 2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 4 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fora da janela: uma por dia (Dia 1 → Dia 2 → Dia 3), encerramento Dia 4
 const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 const HORA_MAX_FOLLOWUP_JANELA = 23;
