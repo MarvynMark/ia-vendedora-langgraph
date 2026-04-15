@@ -291,7 +291,7 @@ async function agenteBoasVindas(state: FollowUpStateType) {
     // Etapa 2 — +30s: texto + vídeo
     await new Promise(r => setTimeout(r, 30_000));
     try {
-      const msg2 = `📌 PASSO 1 — Assista isso antes de tudo\nGravei um vídeo rápido te mostrando:\n• Como acessar a plataforma\n• Onde clicar\n• Como começar suas aulas da forma certa\n\nAssiste agora pra já começar com clareza 🚀`;
+      const msg2 = `Gravei um vídeo rápido te mostrando como acessar a plataforma e por onde começar. Assiste agora pra já entrar com clareza 🚀`;
       await enviarMensagem(accountId, conversationId, msg2);
       await enviarVideoPlataforma(accountId, conversationId);
     } catch (e) {
@@ -301,7 +301,7 @@ async function agenteBoasVindas(state: FollowUpStateType) {
     // Etapa 3 — +1 min
     await new Promise(r => setTimeout(r, 30_000));
     try {
-      const msg3 = `📌 PASSO 2 — Criar seu acesso à plataforma\nAcesse aqui:\nhttps://aluno.mentoriavestigium.com.br/dash\n\nClique em "Criar conta gratuitamente", use o e-mail da compra e defina sua senha.\nSeu acesso já estará liberado ✅`;
+      const msg3 = `Agora cria seu acesso à plataforma:\nhttps://aluno.mentoriavestigium.com.br/dash\n\nClica em "Criar conta gratuitamente", usa o e-mail da compra e define sua senha. Seu acesso já está liberado ✅`;
       await enviarMensagem(accountId, conversationId, msg3);
       logger.info("follow-up", "boas-vindas etapa 3 enviada");
     } catch (e) {
@@ -311,7 +311,7 @@ async function agenteBoasVindas(state: FollowUpStateType) {
     // Etapa 4 — +2 min
     await new Promise(r => setTimeout(r, 60_000));
     try {
-      const msg4 = `📌 PASSO 3 — Laudo Inicial (ESSENCIAL)\nAgora preciso que você preencha o seu Laudo Inicial:\nhttps://forms.gle/KwtrpzKPyuy6sFyT6\n\nÉ com base nele que vamos montar todo o seu plano de estudos dentro da mentoria.`;
+      const msg4 = `Preciso que você preencha o Laudo Inicial — é essencial pra montar seu plano de estudos dentro da mentoria:\nhttps://forms.gle/KwtrpzKPyuy6sFyT6`;
       await enviarMensagem(accountId, conversationId, msg4);
       logger.info("follow-up", "boas-vindas etapa 4 enviada");
     } catch (e) {
@@ -321,7 +321,7 @@ async function agenteBoasVindas(state: FollowUpStateType) {
     // Etapa 5 — +3 min
     await new Promise(r => setTimeout(r, 60_000));
     try {
-      const msg5 = `📌 PASSO 4 — Comunidade oficial\nEntre aqui para receber todos os avisos importantes da mentoria:\n👉 https://chat.whatsapp.com/HS9NlWNw1RuInyZbPDr1FC\n\nIsso aqui é essencial pra você não ficar perdido(a) 👀`;
+      const msg5 = `Entra aqui no grupo oficial da mentoria pra receber todos os avisos importantes:\n👉 https://chat.whatsapp.com/HS9NlWNw1RuInyZbPDr1FC`;
       await enviarMensagem(accountId, conversationId, msg5);
       logger.info("follow-up", "boas-vindas etapa 5 enviada");
     } catch (e) {
@@ -331,7 +331,7 @@ async function agenteBoasVindas(state: FollowUpStateType) {
     // Etapa 6 — +4 min
     await new Promise(r => setTimeout(r, 60_000));
     try {
-      const msg6 = `📌 PASSO 5 — Grupo de disciplina (recomendado)\n👉 https://t.me/+MqIIJEYWzucxZTlh\n\nAqui você vai postar:\n• Sua meta diária batida\n• Tempo em redes sociais\n\nPor gentileza, já salva nosso número de atendimento no suporte.\nSuporte 01: (62) 9 8167-2618`;
+      const msg6 = `Esse aqui é o grupo de disciplina — recomendo entrar também:\n👉 https://t.me/+MqIIJEYWzucxZTlh\n\nJá salva nosso número de suporte:\n(62) 9 8167-2618`;
       await enviarMensagem(accountId, conversationId, msg6);
       logger.info("follow-up", "boas-vindas etapa 6 enviada");
     } catch (e) {
