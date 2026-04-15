@@ -159,12 +159,12 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   **Ordem OBRIGATÓRIA — siga exatamente:**
   1. Chame a ferramenta **Enviar_video_plataforma** PRIMEIRO, antes de enviar qualquer texto.
   2. Se a ferramenta retornar sucesso: envie "me avisa assim que assistir o vídeo, que vou te mostrar todos os entregáveis da mentoria"
-  3. Se a ferramenta retornar erro: envie "O arquivo ficou pesado pra chegar aqui. Dá uma olhada direto nesse link: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04.mp4&version_id=null" e continue para a Mensagem 5C.
+  3. Se a ferramenta retornar erro: envie "O arquivo ficou pesado pra chegar aqui. Dá uma olhada direto nesse link: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4&version_id=null" e continue para a Mensagem 5C.
 
   **PROIBIDO nesta etapa:**
   - Enviar "Vou enviar o vídeo agora" ou qualquer mensagem antes de chamar a ferramenta
   - Chamar a ferramenta Enviar_video_plataforma mais de uma vez na mesma conversa — o vídeo é enviado UMA única vez
-  - Se o lead pedir o vídeo novamente ou mencionar que não viu: diga "Já enviei o vídeo logo acima, dá uma conferida por lá! Caso não esteja carregando, aqui vai o link direto: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04.mp4&version_id=null"
+  - Se o lead pedir o vídeo novamente ou mencionar que não viu: diga "Já enviei o vídeo logo acima, dá uma conferida por lá! Caso não esteja carregando, aqui vai o link direto: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4&version_id=null"
   - Dizer que enviou se o lead afirmar que não recebeu — ofereça o link imediatamente
   - Tentar reenviar o vídeo se falhar
 

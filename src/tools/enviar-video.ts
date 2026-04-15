@@ -5,7 +5,7 @@ import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
 // Vídeo de apresentação da plataforma por dentro — enviado durante a VENDA (Etapa 5B, após imagem de entregáveis)
-export const VIDEO_PLATAFORMA_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04.mp4";
+export const VIDEO_PLATAFORMA_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4";
 
 // Vídeo de boas-vindas — enviado APENAS para alunos que acabaram de pagar (sequência de onboarding)
 export const VIDEO_BOAS_VINDAS_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fboas-vindas.mp4";
@@ -38,7 +38,7 @@ export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
       } catch (e) {
         logger.error("tool:enviar-video", "Erro ao enviar vídeo:", e);
         try {
-          const fallback = "O arquivo ficou pesado pra chegar por aqui. Dá uma olhada direto nesse link: https://drive.google.com/file/d/1ZKTwSLHIsPNWM2TPZxn4uBMgDVFOlKQ5/view?usp=drive_link";
+          const fallback = "O arquivo ficou pesado pra chegar por aqui. Dá uma olhada direto nesse link: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4&version_id=null";
           await enviarMensagem(contexto.idConta, contexto.idConversa, fallback);
           logger.info("tool:enviar-video", "Link fallback enviado com sucesso.");
         } catch (fallbackErr) {
