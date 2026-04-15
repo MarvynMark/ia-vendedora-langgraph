@@ -131,6 +131,11 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
   } else if (stepName.includes("aguardando pagamento")) {
     tipoFollowup = "lembrete";
   } else if (stepName === "ganho") {
+    // Proteção: se boas-vindas já foram enviadas pelo pagamento.ts, ignorar
+    if ((task.description ?? "").includes("boas-vindas: enviado")) {
+      logger.info("follow-up", "Boas-vindas já enviadas via pagamento.ts — ignorando overdue para Ganho");
+      return { status: "ignored", reason: "boas_vindas_ja_enviadas" };
+    }
     tipoFollowup = "boas_vindas";
   } else if (stepName === "nutrir" || stepName === "perdido") {
     tipoFollowup = "nutrir";
