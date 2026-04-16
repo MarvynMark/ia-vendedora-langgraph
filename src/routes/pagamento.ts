@@ -8,6 +8,7 @@ import {
   buscarKanbanBoard,
   adicionarEtiquetas,
   enviarMensagem,
+  reabrirConversa,
   criarConversa,
   enviarArquivo,
 } from "../services/chatwoot.ts";
@@ -213,6 +214,8 @@ async function processarPagamentoAprovado(dados: {
 
   // Notificar grupo de suporte sobre novo aluno
   try {
+    // Garantir que a conversa do grupo está aberta (pode ter sido resolvida manualmente)
+    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
     const telefoneFormatado = dados.telefone
       ? dados.telefone.replace(/^\+55/, "").replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")
       : "(não informado)";
@@ -225,7 +228,7 @@ async function processarPagamentoAprovado(dados: {
     );
     logger.info("pagamento", "Notificação de novo aluno enviada ao grupo de suporte");
   } catch (e) {
-    logger.warn("pagamento", "Erro ao notificar grupo de suporte:", e);
+    logger.error("pagamento", "Erro ao notificar grupo de suporte:", e);
   }
 
   // Adicionar etiqueta "mentoria" se produto for Mentoria Vestigium

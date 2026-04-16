@@ -44,6 +44,24 @@ export async function enviarMensagem(
   }, 3, 300);
 }
 
+export async function reabrirConversa(
+  accountId: string | number,
+  conversationId: string | number,
+) {
+  logger.info("chatwoot", "reabrirConversa", { conversationId });
+  return comRetry(async () => {
+    const res = await fetchComTimeout(
+      `${urlConta(accountId)}/conversations/${conversationId}/toggle_status`,
+      { method: "POST", headers: headers(), body: JSON.stringify({ status: "open" }) },
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`[chatwoot] reabrirConversa falhou (${res.status}): ${text}`);
+    }
+    return res.json();
+  }, 3, 300);
+}
+
 export async function enviarArquivo(
   accountId: string | number,
   conversationId: string | number,
