@@ -209,7 +209,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   "Tem também o Semestral, 6 meses de acompanhamento. Ideal pra quem quer começar começar por um tempo menor.
   Por 12x de R$ 197 no cartão ou No PIX à vista com 10% de desconto por  R$ 1.997 
 
-  Qual plano você escolhe pra começar hoje?"
+  Qual plano se encaixa melhor para você? O anual ou semestral?"
 
 
   **Regras de preço:**
