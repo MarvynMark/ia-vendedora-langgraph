@@ -85,11 +85,21 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
     const d = new Date(); d.setDate(d.getDate() + 1); proximaData = d; // amanhã
   }
 
+  // Ao mover para etapa que inicia nova sequência, zerar o contador de follow-ups
+  // para evitar que o contador da etapa anterior faça o agente pular mensagens
+  const dadosAtualizacao: Parameters<typeof atualizarKanbanTask>[2] = { due_date: proximaData.toISOString() };
+  const etapasComContador = ["conexão", "conexao", "aguardando pagamento"];
+  const descricaoAtual = payload.task.description ?? "";
+  if (etapasComContador.some(e => newStepName.includes(e)) && /🔁\s*-\s*Follow-ups:\s*[1-9]/i.test(descricaoAtual)) {
+    dadosAtualizacao.description = descricaoAtual.replace(/🔁\s*-\s*Follow-ups:\s*\d+/i, "🔁 - Follow-ups: 0");
+    logger.info("follow-up", `Contador de follow-ups zerado ao mover para etapa "${newStepName}"`);
+  }
+
   try {
     await atualizarKanbanTask(
       payload.account_id,
       payload.task.id,
-      { due_date: proximaData.toISOString() },
+      dadosAtualizacao,
     );
     logger.info("follow-up", "task_updated: due_date setada para", proximaData.toISOString());
   } catch (e) {
