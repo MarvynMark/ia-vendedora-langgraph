@@ -7,10 +7,19 @@ import {
   atualizarKanbanTask,
   buscarKanbanBoard,
   adicionarEtiquetas,
+  enviarMensagem,
+  criarConversa,
+  enviarArquivo,
 } from "../services/chatwoot.ts";
+import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
+
+const INBOX_ALUNOS_WALKER = 15;
+const DELAY_BOAS_VINDAS_WALKER_MS = 15 * 60 * 1000; // 15 minutos
+const DELAY_ENTRE_MSGS_MS = 15_000; // 15 segundos
+const VIDEO_BOAS_VINDAS_WALKER_URL = "https://minio.stkd.site/api/v1/download-shared-object/aHR0cHM6Ly9zMy5zdGtkLnNpdGUvYXJxdWl2b3NjbGllbnRlcy9WZXN0aWdpdW0vdmlkZW8td2Fsa2VyLWJvYXMtdmluZGFzLW5vdm8tYWx1bm8ubXA0P1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9M0xJMllMNEtLUEY5S0xGMTdEWU4lMkYyMDI2MDQxNiUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA0MTZUMDM0OTQwWiZYLUFtei1FeHBpcmVzPTQzMjAwJlgtQW16LVNlY3VyaXR5LVRva2VuPWV5SmhiR2NpT2lKSVV6VXhNaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpoWTJObGMzTkxaWGtpT2lJelRFa3lXVXcwUzB0UVJqbExURVl4TjBSWlRpSXNJbVY0Y0NJNk1UYzNOak0xTkRRM09Dd2ljR0Z5Wlc1MElqb2lZV1J0YVc0aWZRLnYzV2w5MWszU3hxX1l0WEpLYnY4cUJFWlM0Vl84eWVOdmxESVRFd0duWmdiSVcyc2RWMV9hY2NHUW1saFMtLWVUVzI5VS1BQUNwODZJSmc3eWxPZTRnJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZ2ZXJzaW9uSWQ9bnVsbCZYLUFtei1TaWduYXR1cmU9YWJkYTBlNmUwZDExMWZkNGFmYzg1OGFkMDI1M2RiNmMxZGMxYmM0YzZkNmJkOTljODRlZjZkZmFlZjE5ZDg0ZQ";
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
 async function obterGrafoFollowup() {
@@ -267,5 +276,77 @@ async function processarPagamentoAprovado(dados: {
     logger.info("pagamento", "Boas-vindas enviadas para:", telefone);
   } catch (e) {
     logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
+  }
+
+  // Agendar mensagens do Walker via inbox #ALUNOS WALKER em 15 minutos
+  const nomeAluno = dados.nome ?? contato.name;
+  const contatoId = contato.id;
+  void agendarBoasVindasWalker(accountId, contatoId, nomeAluno);
+}
+
+async function agendarBoasVindasWalker(
+  accountId: number,
+  contatoId: number,
+  nomeAluno: string,
+) {
+  await new Promise(r => setTimeout(r, DELAY_BOAS_VINDAS_WALKER_MS));
+
+  logger.info("pagamento", "Enviando boas-vindas do Walker pelo inbox #ALUNOS WALKER para:", nomeAluno);
+
+  // Buscar ou criar conversa no inbox ALUNOS WALKER
+  let conversationId: number;
+  try {
+    const conversa = await criarConversa(accountId, {
+      inbox_id: INBOX_ALUNOS_WALKER,
+      contact_id: contatoId,
+    });
+    conversationId = conversa.id;
+    logger.info("pagamento", "Conversa criada no inbox ALUNOS WALKER:", conversationId);
+  } catch (e) {
+    logger.error("pagamento", "Erro ao criar conversa no inbox ALUNOS WALKER:", e);
+    return;
+  }
+
+  const primeiroNome = nomeAluno.split(" ")[0] ?? nomeAluno;
+
+  // Mensagem 1
+  try {
+    await enviarMensagem(accountId, conversationId, `Olá, ${primeiroNome}, tudo bem?\n\nProfessor Walker por aqui!`);
+    logger.info("pagamento", "Walker boas-vindas msg 1 enviada");
+  } catch (e) {
+    logger.error("pagamento", "Erro ao enviar msg 1 Walker:", e);
+  }
+
+  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
+
+  // Mensagem 2
+  try {
+    await enviarMensagem(accountId, conversationId, `Passando para desejar as boas-vindas na mentoria Vestigium!\n\nOlha, é um prazer enorme tê-la aqui, rumo à sua aprovação de uma forma mais eficiente e também mais otimizada.`);
+    logger.info("pagamento", "Walker boas-vindas msg 2 enviada");
+  } catch (e) {
+    logger.error("pagamento", "Erro ao enviar msg 2 Walker:", e);
+  }
+
+  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
+
+  // Mensagem 3
+  try {
+    await enviarMensagem(accountId, conversationId, `Pra gente começar da melhor maneira possível, até porque a mentoria Vestigium é um acompanhamento bem de perto, vou enviar aqui agora um vídeo falando sobre três recados importantes nesse seu início na mentoria.\n\nEntão assista, aplique e, o que precisar, pode contar comigo, tá bom? 😊`);
+    logger.info("pagamento", "Walker boas-vindas msg 3 enviada");
+  } catch (e) {
+    logger.error("pagamento", "Erro ao enviar msg 3 Walker:", e);
+  }
+
+  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
+
+  // Mensagem 4 — vídeo
+  try {
+    const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_WALKER_URL, { method: "GET", timeout: 60_000 });
+    if (!res.ok) throw new Error(`Download do vídeo falhou: ${res.status}`);
+    const buffer = await res.arrayBuffer();
+    await enviarArquivo(accountId, conversationId, new Uint8Array(buffer), "video-walker-boas-vindas.mp4", "video/mp4");
+    logger.info("pagamento", "Walker boas-vindas vídeo enviado");
+  } catch (e) {
+    logger.error("pagamento", "Erro ao enviar vídeo Walker boas-vindas:", e);
   }
 }
