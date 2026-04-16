@@ -196,6 +196,23 @@ async function processarPagamentoAprovado(dados: {
     return;
   }
 
+  // Notificar grupo de suporte sobre novo aluno
+  try {
+    const telefoneFormatado = dados.telefone
+      ? dados.telefone.replace(/^\+55/, "").replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")
+      : "(não informado)";
+    const nomeProdutoNotificacao = dados.nomeOferta || dados.nomeProduto || "Mentoria Vestigium";
+    const mensagemGrupo = `✅✅ NOVO ALUNO MENTORIA: ${dados.nome ?? contato.name}\nEmail: ${dados.email ?? "(não informado)"}\nTelefone: ${telefoneFormatado}\n${nomeProdutoNotificacao}`;
+    await enviarMensagem(
+      accountId,
+      env.CHATWOOT_ALERT_CONVERSATION_ID,
+      mensagemGrupo,
+    );
+    logger.info("pagamento", "Notificação de novo aluno enviada ao grupo de suporte");
+  } catch (e) {
+    logger.warn("pagamento", "Erro ao notificar grupo de suporte:", e);
+  }
+
   // Adicionar etiqueta "mentoria" se produto for Mentoria Vestigium
   if (dados.nomeProduto.toLowerCase().includes("mentoria")) {
     try {
