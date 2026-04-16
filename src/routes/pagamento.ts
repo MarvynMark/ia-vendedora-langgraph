@@ -48,10 +48,16 @@ const dmGuruPayloadSchema = z.object({
 
 export const pagamentoRouter = new Elysia()
   .post("/webhook/pagamento", async ({ body }) => {
-    logger.info("pagamento", ">>> Webhook recebido");
+    logger.info("pagamento", ">>> Webhook recebido", { temPayloadWrapper: !!(body as Record<string, unknown>)["payload"] });
     registrarWebhook("/webhook/pagamento", body, "recebido");
 
-    const parsed = dmGuruPayloadSchema.safeParse(body);
+    // A DMGuru envolve os dados em um campo "payload" — extrair antes de validar
+    const rawBody = body as Record<string, unknown>;
+    const dadosParaValidar = (rawBody["payload"] && typeof rawBody["payload"] === "object")
+      ? rawBody["payload"]
+      : body;
+
+    const parsed = dmGuruPayloadSchema.safeParse(dadosParaValidar);
     if (!parsed.success) {
       logger.warn("pagamento", "Payload inválido:", parsed.error.issues);
       return { status: "error", reason: "invalid_payload" };
