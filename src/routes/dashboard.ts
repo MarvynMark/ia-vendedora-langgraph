@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { env } from "../config/env.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
+import { gerarDashboardHTML } from "./dashboard-html.ts";
 
 const ACCOUNT_ID = env.CHATWOOT_ACCOUNT_ID;
 const BASE_URL = env.CHATWOOT_BASE_URL;
@@ -289,20 +290,21 @@ function gerarHTML(): string {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Vestigium — Painel Comercial</title>
+<title>Vestigium · Painel Comercial</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg:        #080b12;
-    --surface:   #0f1520;
-    --card:      #131b2a;
-    --border:    #1e2d45;
-    --border2:   #243450;
-    --text:      #e2eaf8;
-    --muted:     #5a7399;
-    --muted2:    #3d5478;
+    --bg:      #060810;
+    --s1:      #0d1117;
+    --s2:      #111722;
+    --border:  #1c2333;
+    --border2: rgba(255,255,255,0.06);
+    --text:    #e6edf3;
+    --muted:   #7d8590;
+    --muted2:  #484f58;
     --green:     #2dd4a0;
     --green-dim: rgba(45,212,160,.12);
     --red:       #f05a6a;
@@ -894,7 +896,7 @@ setInterval(fetchDados, 60_000);
 
 export const dashboardRouter = new Elysia()
   .get("/dashboard", () => {
-    return new Response(gerarHTML(), {
+    return new Response(gerarDashboardHTML(), {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   })
