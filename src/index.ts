@@ -10,6 +10,7 @@ import { webhookRouter } from "./routes/webhook.ts";
 import { followupRouter } from "./routes/followup.ts";
 import { pagamentoRouter } from "./routes/pagamento.ts";
 import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
+import { dashboardRouter } from "./routes/dashboard.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
 import { obterLogs } from "./lib/webhook-logger.ts";
@@ -22,6 +23,7 @@ const app = new Elysia()
   .use(followupRouter)
   .use(pagamentoRouter)
   .use(aplicacaoRouter)
+  .use(dashboardRouter)
   .get("/webhook/logs", ({ query }) => {
     const limite = Math.min(Number(query.limite ?? 50), 100);
     return obterLogs(limite);

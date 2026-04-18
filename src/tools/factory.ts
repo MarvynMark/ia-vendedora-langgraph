@@ -5,6 +5,7 @@ import { criarToolAtualizarTarefa, criarToolAtualizarTarefaFollowup } from "./at
 import { criarToolReagirMensagem } from "./reagir-mensagem.ts";
 import { criarToolEnviarVideo } from "./enviar-video.ts";
 import { criarToolEnviarImagemEntregaveis } from "./enviar-imagem-entregaveis.ts";
+import { criarToolBuscarContextoSimilar } from "./buscar-contexto-similar.ts";
 
 interface ContextoMainAgent {
   idMensagem: string;
@@ -49,6 +50,7 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idConta: contexto.idConta,
       idConversa: contexto.idConversa,
     }),
+    criarToolBuscarContextoSimilar(),
   ];
 }
 

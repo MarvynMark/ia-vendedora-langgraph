@@ -70,6 +70,18 @@ export async function criarTabelas() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_template_pendente_enviado ON leads_template_pendente(template_enviado, criado_em);
+
+      CREATE TABLE IF NOT EXISTS rag_documentos (
+        id         SERIAL PRIMARY KEY,
+        tipo       VARCHAR(50)  NOT NULL,
+        titulo     VARCHAR(255),
+        conteudo   TEXT         NOT NULL,
+        metadata   JSONB        NOT NULL DEFAULT '{}',
+        embedding  JSONB        NOT NULL DEFAULT '[]',
+        criado_em  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_rag_tipo ON rag_documentos(tipo);
     `);
     logger.info("db", "Tabelas criadas com sucesso");
   } finally {

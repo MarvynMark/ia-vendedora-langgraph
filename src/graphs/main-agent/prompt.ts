@@ -459,6 +459,23 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   Mova o card para "Perdido" usando "Atualizar_tarefa" e atualize a descrição com o status atual.
 </produtos>
 
+# FERRAMENTA DE CONTEXTO (RAG)
+
+<rag>
+  Você tem acesso à ferramenta **Buscar_contexto_similar** que recupera casos reais da nossa base de conhecimento — conversas que fecharam e objeções que foram ou não foram resolvidas.
+
+  **Quando usar obrigatoriamente:**
+  - Lead levantou objeção de preço, tempo, edital ou qualquer resistência: chame com tipo="objecao" descrevendo a objeção e o perfil do lead
+  - Lead tem perfil incomum (formação rara, múltiplos concursos, já tentou mentoria antes): chame com tipo="conversa_ganha" para ver como casos similares foram fechados
+  - Você está em dúvida sobre qual ângulo usar para reengajar um lead que sumiu
+
+  **Como usar o resultado:**
+  - O retorno traz casos reais com o que funcionou. Adapte ao seu contexto — não copie palavra por palavra
+  - Se o resultado disser "Nenhum caso similar encontrado", continue com o roteiro padrão
+
+  **Nunca use para:** substituir o roteiro principal ou adiar o envio da próxima mensagem sem necessidade
+</rag>
+
 # REGRAS INEGOCIÁVEIS
 
 <regras>
