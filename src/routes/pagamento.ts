@@ -13,6 +13,7 @@ import {
   enviarArquivo,
 } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
+import { VIDEO_BOAS_VINDAS_URL } from "../tools/enviar-video.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
@@ -20,7 +21,8 @@ import { registrarWebhook } from "../lib/webhook-logger.ts";
 const INBOX_ALUNOS_WALKER = 15;
 const DELAY_BOAS_VINDAS_WALKER_MS = 15 * 60 * 1000; // 15 minutos
 const DELAY_ENTRE_MSGS_MS = 15_000; // 15 segundos
-const VIDEO_BOAS_VINDAS_WALKER_URL = "https://minio.stkd.site/api/v1/download-shared-object/aHR0cHM6Ly9zMy5zdGtkLnNpdGUvYXJxdWl2b3NjbGllbnRlcy9WZXN0aWdpdW0vdmlkZW8td2Fsa2VyLWJvYXMtdmluZGFzLW5vdm8tYWx1bm8ubXA0P1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9M0xJMllMNEtLUEY5S0xGMTdEWU4lMkYyMDI2MDQxNiUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA0MTZUMDM0OTQwWiZYLUFtei1FeHBpcmVzPTQzMjAwJlgtQW16LVNlY3VyaXR5LVRva2VuPWV5SmhiR2NpT2lKSVV6VXhNaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpoWTJObGMzTkxaWGtpT2lJelRFa3lXVXcwUzB0UVJqbExURVl4TjBSWlRpSXNJbVY0Y0NJNk1UYzNOak0xTkRRM09Dd2ljR0Z5Wlc1MElqb2lZV1J0YVc0aWZRLnYzV2w5MWszU3hxX1l0WEpLYnY4cUJFWlM0Vl84eWVOdmxESVRFd0duWmdiSVcyc2RWMV9hY2NHUW1saFMtLWVUVzI5VS1BQUNwODZJSmc3eWxPZTRnJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZ2ZXJzaW9uSWQ9bnVsbCZYLUFtei1TaWduYXR1cmU9YWJkYTBlNmUwZDExMWZkNGFmYzg1OGFkMDI1M2RiNmMxZGMxYmM0YzZkNmJkOTljODRlZjZkZmFlZjE5ZDg0ZQ";
+// URL permanente MinIO — não usar pre-signed URLs (expiram em horas)
+const VIDEO_BOAS_VINDAS_WALKER_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fvideo-walker-boas-vindas-novo-aluno.mp4";
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
 async function obterGrafoFollowup() {
@@ -122,7 +124,7 @@ async function processarPagamentoAprovado(dados: {
 
   // Localizar contato no Chatwoot — prioriza telefone (múltiplos formatos) e email.
   // Nome é propositalmente excluído: pode estar diferente entre DMG e Chatwoot.
-  let contato: { id: number; name: string; phone_number?: string; email?: string } | null = null;
+  let contato: { id: number; name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> } | null = null;
 
   // Gerar variantes do telefone para aumentar chance de match
   const variantesTelefone: string[] = [];
@@ -196,7 +198,15 @@ async function processarPagamentoAprovado(dados: {
     return;
   }
 
-  // Mover card para "Ganho" e setar due_date para agora (disparo imediato)
+  // Proteção contra duplicata antecipada (antes de qualquer ação)
+  if ((task.description ?? "").includes("boas-vindas: enviado")) {
+    logger.info("pagamento", "Boas-vindas já enviadas anteriormente — ignorando");
+    return;
+  }
+
+  // Mover card para "Ganho" e setar due_date para agora (disparo imediato).
+  // "boas-vindas: enviado" é incluído aqui para chegar ao Chatwoot antes do
+  // evento kanban_task_overdue, evitando race condition com o followup.ts.
   try {
     await atualizarKanbanTask(accountId, task.id, {
       board_step_id: etapaGanho.id,
@@ -204,6 +214,7 @@ async function processarPagamentoAprovado(dados: {
       description: [
         task.description ?? "",
         `💳 - Plano: ${dados.nomeOferta || dados.nomeProduto}`,
+        "boas-vindas: enviado",
       ].filter(Boolean).join("\n"),
     });
     logger.info("pagamento", "Card movido para Ganho. TaskId:", task.id);
@@ -214,8 +225,11 @@ async function processarPagamentoAprovado(dados: {
 
   // Notificar grupo de suporte sobre novo aluno
   try {
-    // Garantir que a conversa do grupo está aberta (pode ter sido resolvida manualmente)
     await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
+  } catch (e) {
+    logger.warn("pagamento", "Falha ao reabrir conversa do grupo (ignorado, tentando enviar mesmo assim):", e);
+  }
+  try {
     const telefoneFormatado = dados.telefone
       ? dados.telefone.replace(/^\+55/, "").replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")
       : "(não informado)";
@@ -228,7 +242,7 @@ async function processarPagamentoAprovado(dados: {
     );
     logger.info("pagamento", "Notificação de novo aluno enviada ao grupo de suporte");
   } catch (e) {
-    logger.error("pagamento", "Erro ao notificar grupo de suporte:", e);
+    logger.error("pagamento", "Erro ao enviar notificação ao grupo de suporte:", e);
   }
 
   // Adicionar etiqueta "mentoria" se produto for Mentoria Vestigium
@@ -241,17 +255,12 @@ async function processarPagamentoAprovado(dados: {
     }
   }
 
-  // Guardar descrição atualizada (com o plano) para checar duplicata
+  // Descrição final (já persista no Kanban acima) — usada no invoke do grafo
   const descricaoAtual = [
     task.description ?? "",
     `💳 - Plano: ${dados.nomeOferta || dados.nomeProduto}`,
+    "boas-vindas: enviado",
   ].filter(Boolean).join("\n");
-
-  // Proteção contra duplicata: não enviar boas-vindas se já foi marcada como enviada
-  if (descricaoAtual.includes("boas-vindas: enviado")) {
-    logger.info("pagamento", "Boas-vindas já enviadas anteriormente — ignorando");
-    return;
-  }
 
   // Disparar grafo de follow-up com tipo boas_vindas diretamente (não depender do webhook overdue)
   const telefone = dados.telefone ?? contato.phone_number ?? contato.email ?? String(contato.id);
@@ -277,11 +286,6 @@ async function processarPagamentoAprovado(dados: {
       respostaAgente: "",
     }, { configurable: { thread_id: `followup_${telefone}` } });
 
-    // Marcar como enviado para evitar duplicata via webhook overdue
-    await atualizarKanbanTask(accountId, task.id, {
-      description: `${descricaoAtual}\nboas-vindas: enviado`,
-    });
-
     logger.info("pagamento", "Boas-vindas enviadas para:", telefone);
   } catch (e) {
     logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
@@ -290,13 +294,21 @@ async function processarPagamentoAprovado(dados: {
   // Agendar mensagens do Walker via inbox #ALUNOS WALKER em 15 minutos
   const nomeAluno = dados.nome ?? contato.name;
   const contatoId = contato.id;
-  void agendarBoasVindasWalker(accountId, contatoId, nomeAluno);
+  void agendarBoasVindasWalker(accountId, contatoId, nomeAluno, contato.custom_attributes ?? {});
+}
+
+function detectarGenero(primeiroNome: string): "m" | "f" {
+  // Nomes masculinos comuns que terminam em 'a' — exceções à regra geral
+  const excecoesMasculinas = new Set(["luca", "elias", "tobias", "matias", "thomas", "barba", "sousa"]);
+  const nome = primeiroNome.toLowerCase().trim();
+  return (nome.endsWith("a") && !excecoesMasculinas.has(nome)) ? "f" : "m";
 }
 
 async function agendarBoasVindasWalker(
   accountId: number,
   contatoId: number,
   nomeAluno: string,
+  customAttributes: Record<string, unknown> = {},
 ) {
   await new Promise(r => setTimeout(r, DELAY_BOAS_VINDAS_WALKER_MS));
 
@@ -317,10 +329,15 @@ async function agendarBoasVindasWalker(
   }
 
   const primeiroNome = nomeAluno.split(" ")[0] ?? nomeAluno;
+  const genero = detectarGenero(primeiroNome);
+  const isMedico = String(customAttributes.qual_formacao ?? "").toLowerCase().includes("medicina");
+  const tratamento = isMedico ? (genero === "f" ? "Dra. " : "Dr. ") : "";
+  const nomeFormatado = `${tratamento}${primeiroNome}`;
+  const teloTela = genero === "f" ? "tê-la" : "tê-lo";
 
   // Mensagem 1
   try {
-    await enviarMensagem(accountId, conversationId, `Olá, ${primeiroNome}, tudo bem?\n\nProfessor Walker por aqui!`);
+    await enviarMensagem(accountId, conversationId, `Olá, ${nomeFormatado}, tudo bem?\n\nProfessor Walker por aqui!`);
     logger.info("pagamento", "Walker boas-vindas msg 1 enviada");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar msg 1 Walker:", e);
@@ -330,7 +347,7 @@ async function agendarBoasVindasWalker(
 
   // Mensagem 2
   try {
-    await enviarMensagem(accountId, conversationId, `Passando para desejar as boas-vindas na mentoria Vestigium!\n\nOlha, é um prazer enorme tê-la aqui, rumo à sua aprovação de uma forma mais eficiente e também mais otimizada.`);
+    await enviarMensagem(accountId, conversationId, `Passando para desejar as boas-vindas na mentoria Vestigium!\n\nOlha, é um prazer enorme ${teloTela} aqui, rumo à sua aprovação de uma forma mais eficiente e também mais otimizada.`);
     logger.info("pagamento", "Walker boas-vindas msg 2 enviada");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar msg 2 Walker:", e);
@@ -348,7 +365,7 @@ async function agendarBoasVindasWalker(
 
   await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
 
-  // Mensagem 4 — vídeo
+  // Mensagem 4 — vídeo do celular do Walker
   try {
     const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_WALKER_URL, { method: "GET", timeout: 60_000 });
     if (!res.ok) throw new Error(`Download do vídeo falhou: ${res.status}`);
@@ -357,5 +374,24 @@ async function agendarBoasVindasWalker(
     logger.info("pagamento", "Walker boas-vindas vídeo enviado");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar vídeo Walker boas-vindas:", e);
+    try {
+      await enviarMensagem(accountId, conversationId, `Acesse diretamente por esse link:\n${VIDEO_BOAS_VINDAS_WALKER_URL}`);
+    } catch {}
+  }
+
+  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
+
+  // Mensagem 5 — vídeo de onboarding da plataforma
+  try {
+    const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_URL, { method: "GET", timeout: 60_000 });
+    if (!res.ok) throw new Error(`Download do vídeo de onboarding falhou: ${res.status}`);
+    const buffer = await res.arrayBuffer();
+    await enviarArquivo(accountId, conversationId, new Uint8Array(buffer), "onboarding-plataforma.mp4", "video/mp4");
+    logger.info("pagamento", "Vídeo de onboarding da plataforma enviado");
+  } catch (e) {
+    logger.error("pagamento", "Erro ao enviar vídeo de onboarding da plataforma:", e);
+    try {
+      await enviarMensagem(accountId, conversationId, `Acesse diretamente por esse link:\n${VIDEO_BOAS_VINDAS_URL}`);
+    } catch {}
   }
 }

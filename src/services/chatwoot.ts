@@ -88,6 +88,7 @@ export async function enviarArquivo(
         method: "POST",
         headers: { api_access_token: TOKEN },
         body: form,
+        timeout: 120_000,
       },
     );
 
@@ -305,7 +306,7 @@ export async function atualizarAtributosConversa(
 export async function buscarContatoPorQuery(
   accountId: string | number,
   query: string,
-): Promise<{ id: number; name: string; phone_number?: string; email?: string } | null> {
+): Promise<{ id: number; name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> } | null> {
   const url = `${urlConta(accountId)}/contacts/search?q=${encodeURIComponent(query)}&include_contacts=true`;
   const res = await fetchComTimeout(url, { method: "GET", headers: headers() });
 
@@ -314,7 +315,7 @@ export async function buscarContatoPorQuery(
     throw new Error(`[chatwoot] buscarContatoPorQuery falhou (${res.status}): ${text}`);
   }
 
-  const data = await res.json() as { payload: Array<{ id: number; name: string; phone_number?: string; email?: string }> };
+  const data = await res.json() as { payload: Array<{ id: number; name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> }> };
   return data.payload?.[0] ?? null;
 }
 
