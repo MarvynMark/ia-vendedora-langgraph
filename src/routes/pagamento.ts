@@ -46,7 +46,13 @@ const dmGuruPayloadSchema = z.object({
   }).optional(),
   status: z.string().optional(),
   webhook_type: z.string().optional(),
-  is_reissue: z.number().optional(), // 0 = nova compra, 1 = parcela recorrente
+  is_reissue: z.number().optional(), // 0 = nova compra, 1 = parcela recorrente (não confiável: DMG envia 0 em cobranças recorrentes)
+  subscription: z.object({
+    charged_times: z.number().optional(), // > 1 = cobrança recorrente posterior à primeira
+  }).optional(),
+  invoice: z.object({
+    cycle: z.number().optional(), // > 1 = cobrança de ciclo recorrente posterior
+  }).optional(),
 });
 
 export const pagamentoRouter = new Elysia()
@@ -72,9 +78,22 @@ export const pagamentoRouter = new Elysia()
       return { status: "ignored", reason: "not_approved" };
     }
 
-    // Só processar nova compra — ignorar parcelas recorrentes
-    if (parsed.data.is_reissue === 1) {
-      logger.info("pagamento", "Ignorado: cobrança recorrente (is_reissue=1)");
+    // Só processar a 1ª cobrança — ignorar parcelas recorrentes posteriores.
+    // is_reissue não é confiável (DMG envia 0 em parcelas recorrentes), então
+    // checamos também charged_times e cycle: > 1 indica cobrança não-inicial.
+    const chargedTimes = parsed.data.subscription?.charged_times;
+    const invoiceCycle = parsed.data.invoice?.cycle;
+    const ehCobrancaPosterior =
+      parsed.data.is_reissue === 1 ||
+      (typeof chargedTimes === "number" && chargedTimes > 1) ||
+      (typeof invoiceCycle === "number" && invoiceCycle > 1);
+
+    if (ehCobrancaPosterior) {
+      logger.info("pagamento", "Ignorado: cobrança recorrente posterior à 1ª", {
+        is_reissue: parsed.data.is_reissue,
+        charged_times: chargedTimes,
+        cycle: invoiceCycle,
+      });
       return { status: "ignored", reason: "recurring_installment" };
     }
 
@@ -291,10 +310,10 @@ async function processarPagamentoAprovado(dados: {
     logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
   }
 
-  // Agendar mensagens do Walker via inbox #ALUNOS WALKER em 15 minutos
-  const nomeAluno = dados.nome ?? contato.name;
-  const contatoId = contato.id;
-  void agendarBoasVindasWalker(accountId, contatoId, nomeAluno, contato.custom_attributes ?? {});
+  // Boas-vindas do Walker (inbox #ALUNOS WALKER) DESATIVADAS temporariamente.
+  // Reativar removendo o comentário abaixo.
+  // void agendarBoasVindasWalker(accountId, contato.id, dados.nome ?? contato.name, contato.custom_attributes ?? {});
+  logger.info("pagamento", "Boas-vindas Walker DESATIVADAS (inbox #ALUNOS WALKER) — não enviando");
 }
 
 function detectarGenero(primeiroNome: string): "m" | "f" {
