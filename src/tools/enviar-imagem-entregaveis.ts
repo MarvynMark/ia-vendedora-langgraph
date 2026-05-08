@@ -22,8 +22,10 @@ E ainda leva de bônus:
 
 🎁 Curso de Medicina Legal e Criminalística
 🎁 Cursos de Genética Forense, Balística, Toxicologia e Química
-🎁 Encontros de apoio para TAF, discursiva, psicotécnico e análise de edital
+🎁 Encontros de apoio para TAF, temas de discursiva, psicotécnico e análise de edital
 🎁 Noções de Direito Penal, Processual Penal e Português`;
+
+const conversasComImagemEnviada = new Set<string>();
 
 interface ContextoEnviarImagem {
   idConta: string;
@@ -33,6 +35,10 @@ interface ContextoEnviarImagem {
 export function criarToolEnviarImagemEntregaveis(contexto: ContextoEnviarImagem) {
   return tool(
     async () => {
+      if (conversasComImagemEnviada.has(contexto.idConversa)) {
+        return "Imagem já enviada nesta conversa.";
+      }
+      conversasComImagemEnviada.add(contexto.idConversa);
       try {
         logger.info("tool:enviar-imagem-entregaveis", "Baixando imagem de:", IMAGEM_ENTREGAVEIS_URL);
         const res = await fetchComTimeout(IMAGEM_ENTREGAVEIS_URL, { method: "GET", timeout: 30_000 });

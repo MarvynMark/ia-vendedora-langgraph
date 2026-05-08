@@ -130,6 +130,7 @@ async function executarAgente(state: MainAgentStateType) {
     dataHoraAtual,
     dadosFormulario: state.dadosFormulario,
     atributosContato: state.atributosContato,
+    nomeLead: state.nome,
   });
 
   // Injetar no system prompt quando a conversa já está em andamento

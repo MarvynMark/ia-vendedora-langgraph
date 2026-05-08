@@ -10,6 +10,8 @@ export const VIDEO_PLATAFORMA_URL = "https://minio.stkd.site/api/v1/buckets/arqu
 // Vídeo de boas-vindas — enviado APENAS para alunos que acabaram de pagar (sequência de onboarding)
 export const VIDEO_BOAS_VINDAS_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fboas-vindas.mp4";
 
+const conversasComVideoEnviado = new Set<string>();
+
 interface ContextoEnviarVideo {
   idConta: string;
   idConversa: string;
@@ -18,6 +20,10 @@ interface ContextoEnviarVideo {
 export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
   return tool(
     async () => {
+      if (conversasComVideoEnviado.has(contexto.idConversa)) {
+        return "Vídeo já enviado nesta conversa.";
+      }
+      conversasComVideoEnviado.add(contexto.idConversa);
       try {
         logger.info("tool:enviar-video", "Baixando vídeo de:", VIDEO_PLATAFORMA_URL);
         const res = await fetchComTimeout(VIDEO_PLATAFORMA_URL, { method: "GET", timeout: 60_000 });

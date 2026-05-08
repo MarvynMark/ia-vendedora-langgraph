@@ -17,24 +17,24 @@ export function criarToolEscalarHumano(contexto: ContextoEscalarHumano) {
   return tool(
     async (input) => {
       try {
-        // Remove "agente-on" para desativar o agente na conversa
         await removerEtiquetas(contexto.idConta, contexto.idConversa, ["agente-on"]);
+      } catch (e) {
+        logger.error("tool:escalar-humano", "Erro ao remover label:", e);
+      }
 
-        // Enviar alerta na conversa de alerta
+      try {
         const nomeDisplay = contexto.nome || "(usuario nao cadastrado)";
         const mensagemAlerta = `Assistente desabilitado para o usuario ${nomeDisplay} (${contexto.telefone}).\n\n*Ultima mensagem*:\n\n"${contexto.ultimaMensagem}"\n\n*Resumo da conversa*:\n\n"${input.resumoConversa}"`;
-
         await enviarMensagem(
           env.CHATWOOT_ACCOUNT_ID,
           env.CHATWOOT_ALERT_CONVERSATION_ID,
           mensagemAlerta,
         );
-
-        return JSON.stringify({ resultado: "Atendimento escalado para humano." });
       } catch (e) {
-        logger.error("tool:escalar-humano", "Erro:", e);
-        return JSON.stringify({ erro: "Falha na operação. Tente novamente." });
+        logger.warn("tool:escalar-humano", "Erro ao enviar alerta (escalação já executada):", e);
       }
+
+      return JSON.stringify({ resultado: "ok" });
     },
     {
       name: "Escalar_humano",

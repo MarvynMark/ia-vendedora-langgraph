@@ -60,9 +60,15 @@ export async function verificarFollowupsPendentes() {
         // Vencida: disparar follow-up
         if (task.date_status !== "overdue") continue;
 
-        const conversa = task.conversations?.[0];
+        const conversa =
+          task.conversations?.find(c => c.inbox.id === env.CHATWOOT_INBOX_ID)
+          ?? task.conversations?.[0];
         if (!conversa) {
           logger.warn("followup-timer", `Task ${task.id} sem conversa associada — ignorando`);
+          continue;
+        }
+        if (conversa.inbox.id !== env.CHATWOOT_INBOX_ID) {
+          logger.warn("followup-timer", `Task ${task.id}: conversa ${conversa.id} fora do inbox comercial (inbox ${conversa.inbox.id}) — follow-up ignorado`);
           continue;
         }
 

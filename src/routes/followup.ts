@@ -81,6 +81,8 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
     proximaData = new Date(Date.now() + 5 * 60 * 1000); // 5 min
   } else if (newStepName.includes("primeira mensagem")) {
     proximaData = proximoHorarioComercial(new Date(), 2 * 60 * 60 * 1000); // 2h
+  } else if (newStepName.includes("aguardando pagamento")) {
+    proximaData = proximoHorarioComercial(new Date(), 30 * 60 * 1000); // 30 min (igual DELAYS_LEMBRETE_MS[0])
   } else {
     const d = new Date(); d.setDate(d.getDate() + 1); proximaData = d; // amanhã
   }
@@ -115,11 +117,19 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
     return { status: "ignored", reason: "modo_teste" };
   }
   const task = payload.task;
-  const conversa = task.conversations?.[0];
+  // Filtra para usar apenas a conversa do inbox comercial — evita enviar follow-up
+  // pelo número errado quando o contato tem conversas em múltiplos inboxes (ex: #ALUNOS WALKER)
+  const conversa = task.conversations?.find(c => c.inbox_id === env.CHATWOOT_INBOX_ID)
+    ?? task.conversations?.[0];
 
   if (!conversa) {
     logger.error("follow-up", "Nenhuma conversa encontrada na tarefa");
     return { status: "error", reason: "no_conversation" };
+  }
+
+  if (conversa.inbox_id !== env.CHATWOOT_INBOX_ID) {
+    logger.warn("follow-up", `Conversa ${conversa.id} não pertence ao inbox comercial (inbox ${conversa.inbox_id}) — follow-up ignorado`);
+    return { status: "ignored", reason: "inbox_nao_comercial" };
   }
 
   const telefone = conversa.contact?.phone_number ?? conversa.contact?.additional_attributes?.social_profiles?.instagram ?? "";
@@ -153,6 +163,18 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
     tipoFollowup = "ignorar";
   }
 
+  // Proteção contra overdue com board_step desatualizado: se o Chatwoot enfileirou
+  // o evento quando o card ainda estava em etapa anterior à conversão, a descrição
+  // já terá "boas-vindas: enviado" mesmo que o step no payload seja "conexão" etc.
+  if (
+    (task.description ?? "").includes("boas-vindas: enviado") &&
+    tipoFollowup !== "boas_vindas" &&
+    tipoFollowup !== "nutrir"
+  ) {
+    logger.warn("follow-up", `Overdue ignorado — lead já converteu mas step no payload é "${task.board_step.name}"`);
+    return { status: "ignored", reason: "lead_convertido_step_desatualizado" };
+  }
+
   logger.info("follow-up", `Processando overdue para: ${telefone} — step: ${task.board_step.name} — tipo: ${tipoFollowup}`);
 
   const processamento = (async () => {
@@ -171,7 +193,7 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
         telefone,
         conversationId: conversa.id,
         inboxId: conversa.inbox_id,
-        displayId: conversa.display_id,
+        displayId: conversa.id,
         funilSteps: [],
         idEtapaPerdido: 0,
         tipoFollowup,

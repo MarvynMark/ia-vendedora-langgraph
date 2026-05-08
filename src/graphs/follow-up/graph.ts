@@ -3,7 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, verificarLeadRespondeuUltimo, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
 import { VIDEO_BOAS_VINDAS_URL } from "../../tools/enviar-video.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
@@ -95,17 +95,17 @@ const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_duvida", "olhinho_followup", "en
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
 
-  // Se o lead já respondeu, apenas reagenda
+  // Se a última mensagem da conversa foi do lead (ele respondeu após o agente), apenas reagenda
   try {
-    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
-    if (totalIncoming > 0) {
-      logger.info("follow-up", "Lead já respondeu — reagendando follow-up Conexão");
+    const leadRespondeuUltimo = await verificarLeadRespondeuUltimo(state.accountId, state.conversationId);
+    if (leadRespondeuUltimo) {
+      logger.info("follow-up", "Lead respondeu por último — reagendando follow-up Conexão");
       const proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
       await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
       return { respostaAgente: "" };
     }
   } catch (e) {
-    logger.warn("follow-up", "Erro ao verificar incoming:", e);
+    logger.warn("follow-up", "Erro ao verificar última mensagem:", e);
   }
 
   const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);

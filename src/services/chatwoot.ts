@@ -385,6 +385,20 @@ export async function contarMensagensIncoming(
   return msgs.filter(m => m.message_type === 0).length;
 }
 
+// Retorna true se a última mensagem real da conversa foi do lead (type 0)
+// Ignora mensagens de atividade (type 2). Usado para detectar se o lead
+// respondeu APÓS a última mensagem do agente — caso contrário o follow-up deve ser enviado.
+export async function verificarLeadRespondeuUltimo(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<boolean> {
+  const data = await listarMensagens(accountId, conversationId) as { payload?: Array<{ message_type: number; created_at: number }> };
+  const msgs = (data.payload ?? []).filter(m => m.message_type === 0 || m.message_type === 1);
+  if (msgs.length === 0) return false;
+  const ultima = msgs.sort((a, b) => b.created_at - a.created_at)[0]!;
+  return ultima.message_type === 0;
+}
+
 // Verifica se o lead enviou mensagem nas últimas 24h (janela ativa do WhatsApp)
 export async function verificarJanela24h(
   accountId: string | number,
