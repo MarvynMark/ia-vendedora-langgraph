@@ -246,8 +246,11 @@ async function processarPagamentoAprovado(dados: {
   }
 
   // Notificar grupo de suporte sobre novo aluno
-  // Não chamar reabrirConversa aqui: toggle_status fecha a conversa se já estiver aberta,
-  // o que impede o envio subsequente. O grupo de suporte deve permanecer sempre aberto.
+  try {
+    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
+  } catch (e) {
+    logger.warn("pagamento", "Falha ao reabrir conversa do grupo (ignorado):", e);
+  }
   try {
     const telefoneFormatado = dados.telefone
       ? dados.telefone.replace(/^\+55/, "").replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")

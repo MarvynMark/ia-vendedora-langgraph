@@ -49,6 +49,12 @@ export async function reabrirConversa(
   conversationId: string | number,
 ) {
   logger.info("chatwoot", "reabrirConversa", { conversationId });
+  // toggle_status fecha a conversa se já estiver aberta — verificar antes de chamar
+  const conv = await buscarConversa(accountId, conversationId) as { status?: string };
+  if (conv.status === "open") {
+    logger.info("chatwoot", "reabrirConversa: conversa já está aberta, ignorando toggle", { conversationId });
+    return;
+  }
   return comRetry(async () => {
     const res = await fetchComTimeout(
       `${urlConta(accountId)}/conversations/${conversationId}/toggle_status`,
