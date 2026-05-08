@@ -47,12 +47,15 @@ const dmGuruPayloadSchema = z.object({
   status: z.string().optional(),
   webhook_type: z.string().optional(),
   is_reissue: z.number().optional(), // 0 = nova compra, 1 = parcela recorrente (não confiável: DMG envia 0 em cobranças recorrentes)
-  subscription: z.object({
-    charged_times: z.number().optional(), // > 1 = cobrança recorrente posterior à primeira
-  }).optional(),
-  invoice: z.object({
-    cycle: z.number().optional(), // > 1 = cobrança de ciclo recorrente posterior
-  }).optional(),
+  // DMG envia [] quando não é assinatura — aceitar array ou objeto
+  subscription: z.union([
+    z.object({ charged_times: z.number().optional() }),
+    z.array(z.unknown()),
+  ]).optional(),
+  invoice: z.union([
+    z.object({ cycle: z.number().optional() }),
+    z.array(z.unknown()),
+  ]).optional(),
 });
 
 export const pagamentoRouter = new Elysia()
@@ -81,8 +84,8 @@ export const pagamentoRouter = new Elysia()
     // Só processar a 1ª cobrança — ignorar parcelas recorrentes posteriores.
     // is_reissue não é confiável (DMG envia 0 em parcelas recorrentes), então
     // checamos também charged_times e cycle: > 1 indica cobrança não-inicial.
-    const chargedTimes = parsed.data.subscription?.charged_times;
-    const invoiceCycle = parsed.data.invoice?.cycle;
+    const chargedTimes = Array.isArray(parsed.data.subscription) ? undefined : parsed.data.subscription?.charged_times;
+    const invoiceCycle = Array.isArray(parsed.data.invoice) ? undefined : parsed.data.invoice?.cycle;
     const ehCobrancaPosterior =
       parsed.data.is_reissue === 1 ||
       (typeof chargedTimes === "number" && chargedTimes > 1) ||
