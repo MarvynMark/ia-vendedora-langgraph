@@ -245,12 +245,9 @@ async function processarPagamentoAprovado(dados: {
     return;
   }
 
-  // Notificar grupo de suporte sobre novo aluno
-  try {
-    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
-  } catch (e) {
-    logger.warn("pagamento", "Falha ao reabrir conversa do grupo (ignorado):", e);
-  }
+  // Notificar grupo de suporte sobre novo aluno.
+  // Ordem importa: enviar primeiro (Baileys enfileira a msg), depois reabrir
+  // (Baileys entrega as msgs pendentes ao reabrir). Inverter a ordem causa falha.
   try {
     const telefoneFormatado = dados.telefone
       ? dados.telefone.replace(/^\+55/, "").replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")
@@ -265,6 +262,11 @@ async function processarPagamentoAprovado(dados: {
     logger.info("pagamento", "Notificação de novo aluno enviada ao grupo de suporte");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar notificação ao grupo de suporte:", e);
+  }
+  try {
+    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
+  } catch (e) {
+    logger.warn("pagamento", "Falha ao reabrir conversa do grupo:", e);
   }
 
   // Adicionar etiqueta "mentoria" se produto for Mentoria Vestigium
