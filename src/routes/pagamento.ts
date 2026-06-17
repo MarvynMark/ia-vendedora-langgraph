@@ -10,6 +10,7 @@ import {
   enviarMensagem,
   reabrirConversa,
   criarConversa,
+  criarKanbanTask,
   enviarArquivo,
 } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
@@ -188,9 +189,49 @@ async function processarPagamentoAprovado(dados: {
   }
 
   // Pegar a conversa mais recente que tenha kanban_task
-  const conversaComTask = conversas.find(c => c.kanban_task && Object.keys(c.kanban_task).length > 0);
+  let conversaComTask = conversas.find(c => c.kanban_task && Object.keys(c.kanban_task).length > 0);
+
+  // Fallback: contato encontrado mas sem card no Kanban — criar conversa na API Comercial e card automaticamente
   if (!conversaComTask?.kanban_task) {
-    logger.error("pagamento", "Nenhuma conversa com kanban_task encontrada para contato:", contato.id);
+    logger.warn("pagamento", "Sem kanban_task para contato — criando conversa e card automaticamente:", contato.id);
+    try {
+      const board = await buscarKanbanBoard(accountId, 1) as {
+        steps?: Array<{ id: number; name: string }>;
+      };
+      const ganhoStep = (board.steps ?? []).find(s => s.name.toLowerCase() === "ganho");
+      if (!ganhoStep) {
+        logger.error("pagamento", "Etapa 'Ganho' não encontrada no fallback");
+        return;
+      }
+      const novaConversa = await criarConversa(accountId, {
+        inbox_id: Number(env.CHATWOOT_INBOX_ID),
+        contact_id: contato.id,
+      });
+      const novaTask = await criarKanbanTask(accountId, {
+        board_id: 1,
+        board_step_id: ganhoStep.id,
+        title: contato.name,
+        conversation_id: novaConversa.id,
+      });
+      logger.info("pagamento", "Conversa e card criados no fallback:", { conversaId: novaConversa.id, taskId: novaTask.id });
+      conversaComTask = {
+        id: novaConversa.id,
+        inbox_id: Number(env.CHATWOOT_INBOX_ID),
+        kanban_task: {
+          id: novaTask.id,
+          board_id: 1,
+          title: contato.name,
+          description: undefined,
+        },
+      };
+    } catch (e) {
+      logger.error("pagamento", "Erro ao criar conversa/card no fallback:", e);
+      return;
+    }
+  }
+
+  if (!conversaComTask?.kanban_task) {
+    logger.error("pagamento", "Kanban task indisponível mesmo após fallback — abortando");
     return;
   }
 
