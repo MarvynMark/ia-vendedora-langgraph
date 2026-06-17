@@ -154,6 +154,9 @@ async function processarPagamentoAprovado(dados: {
     const semPlus = dados.telefone.replace(/^\+/, "");          // 5562996171551
     const semPais = semPlus.replace(/^55/, "");                  // 62996171551
     variantesTelefone.push(dados.telefone, semPlus, semPais);
+    // Remover o 9º dígito caso DMG envie formato novo (66984208276) mas Chatwoot tenha formato antigo (6684208276)
+    const semNono = semPais.replace(/^(\d{2})9(\d{7,8})$/, "$1$2");
+    if (semNono !== semPais) variantesTelefone.push(`+55${semNono}`, `55${semNono}`, semNono);
   }
 
   const tentativas = [...new Set([...variantesTelefone, dados.email].filter(Boolean))] as string[];
