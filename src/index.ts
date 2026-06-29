@@ -13,6 +13,8 @@ import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
+import { verificarNoticias } from "./lib/monitor-noticias.ts";
+import { monitorNoticiasRouter } from "./routes/monitor-noticias.ts";
 import { obterLogs } from "./lib/webhook-logger.ts";
 
 const app = new Elysia()
@@ -24,6 +26,7 @@ const app = new Elysia()
   .use(pagamentoRouter)
   .use(aplicacaoRouter)
   .use(dashboardRouter)
+  .use(monitorNoticiasRouter)
   .get("/webhook/logs", ({ query }) => {
     const limite = Math.min(Number(query.limite ?? 50), 100);
     return obterLogs(limite);
@@ -49,6 +52,18 @@ setInterval(async () => {
     logger.error("followup-timer", "Erro no job de follow-ups:", e);
   }
 }, 5 * 60_000);
+
+// Job: monitorar sites de notícias e alertar sobre "perito criminal"
+if (env.MONITOR_ATIVO) {
+  logger.info("monitor-noticias", `Monitor de notícias ativo (intervalo ${env.MONITOR_INTERVALO_MS}ms, termos: "${env.MONITOR_TERMOS}")`);
+  setInterval(async () => {
+    try {
+      await verificarNoticias();
+    } catch (e) {
+      logger.error("monitor-noticias", "Erro no job de notícias:", e);
+    }
+  }, env.MONITOR_INTERVALO_MS);
+}
 
 async function shutdown() {
   logger.info("server", "Desligando...");

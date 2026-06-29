@@ -82,6 +82,15 @@ export async function criarTabelas() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_rag_tipo ON rag_documentos(tipo);
+
+      CREATE TABLE IF NOT EXISTS noticias_vistas (
+        url        TEXT PRIMARY KEY,
+        titulo     TEXT,
+        termo      TEXT,
+        criado_em  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_noticias_criado ON noticias_vistas(criado_em DESC);
     `);
     logger.info("db", "Tabelas criadas com sucesso");
   } finally {
