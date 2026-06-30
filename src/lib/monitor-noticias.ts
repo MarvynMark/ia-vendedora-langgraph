@@ -34,8 +34,21 @@ const FONTES: Fonte[] = [
   },
 ];
 
-const USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+// Headers completos de browser. Sites atrás de Cloudflare (ex: Gran Cursos) barram
+// requisições "cruas" que só mandam User-Agent; o conjunto completo passa na checagem
+// de integridade de browser mesmo a partir de IP de datacenter.
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
 
 interface Noticia {
   titulo: string;
@@ -69,7 +82,7 @@ function termoQueCasa(titulo: string, termos: string[]): string | null {
 // Busca e faz parse de uma fonte, retornando as notícias encontradas.
 async function coletarFonte(fonte: Fonte): Promise<Noticia[]> {
   const res = await comRetry(
-    () => fetchComTimeout(fonte.url, { timeout: 15000, headers: { "User-Agent": USER_AGENT } }),
+    () => fetchComTimeout(fonte.url, { timeout: 15000, headers: BROWSER_HEADERS }),
     3,
     1000,
   );
