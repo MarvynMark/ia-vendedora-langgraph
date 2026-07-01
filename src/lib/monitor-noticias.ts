@@ -15,6 +15,7 @@ interface Fonte {
   seletorItem: string;   // seleciona cada bloco de notícia
   seletorTitulo: string; // dentro do item, onde está o título (usa .text)
   seletorLink: string;   // dentro do item, onde está o link (usa href)
+  viaProxy?: boolean;    // busca via Jina Reader (contorna Cloudflare que bloqueia o IP)
 }
 
 const FONTES: Fonte[] = [
@@ -26,13 +27,20 @@ const FONTES: Fonte[] = [
     seletorLink: "a",
   },
   {
+    // O Cloudflare do Gran Cursos bloqueia (403) o IP do servidor de produção.
+    // Buscar via Jina Reader resolve: ele busca a página a partir dos servidores
+    // dele e devolve o HTML original, que o mesmo parser abaixo consome.
     nome: "grancursos",
     url: "https://blog.grancursosonline.com.br/ultimas-noticias/",
     seletorItem: ".list-post",
     seletorTitulo: "h2 a",
     seletorLink: "h2 a",
+    viaProxy: true,
   },
 ];
+
+// Prefixo do leitor-proxy usado para fontes bloqueadas por IP.
+const PROXY_PREFIXO = "https://r.jina.ai/";
 
 // Headers completos de browser. Sites atrás de Cloudflare (ex: Gran Cursos) barram
 // requisições "cruas" que só mandam User-Agent; o conjunto completo passa na checagem
@@ -81,8 +89,17 @@ function termoQueCasa(titulo: string, termos: string[]): string | null {
 
 // Busca e faz parse de uma fonte, retornando as notícias encontradas.
 async function coletarFonte(fonte: Fonte): Promise<Noticia[]> {
+  // Fontes bloqueadas por IP são buscadas via Jina Reader, pedindo o HTML original
+  // (X-Return-Format: html) para que o mesmo parser abaixo funcione sem alteração.
+  const alvo = fonte.viaProxy ? `${PROXY_PREFIXO}${fonte.url}` : fonte.url;
+  const headers = fonte.viaProxy
+    ? { ...BROWSER_HEADERS, "X-Return-Format": "html" }
+    : BROWSER_HEADERS;
+  // O proxy adiciona latência (busca a página remotamente), então damos mais tempo.
+  const timeout = fonte.viaProxy ? 30000 : 15000;
+
   const res = await comRetry(
-    () => fetchComTimeout(fonte.url, { timeout: 15000, headers: BROWSER_HEADERS }),
+    () => fetchComTimeout(alvo, { timeout, headers }),
     3,
     1000,
   );
