@@ -32,41 +32,46 @@ interface ContextoEnviarImagem {
   idConversa: string;
 }
 
+// Envia a imagem de entregáveis para a conversa (com dedupe e fallback em texto).
+// Exportado para ser reutilizado tanto pela tool do LLM quanto pela guarda determinística
+// do grafo principal (garante o envio mesmo quando o LLM narra o envio sem chamar a tool).
+export async function enviarImagemEntregaveis(idConta: string, idConversa: string): Promise<string> {
+  if (conversasComImagemEnviada.has(idConversa)) {
+    return "Imagem já enviada nesta conversa.";
+  }
+  conversasComImagemEnviada.add(idConversa);
+  try {
+    logger.info("tool:enviar-imagem-entregaveis", "Baixando imagem de:", IMAGEM_ENTREGAVEIS_URL);
+    const res = await fetchComTimeout(IMAGEM_ENTREGAVEIS_URL, { method: "GET", timeout: 30_000 });
+    if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
+
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("text/html")) {
+      throw new Error("URL retornou HTML — verifique se o link do MinIO está acessível.");
+    }
+
+    const buffer = await res.arrayBuffer();
+    const dados = new Uint8Array(buffer);
+
+    logger.info("tool:enviar-imagem-entregaveis", `Enviando imagem (${dados.length} bytes)...`);
+    await enviarArquivo(idConta, idConversa, dados, "entregaveis-mentoria.jpg", "image/jpeg");
+
+    return "Imagem de entregáveis enviada com sucesso.";
+  } catch (e) {
+    logger.error("tool:enviar-imagem-entregaveis", "Erro ao enviar imagem — usando fallback em texto:", e);
+    try {
+      await enviarMensagem(idConta, idConversa, FALLBACK_ENTREGAVEIS);
+      logger.info("tool:enviar-imagem-entregaveis", "Fallback em texto enviado.");
+    } catch (fallbackErr) {
+      logger.error("tool:enviar-imagem-entregaveis", "Erro ao enviar fallback:", fallbackErr);
+    }
+    return "Não consegui enviar a imagem, mas enviei os entregáveis em texto. Continue a conversa normalmente.";
+  }
+}
+
 export function criarToolEnviarImagemEntregaveis(contexto: ContextoEnviarImagem) {
   return tool(
-    async () => {
-      if (conversasComImagemEnviada.has(contexto.idConversa)) {
-        return "Imagem já enviada nesta conversa.";
-      }
-      conversasComImagemEnviada.add(contexto.idConversa);
-      try {
-        logger.info("tool:enviar-imagem-entregaveis", "Baixando imagem de:", IMAGEM_ENTREGAVEIS_URL);
-        const res = await fetchComTimeout(IMAGEM_ENTREGAVEIS_URL, { method: "GET", timeout: 30_000 });
-        if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
-
-        const contentType = res.headers.get("content-type") ?? "";
-        if (contentType.includes("text/html")) {
-          throw new Error("URL retornou HTML — verifique se o link do MinIO está acessível.");
-        }
-
-        const buffer = await res.arrayBuffer();
-        const dados = new Uint8Array(buffer);
-
-        logger.info("tool:enviar-imagem-entregaveis", `Enviando imagem (${dados.length} bytes)...`);
-        await enviarArquivo(contexto.idConta, contexto.idConversa, dados, "entregaveis-mentoria.jpg", "image/jpeg");
-
-        return "Imagem de entregáveis enviada com sucesso.";
-      } catch (e) {
-        logger.error("tool:enviar-imagem-entregaveis", "Erro ao enviar imagem — usando fallback em texto:", e);
-        try {
-          await enviarMensagem(contexto.idConta, contexto.idConversa, FALLBACK_ENTREGAVEIS);
-          logger.info("tool:enviar-imagem-entregaveis", "Fallback em texto enviado.");
-        } catch (fallbackErr) {
-          logger.error("tool:enviar-imagem-entregaveis", "Erro ao enviar fallback:", fallbackErr);
-        }
-        return "Não consegui enviar a imagem, mas enviei os entregáveis em texto. Continue a conversa normalmente.";
-      }
-    },
+    async () => enviarImagemEntregaveis(contexto.idConta, contexto.idConversa),
     {
       name: "Enviar_imagem_entregaveis",
       description:

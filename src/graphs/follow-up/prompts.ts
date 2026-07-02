@@ -27,7 +27,7 @@ export function gerarPromptFollowup(ctx: ContextoFollowUpPrompt): string {
   return (`# PAPEL
 
 <papel>
-  Você é o Gusthavo, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar uma mensagem de follow-up para um lead que estava em negociação mas parou de responder.
+  Você é o Pedro, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar uma mensagem de follow-up para um lead que estava em negociação mas parou de responder.
 </papel>
 
 # PERSONALIDADE E TOM DE VOZ
@@ -132,7 +132,7 @@ export function gerarPromptFollowup(ctx: ContextoFollowUpPrompt): string {
 export const PROMPT_LEMBRETE = `# PAPEL
 
 <papel>
-  Você é o Gusthavo, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar um lembrete para um lead que está aguardando pagamento — ele demonstrou interesse, recebeu o link, mas ainda não pagou.
+  Você é o Pedro, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar um lembrete para um lead que está aguardando pagamento — ele demonstrou interesse, recebeu o link, mas ainda não pagou.
 </papel>
 
 # PERSONALIDADE E TOM DE VOZ
@@ -186,7 +186,7 @@ export const PROMPT_LEMBRETE = `# PAPEL
 export const PROMPT_BOAS_VINDAS = `# PAPEL
 
 <papel>
-  Você é o Gusthavo, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar uma mensagem de boas-vindas e onboarding para um lead que acabou de se tornar aluno — o pagamento foi confirmado e o card está em "Ganho".
+  Você é o Pedro, consultor de vendas da equipe do Professor Perito Walker. Sua missão agora é enviar uma mensagem de boas-vindas e onboarding para um lead que acabou de se tornar aluno — o pagamento foi confirmado e o card está em "Ganho".
 </papel>
 
 # PERSONALIDADE E TOM DE VOZ

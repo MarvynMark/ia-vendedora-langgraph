@@ -12,6 +12,8 @@ import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atu
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
+import { enviarVideoPlataforma } from "../../tools/enviar-video.ts";
+import { enviarImagemEntregaveis } from "../../tools/enviar-imagem-entregaveis.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
 import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
@@ -89,6 +91,44 @@ export async function coletarMensagens(state: MainAgentStateType) {
   } catch (e) {
     logger.error("main-agent", "coletarMensagens erro:", e);
     return { mensagensAgregadas: "", erroFatal: true };
+  }
+}
+
+// Guarda determinística de mídia: o LLM às vezes NARRA que enviou o vídeo (5B) ou a imagem de
+// entregáveis (5C) sem chamar a tool correspondente — nesses casos a mídia nunca chega ao lead
+// (comportamento observado na conversa 3433). Aqui detectamos a frase de confirmação SEM o tool
+// call e enviamos a mídia deterministicamente, antes do texto de confirmação ir para o WhatsApp.
+// O dedupe interno das tools (Set por conversa) evita envio duplicado.
+async function garantirMidiaEntregue(
+  output: string,
+  toolsChamadas: Set<string>,
+  idConta: string,
+  idConversa: string,
+) {
+  const txt = output.toLowerCase();
+
+  // Imagem de entregáveis (5C): "esses são (todos) os entregáveis" = IA acha que já mostrou a imagem
+  const confirmouEntregaveis = /esses s[ãa]o (todos )?os entreg[áa]veis/.test(txt);
+  if (confirmouEntregaveis && !toolsChamadas.has("Enviar_imagem_entregaveis")) {
+    logger.warn("main-agent", "Guarda de mídia: IA confirmou entregáveis sem chamar a tool — enviando imagem deterministicamente");
+    try {
+      await enviarImagemEntregaveis(idConta, idConversa);
+    } catch (e) {
+      logger.error("main-agent", "garantirMidiaEntregue (imagem) erro:", e);
+    }
+  }
+
+  // Vídeo da plataforma (5B): frases pós-envio ("acabei de te enviar o vídeo", "assim que assistir o vídeo")
+  const confirmouVideo =
+    /(acabei de te enviar|te enviei|assim que.{0,20}assistir).{0,40}v[ií]deo/.test(txt) ||
+    /v[ií]deo.{0,40}assim que.{0,20}assistir/.test(txt);
+  if (confirmouVideo && !toolsChamadas.has("Enviar_video_plataforma")) {
+    logger.warn("main-agent", "Guarda de mídia: IA confirmou vídeo sem chamar a tool — enviando vídeo deterministicamente");
+    try {
+      await enviarVideoPlataforma(idConta, idConversa);
+    } catch (e) {
+      logger.error("main-agent", "garantirMidiaEntregue (vídeo) erro:", e);
+    }
   }
 }
 
@@ -224,6 +264,18 @@ async function executarAgente(state: MainAgentStateType) {
     }
 
     logger.info("main-agent", "output do agente:", output.substring(0, 100) + "...");
+
+    // Coletar quais tools o agente chamou neste turno (para a guarda de mídia determinística)
+    const toolsChamadas = new Set<string>();
+    for (const m of newMsgs) {
+      const tcs = (m as unknown as { tool_calls?: Array<{ name?: string }> }).tool_calls;
+      if (Array.isArray(tcs)) {
+        for (const tc of tcs) {
+          if (tc?.name) toolsChamadas.add(tc.name);
+        }
+      }
+    }
+    await garantirMidiaEntregue(output, toolsChamadas, state.idConta, state.idConversa);
 
     return { outputAgente: output };
   } catch (e) {

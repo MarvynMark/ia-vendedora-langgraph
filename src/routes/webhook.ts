@@ -182,7 +182,7 @@ export const webhookRouter = new Elysia()
               idInbox: introIdInbox,
               telefone: introTelefone,
               nome: introNome,
-              mensagem: "[SISTEMA: Lead preencheu o formulário de aplicação. Apresente-se como Gusthavo da equipe do Perito Walker, diga que acabou de receber o formulário e inicie a conversa pela Etapa 1 do roteiro.]",
+              mensagem: "[SISTEMA: Lead preencheu o formulário de aplicação. Apresente-se como Pedro da equipe do Perito Walker, diga que acabou de receber o formulário e inicie a conversa pela Etapa 1 do roteiro.]",
               mensagemDeAudio: false,
               timestamp: new Date().toISOString(),
               tipoArquivo: null,

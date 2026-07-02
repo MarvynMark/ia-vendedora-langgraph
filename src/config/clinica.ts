@@ -1,7 +1,7 @@
 export const vestigium = {
   nome: "Instituto Vestigium",
   cnpj: "39.523.145/0001-02",
-  consultor: "Gusthavo",
+  consultor: "Pedro",
   mentor: "Professor Perito Walker",
   planos: {
     anual: {
