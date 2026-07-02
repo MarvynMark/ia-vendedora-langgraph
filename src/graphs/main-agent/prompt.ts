@@ -221,7 +221,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   "Mensagem única:
   [NOME], você já foi direto comigo sobre o investimento, então vou ser direto também. A gente tem uma opção mais acessível: a mentoria por 3 meses.
-  São 12x de R$ 98,35 no cartão ou R$ 997 à vista no PIX. É tempo suficiente pra dar uma virada real nos estudos antes do edital do [concurso] sair. Posso gerar o link pra você?"
+  São 12x de R$ 98,35 no cartão ou R$ 997 à vista no PIX. É tempo suficiente pra dar uma virada real nos estudos antes do edital do [concurso] sair. As vagas dessa turma estão acabando, me confirma que quer garantir a sua que eu já te passo o link pra finalizar agora."
 
   > Se aceitar: ir para Fechamento com link do Plano Trimestral.
   > Se recusar: ir direto para "Quando a mentoria definitivamente não fecha" (IMLC → Clube → e-book).
@@ -255,7 +255,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   **OBRIGATÓRIO antes de enviar o link: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e registrar o plano escolhido na descrição.**
 
-  "Posso gerar o link exclusivo pra você finalizar agora?"
+  "[NOME], as vagas dessa turma estão acabando. Me confirma que quer garantir a sua que eu já te passo o link pra finalizar agora."
 
   > Após confirmação, envie APENAS o link do plano escolhido pelo lead (não mande os três):
 
@@ -279,7 +279,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   > Se for parcela: apresente o Semestral em 12x de R$ 197 ou, se não tiver limite no cartão, o modo recorrente.
   > Se for valor total: apresente o Semestral à vista no PIX por R$ 1.997. Explore se é objeção real ou desconforto com a decisão.
-  > Se mesmo o Semestral for recusado por preço: ofereça o Trimestral: "Entendo. Tem o plano de 3 meses por 12x de R$ 98,35, menos de R$100 por mês. É o menor investimento pra entrar na mentoria. Posso gerar o link?"
+  > Se mesmo o Semestral for recusado por preço: ofereça o Trimestral: "Entendo. Tem o plano de 3 meses por 12x de R$ 98,35, menos de R$100 por mês. É o menor investimento pra entrar na mentoria. As vagas dessa turma estão acabando, me confirma que quer garantir a sua que eu já te passo o link pra finalizar agora."
 
   ## "Preciso pensar / vou falar com meu esposo(a)"
 
