@@ -39,6 +39,10 @@ function resumirBody(body: unknown): Record<string, unknown> {
 
   const b = body as Record<string, unknown>;
   return {
+    // Lista de todos os nomes de campo do topo — útil para descobrir a estrutura
+    // de webhooks novos (ex.: TMB) sem precisar dos logs de runtime.
+    bodyKeys: Object.keys(b),
+    // Campos do Chatwoot / DMGuru
     event: b["event"],
     message_type: b["message_type"],
     content: typeof b["content"] === "string" ? b["content"].substring(0, 100) : b["content"],
@@ -52,6 +56,19 @@ function resumirBody(body: unknown): Record<string, unknown> {
       : undefined,
     product: (b["data"] as Record<string, unknown>)?.["product"]
       ? ((b["data"] as Record<string, unknown>)["product"] as Record<string, unknown>)?.["name"]
+      : undefined,
+    // Campos da TMB (Webhook Vendas) — payload com os dados no nível do topo
+    tmb: b["status_pedido"] !== undefined || b["cliente"] !== undefined
+      ? {
+          status_pedido: b["status_pedido"],
+          cliente: b["cliente"],
+          email: b["email"],
+          telefone_ativo: b["telefone_ativo"],
+          telefones: b["telefones"],
+          lancamento: b["lancamento"],
+          titulo: b["titulo"],
+          pedido: b["pedido"] ?? b["id"],
+        }
       : undefined,
   };
 }
