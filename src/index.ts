@@ -9,6 +9,7 @@ import { setupRouter } from "./routes/setup.ts";
 import { webhookRouter } from "./routes/webhook.ts";
 import { followupRouter } from "./routes/followup.ts";
 import { pagamentoRouter } from "./routes/pagamento.ts";
+import { pagamentoTmbRouter } from "./routes/pagamento-tmb.ts";
 import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
@@ -24,6 +25,7 @@ const app = new Elysia()
   .use(webhookRouter)
   .use(followupRouter)
   .use(pagamentoRouter)
+  .use(pagamentoTmbRouter)
   .use(aplicacaoRouter)
   .use(dashboardRouter)
   .use(monitorNoticiasRouter)

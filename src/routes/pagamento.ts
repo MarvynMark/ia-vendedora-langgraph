@@ -136,13 +136,18 @@ export const pagamentoRouter = new Elysia()
     return { status: "accepted" };
   });
 
-async function processarPagamentoAprovado(dados: {
+export interface PagamentoAprovadoDados {
   nome?: string;
   email?: string;
   telefone?: string;
   nomeProduto: string;
   nomeOferta: string;
-}) {
+}
+
+// Lógica de processamento agnóstica de plataforma de pagamento (DMGuru, TMB, ...):
+// localiza o contato/card no Chatwoot, move para "Ganho", notifica o grupo e
+// dispara as boas-vindas. Reusada por todos os webhooks de pagamento.
+export async function processarPagamentoAprovado(dados: PagamentoAprovadoDados) {
   const accountId = Number(env.CHATWOOT_ACCOUNT_ID);
 
   // Localizar contato no Chatwoot — prioriza telefone (múltiplos formatos) e email.

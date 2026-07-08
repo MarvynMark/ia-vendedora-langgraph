@@ -50,6 +50,11 @@ export const env = {
   MONITOR_INTERVALO_MS: Number(process.env["MONITOR_INTERVALO_MS"] ?? "300000"), // 5 minutos
   MONITOR_ATIVO: process.env["MONITOR_ATIVO"] !== "false", // ligado por default
 
+  // Webhook Vendas da TMB — validação opcional por header (campos "Chave"/"Valor" da config da TMB).
+  // Se TMB_WEBHOOK_SECRET estiver vazio, a validação é ignorada (útil no primeiro teste).
+  TMB_WEBHOOK_HEADER: (process.env["TMB_WEBHOOK_HEADER"] ?? "x-tmb-token").toLowerCase(),
+  TMB_WEBHOOK_SECRET: process.env["TMB_WEBHOOK_SECRET"] ?? "",
+
   KANBAN_BOARD_ID: Number(process.env["KANBAN_BOARD_ID"] ?? "1"),
   GRUPO_ESPERA_LINK: process.env["GRUPO_ESPERA_LINK"] ?? "https://chat.whatsapp.com/BFRcUIZD4tp85KfF1rNCHU",
   TEMPLATE_DELAY_MS: Number(process.env["TEMPLATE_DELAY_MS"] ?? "300000"), // 5 minutos
