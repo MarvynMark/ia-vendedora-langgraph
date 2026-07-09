@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -20,11 +20,23 @@ interface ContextoEnviarVideo {
 // Envia o vídeo da plataforma para a conversa (com dedupe e fallback em link).
 // Exportado para ser reutilizado tanto pela tool do LLM quanto pela guarda determinística
 // do grafo principal (garante o envio mesmo quando o LLM narra o envio sem chamar a tool).
-export async function enviarVideoPlataforma(idConta: string, idConversa: string): Promise<string> {
+export async function enviarVideoPlataforma(idConta: string, idConversa: string, mensagemAntes?: string): Promise<string> {
   if (conversasComVideoEnviado.has(idConversa)) {
     return "Vídeo já enviado nesta conversa.";
   }
   conversasComVideoEnviado.add(idConversa);
+
+  // Envia o texto de apresentação ANTES do vídeo (garante a ordem texto -> vídeo)
+  if (mensagemAntes && mensagemAntes.trim()) {
+    try {
+      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(mensagemAntes));
+      await enviarMensagem(idConta, idConversa, mensagemAntes.trim());
+      registrarTextoMidia(idConversa, mensagemAntes);
+      await pausaComDigitando(idConta, idConversa, 3000);
+    } catch (e) {
+      logger.warn("tool:enviar-video", "Erro ao enviar mensagem antes do vídeo:", e);
+    }
+  }
   try {
     logger.info("tool:enviar-video", "Baixando vídeo de:", VIDEO_PLATAFORMA_URL);
     const res = await fetchComTimeout(VIDEO_PLATAFORMA_URL, { method: "GET", timeout: 60_000 });
@@ -60,12 +72,20 @@ export async function enviarVideoPlataforma(idConta: string, idConversa: string)
 
 export function criarToolEnviarVideo(contexto: ContextoEnviarVideo) {
   return tool(
-    async () => enviarVideoPlataforma(contexto.idConta, contexto.idConversa),
+    async ({ mensagem_antes }: { mensagem_antes?: string }) =>
+      enviarVideoPlataforma(contexto.idConta, contexto.idConversa, mensagem_antes),
     {
       name: "Enviar_video_plataforma",
       description:
-        "Envia o vídeo de apresentação da plataforma diretamente no WhatsApp do lead. Use imediatamente após enviar a lista de bônus (Etapa 6, Mensagem 2). Não precisa de parâmetros.",
-      schema: z.object({}),
+        "Envia o vídeo de apresentação da plataforma por dentro no WhatsApp do lead. Passe em 'mensagem_antes' a frase que apresenta o vídeo; ela é enviada como texto ANTES do vídeo, garantindo a ordem. Envie o vídeo sozinho, sem outra mídia junto.",
+      schema: z.object({
+        mensagem_antes: z
+          .string()
+          .optional()
+          .describe(
+            "Texto enviado ANTES do vídeo, apresentando-o. Ex: 'Gravei um vídeo mostrando como é nossa plataforma por dentro. Dá uma olhadinha, vou te mandar, confirma se conseguiu abrir.'",
+          ),
+      }),
     },
   );
 }

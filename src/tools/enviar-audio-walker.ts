@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -50,6 +50,8 @@ export async function enviarAudioWalker(
       // "Digitando" proporcional ao tamanho do texto, depois envia, e uma pausa curta antes do áudio
       await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(mensagemAntes));
       await enviarMensagem(idConta, idConversa, mensagemAntes.trim());
+      // Registra o texto para que o envio do output filtre qualquer repetição feita pelo LLM
+      registrarTextoMidia(idConversa, mensagemAntes);
       await pausaComDigitando(idConta, idConversa, 3000);
     } catch (e) {
       logger.warn("tool:enviar-audio-walker", "Erro ao enviar mensagem antes do áudio:", e);

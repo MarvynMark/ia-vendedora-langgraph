@@ -292,32 +292,62 @@ export async function atualizarPresenca(
   return res.json();
 }
 
+// Registro (por conversa) dos textos enviados como "apresentação de mídia" (o mensagem_antes
+// dos áudios). O LLM às vezes repete esse mesmo texto no output final, gerando duplicação.
+// Guardamos o que já foi enviado para filtrar blocos duplicados no envio de texto.
+const textosMidiaPorConversa = new Map<string, string[]>();
+function normalizarTextoMidia(s: string): string {
+  return (s ?? "").toLowerCase().replace(/[.,!?;:]/g, "").replace(/\s+/g, " ").trim();
+}
+export function registrarTextoMidia(idConversa: string | number, texto: string): void {
+  const t = normalizarTextoMidia(texto);
+  if (!t) return;
+  const chave = String(idConversa);
+  const arr = textosMidiaPorConversa.get(chave) ?? [];
+  arr.push(t);
+  textosMidiaPorConversa.set(chave, arr);
+}
+export function limparTextosMidia(idConversa: string | number): void {
+  textosMidiaPorConversa.delete(String(idConversa));
+}
+// Retorna true se o bloco de texto já foi enviado como apresentação de mídia nesta conversa
+// (está contido em algum mensagem_antes registrado) — ou seja, é uma duplicata a descartar.
+export function blocoDuplicaMidia(idConversa: string | number, bloco: string): boolean {
+  const arr = textosMidiaPorConversa.get(String(idConversa));
+  if (!arr || arr.length === 0) return false;
+  const b = normalizarTextoMidia(bloco);
+  if (b.length < 5) return false;
+  return arr.some(t => t.includes(b));
+}
+
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.
-export function calcularDelayDigitando(texto: string, minMs = 2000, maxMs = 9000): number {
+export function calcularDelayDigitando(texto: string, minMs = 3000, maxMs = 12000): number {
   const chars = (texto ?? "").length;
-  const CHARS_POR_SEGUNDO = 25; // ~digitação rápida no celular
+  const CHARS_POR_SEGUNDO = 12; // ritmo de digitação humana perceptível (não instantâneo)
   const ms = Math.round((chars / CHARS_POR_SEGUNDO) * 1000);
   return Math.min(Math.max(ms, minMs), maxMs);
 }
 
-// Mostra "digitando" por `ms` milissegundos e desliga em seguida. Usado como intervalo
-// natural entre mensagens e — principalmente — para garantir que uma mídia (áudio/vídeo/imagem)
-// termine de carregar no WhatsApp antes de enviar a próxima mensagem, evitando que o texto
-// chegue antes do áudio (arquivos demoram mais que texto para serem entregues).
+// Mantém o status "digitando" visível durante TODO o intervalo `ms`, renovando a presença
+// periodicamente (o WhatsApp expira o status após ~10s). NÃO desliga no fim: o "digitando"
+// some sozinho quando a próxima mensagem/mídia é enviada. Serve como intervalo natural entre
+// mensagens e para dar tempo de uma mídia (áudio/vídeo/imagem) carregar antes da próxima.
 export async function pausaComDigitando(
   accountId: string | number,
   conversationId: string | number,
   ms = 5000,
 ) {
-  try {
-    await atualizarPresenca(accountId, conversationId, true);
-    await new Promise(r => setTimeout(r, ms));
-    await atualizarPresenca(accountId, conversationId, false);
-  } catch {
-    // Se a presença falhar, ainda respeita o delay para preservar a ordem das mensagens
-    await new Promise(r => setTimeout(r, ms));
+  let restante = ms;
+  const intervalo = 4000; // renova o "digitando" antes de expirar
+  while (restante > 0) {
+    try {
+      await atualizarPresenca(accountId, conversationId, true);
+    } catch { /* se a presença falhar, ainda respeita o delay */ }
+    const espera = Math.min(restante, intervalo);
+    await new Promise(r => setTimeout(r, espera));
+    restante -= espera;
   }
 }
 

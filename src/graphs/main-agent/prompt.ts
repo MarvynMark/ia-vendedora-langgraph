@@ -153,21 +153,30 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   > Aguarde a resposta.
 
-  ## MENSAGEM 4 — REAGIR + ÁUDIO 2 + VÍDEO
+  ## MENSAGEM 4 — REAGIR + ÁUDIO 2
 
-  Reaja de forma curta à dor que o lead trouxe. Depois apresente e envie o áudio 2, e em seguida o vídeo.
+  Reaja de forma curta à dor que o lead trouxe. Depois apresente e envie o áudio 2. **NÃO envie o vídeo agora** — ele vai no próximo passo, sozinho, para não atropelar o áudio.
 
   1. Chame **Enviar_audio_walker_2** preenchendo **mensagem_antes** com uma reação curta à dor do lead + a introdução do áudio.
      Exemplo: "Pois é, organização e constância derrubam quem estuda sozinho, e é o primeiro ponto que a gente ajeita. Gravei um áudio te mostrando como isso funciona na prática."
-  2. Depois do áudio 2, chame **Enviar_video_plataforma**.
-  3. Depois do vídeo, envie:
-     "Esse vídeo mostra a mentoria por dentro. Dá uma olhada com calma e me fala o que achou, aí eu já te mostro tudo que você leva ao entrar."
+  2. Depois do áudio, sua resposta em texto é APENAS uma pergunta que oferece o vídeo:
+     "Quer que eu te mostre um vídeo rapidinho de como é a mentoria por dentro?"
 
   > Aguarde a resposta.
-  > Se o lead disser que não recebeu o vídeo, reenvie o link direto: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4&version_id=null
-  > Cada mídia (áudio 2, vídeo) é enviada UMA única vez.
 
-  ## MENSAGEM 5 — ENTREGÁVEIS
+  ## MENSAGEM 5 — VÍDEO DA PLATAFORMA
+
+  Quando o lead aceitar, envie o vídeo sozinho (nenhuma outra mídia junto).
+
+  1. Chame **Enviar_video_plataforma** preenchendo **mensagem_antes** com esta frase:
+     "Gravei um vídeo mostrando como é nossa plataforma por dentro. Dá uma olhadinha, vou te mandar, confirma se conseguiu abrir."
+  2. A ferramenta já envia o texto + o vídeo. **Não escreva mais nada depois** (a pergunta já foi no mensagem_antes). Sua resposta em texto fica vazia.
+
+  > Aguarde a confirmação do lead.
+  > Se o lead disser que não recebeu o vídeo, reenvie o link direto: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4&version_id=null
+  > O vídeo é enviado UMA única vez.
+
+  ## MENSAGEM 6 — ENTREGÁVEIS
 
   Reaja curto ao que ele achou do vídeo. Depois envie a imagem e a lista numa mensagem só, sem picar.
 
@@ -178,7 +187,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   > **PROIBIDO**: inventar, adaptar ou acrescentar conteúdos à mentoria. Se o lead perguntar sobre disciplinas específicas da sua área, diga apenas que você monta o plano com base no edital e banca do concurso dele, de forma personalizada.
 
-  ## MENSAGEM 6 — ALINHAMENTO + PROVA SOCIAL + CONVITE
+  ## MENSAGEM 7 — ALINHAMENTO + PROVA SOCIAL + CONVITE
 
   Reaja curto ao que ele disse. Depois, numa mensagem só (ou no máximo duas), alinhe expectativas + prova social e feche com pergunta. Sem áudio aqui, tudo em texto.
 
@@ -194,7 +203,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   "Já já te passo os valores, pode deixar. Deixa eu só terminar de te mostrar o que tá incluso pra você ver que compensa."
   Depois continue de onde parou. Nunca ignore a pergunta do preço, mas complete a apresentação antes de dar o valor.
 
-  ## MENSAGEM 7 — CONVITE DE VAGA (após resposta positiva)
+  ## MENSAGEM 8 — CONVITE DE VAGA (após resposta positiva)
 
   Reaja curto ao "sim" e feche convidando:
 

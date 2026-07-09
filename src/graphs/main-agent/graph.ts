@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -147,6 +147,10 @@ async function garantirMidiaEntregue(
 
 async function executarAgente(state: MainAgentStateType) {
   logger.info("main-agent", "executando agente IA...");
+
+  // Zera o registro de textos de mídia deste turno (as tools de áudio o preenchem ao enviar o
+  // mensagem_antes, e o envio do output filtra blocos que dupliquem esse texto)
+  limparTextosMidia(state.idConversa);
 
   const tarefa = state.tarefa ?? {};
   const board = tarefa["board"] as { steps?: Array<{ id: number; name: string }> } | undefined;
@@ -347,13 +351,15 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
   const formatado = await formatarTextoFn(state.outputAgente);
-  const blocos = dividirMensagem(formatado);
-  for (let i = 0; i < blocos.length; i++) {
-    if (i > 0) {
-      // Delay proporcional ao tamanho do próximo bloco (simula tempo de digitação)
-      await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(blocos[i]!));
-    }
-    await enviarMensagem(state.idConta, state.idConversa, blocos[i]!);
+  // Remove blocos que o LLM repetiu do texto já enviado como apresentação de áudio (mensagem_antes)
+  const blocos = dividirMensagem(formatado).filter(
+    (b) => !blocoDuplicaMidia(state.idConversa, b),
+  );
+  for (const bloco of blocos) {
+    // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem (inclusive a 1ª),
+    // simulando alguém digitando o texto todo
+    await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(bloco));
+    await enviarMensagem(state.idConta, state.idConversa, bloco);
   }
 }
 
