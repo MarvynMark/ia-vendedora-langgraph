@@ -292,6 +292,25 @@ export async function atualizarPresenca(
   return res.json();
 }
 
+// Mostra "digitando" por `ms` milissegundos e desliga em seguida. Usado como intervalo
+// natural entre mensagens e — principalmente — para garantir que uma mídia (áudio/vídeo/imagem)
+// termine de carregar no WhatsApp antes de enviar a próxima mensagem, evitando que o texto
+// chegue antes do áudio (arquivos demoram mais que texto para serem entregues).
+export async function pausaComDigitando(
+  accountId: string | number,
+  conversationId: string | number,
+  ms = 5000,
+) {
+  try {
+    await atualizarPresenca(accountId, conversationId, true);
+    await new Promise(r => setTimeout(r, ms));
+    await atualizarPresenca(accountId, conversationId, false);
+  } catch {
+    // Se a presença falhar, ainda respeita o delay para preservar a ordem das mensagens
+    await new Promise(r => setTimeout(r, ms));
+  }
+}
+
 export async function atualizarAtributosConversa(
   accountId: string | number,
   conversationId: string | number,

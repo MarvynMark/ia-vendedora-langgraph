@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -55,6 +55,9 @@ export async function enviarImagemEntregaveis(idConta: string, idConversa: strin
 
     logger.info("tool:enviar-imagem-entregaveis", `Enviando imagem (${dados.length} bytes)...`);
     await enviarArquivo(idConta, idConversa, dados, "entregaveis-mentoria.jpg", "image/jpeg");
+
+    // Pausa com "digitando" para a imagem carregar antes da próxima mensagem
+    await pausaComDigitando(idConta, idConversa, 5000);
 
     return "Imagem de entregáveis enviada com sucesso.";
   } catch (e) {

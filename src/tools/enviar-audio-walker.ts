@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -60,6 +60,10 @@ export async function enviarAudioWalker(
     await enviarArquivo(idConta, idConversa, dados, `walker-audio-0${numero}.ogg`, "audio/ogg", {
       isRecordedAudio: true,
     });
+
+    // Pausa com "digitando" para o áudio terminar de carregar no WhatsApp antes da próxima
+    // mensagem — senão o texto seguinte chega antes da nota de voz.
+    await pausaComDigitando(idConta, idConversa, 5000);
 
     return `Áudio ${numero} do Walker enviado com sucesso.`;
   } catch (e) {
