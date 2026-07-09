@@ -189,10 +189,15 @@ async function lancarNoChatwoot(d: Record<string, string>) {
 
   // Registra conversa para o timer de template (5 minutos)
   logger.debug("aplicacao", `Registrando no timer de template: conversation_id=${conversa.id} account_id=${accountId} phone=${phoneE164 ?? "null"}`);
+  // ON CONFLICT DO UPDATE reativa o timer quando o lead preenche a aplicação novamente
+  // (o criarConversa reusa a mesma conversa, então a chave conversation_id colide).
+  // Reseta template_enviado/criado_em para reengajar; o verificar-templates já protege
+  // contra spam pulando o envio se o lead já tiver respondido (contarMensagensIncoming > 0).
   await pool.query(
     `INSERT INTO leads_template_pendente (conversation_id, account_id, phone)
      VALUES ($1, $2, $3)
-     ON CONFLICT (conversation_id) DO NOTHING`,
+     ON CONFLICT (conversation_id) DO UPDATE
+       SET template_enviado = FALSE, criado_em = NOW(), phone = EXCLUDED.phone`,
     [conversa.id, Number(accountId), phoneE164 ?? null],
   );
   logger.info("aplicacao", "Lead registrado no timer de template");
