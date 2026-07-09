@@ -14,6 +14,7 @@ import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, divid
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
 import { enviarVideoPlataforma } from "../../tools/enviar-video.ts";
 import { enviarImagemEntregaveis } from "../../tools/enviar-imagem-entregaveis.ts";
+import { enviarAudioWalker } from "../../tools/enviar-audio-walker.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
 import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
@@ -128,6 +129,18 @@ async function garantirMidiaEntregue(
       await enviarVideoPlataforma(idConta, idConversa);
     } catch (e) {
       logger.error("main-agent", "garantirMidiaEntregue (vídeo) erro:", e);
+    }
+  }
+
+  // Áudio 1 do Walker: a IA sempre escreve "vou te mandar um áudio" logo antes de enviá-lo.
+  // Se narrou sem chamar a tool, o áudio nunca chegaria — enviamos deterministicamente.
+  const confirmouAudio1 = /vou te (mandar|enviar|passar) (um )?[áa]udio/.test(txt);
+  if (confirmouAudio1 && !toolsChamadas.has("Enviar_audio_walker_1")) {
+    logger.warn("main-agent", "Guarda de mídia: IA anunciou áudio 1 sem chamar a tool — enviando áudio deterministicamente");
+    try {
+      await enviarAudioWalker(1, idConta, idConversa);
+    } catch (e) {
+      logger.error("main-agent", "garantirMidiaEntregue (áudio 1) erro:", e);
     }
   }
 }

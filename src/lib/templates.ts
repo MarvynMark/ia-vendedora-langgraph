@@ -3,7 +3,7 @@
 export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Abertura inicial (Novo Lead) ---
   abertura_esta_estudando:
-    "Olá, tudo bem?\n\nAqui é o Pedro, do time do Perito Walker.\nAcabei de ver sua aplicação pra mentoria e preciso confirmar uma informação rapidinho antes de seguir com a análise.\n\nHoje você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
+    "Olá, tudo bem?\n\nAqui é o Perito Walker.\nAcabei de ver seu formulário e queria confirmar uma coisa rapidinho.\n\nHoje você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
 
   // --- Sequência de recuperação: Primeira mensagem ---
   // Usados como template (janela fechada) ou mensagem normal (janela aberta)

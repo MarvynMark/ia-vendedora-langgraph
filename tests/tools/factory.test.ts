@@ -1,44 +1,36 @@
 import { describe, test, expect } from "bun:test";
-import { criarToolsAgenteClinica, criarToolsFollowup } from "../../src/tools/factory.ts";
+import { criarToolsAgenteVestigium, criarToolsFollowup } from "../../src/tools/factory.ts";
+
+const CONTEXTO_BASE = {
+  idMensagem: "1",
+  idConta: "8",
+  idConversa: "1",
+  idContato: "1",
+  idInbox: "1",
+  telefone: "+5511999999999",
+  nome: "Teste",
+  mensagem: "Olá",
+  tarefa: {},
+};
 
 describe("tool factory - main agent", () => {
-  test("cria 9 tools", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
-      tarefa: {},
-    });
-
-    expect(tools.length).toBe(9);
+  test("cria 10 tools", () => {
+    const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
+    expect(tools.length).toBe(10);
   });
 
-  test("tools têm nomes corretos", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
-      tarefa: {},
-    });
+  test("tools têm nomes corretos (incluindo os 3 áudios do Walker)", () => {
+    const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
 
     const nomes = tools.map(t => t.name).sort();
     expect(nomes).toEqual([
-      "Atualizar_agendamento",
       "Atualizar_tarefa",
-      "Buscar_agendamentos_do_contato",
-      "Buscar_janelas_disponiveis",
-      "Cancelar_agendamento",
-      "Criar_agendamento",
+      "Buscar_contexto_similar",
+      "Enviar_audio_walker_1",
+      "Enviar_audio_walker_2",
+      "Enviar_audio_walker_3",
+      "Enviar_imagem_entregaveis",
+      "Enviar_video_plataforma",
       "Escalar_humano",
       "Reagir_mensagem",
       "Refletir",
@@ -46,20 +38,13 @@ describe("tool factory - main agent", () => {
   });
 
   test("Atualizar_tarefa inclui etapas na descrição", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
+    const tools = criarToolsAgenteVestigium({
+      ...CONTEXTO_BASE,
       tarefa: {
         board: {
           steps: [
-            { id: 1, name: "Qualificado" },
-            { id: 2, name: "Agendado" },
+            { id: 1, name: "Conexão" },
+            { id: 2, name: "Aguardando Pagamento" },
           ],
         },
       },
@@ -67,84 +52,18 @@ describe("tool factory - main agent", () => {
 
     const atualizar = tools.find(t => t.name === "Atualizar_tarefa");
     expect(atualizar).toBeDefined();
-    expect(atualizar!.description).toContain("Qualificado: 1");
-    expect(atualizar!.description).toContain("Agendado: 2");
+    expect(atualizar!.description).toContain("Conexão: 1");
+    expect(atualizar!.description).toContain("Aguardando Pagamento: 2");
   });
 
-  test("Buscar_janelas_disponiveis tem descrição verbatim do n8n", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
-      tarefa: {},
-    });
+  test("cada tool de áudio do Walker é enviada uma única vez (schema sem parâmetros)", () => {
+    const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
 
-    const buscar = tools.find(t => t.name === "Buscar_janelas_disponiveis");
-    expect(buscar).toBeDefined();
-    expect(buscar!.description).toContain("Utilize essa ferramenta para buscar as janelas disponíveis");
-    expect(buscar!.description).toContain("Evite utilizar com janelas de tamanho muito grandes");
-  });
-
-  test("Buscar_agendamentos_do_contato tem descrição verbatim do n8n", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
-      tarefa: {},
-    });
-
-    const buscar = tools.find(t => t.name === "Buscar_agendamentos_do_contato");
-    expect(buscar).toBeDefined();
-    expect(buscar!.description).toContain("buscar os agendamentos já existentes para o contato atual");
-    expect(buscar!.description).toContain("evitar agendamentos duplicados");
-  });
-
-  test("Atualizar_agendamento tem descrição verbatim do n8n", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
-      tarefa: {},
-    });
-
-    const atualizar = tools.find(t => t.name === "Atualizar_agendamento");
-    expect(atualizar).toBeDefined();
-    expect(atualizar!.description).toContain("atualizar informações no título e descrição do evento");
-    expect(atualizar!.description).toContain("Não pode ser utilizada para atualizar o horário");
-  });
-
-  test("Criar_agendamento tem descrição verbatim do n8n", () => {
-    const tools = criarToolsAgenteClinica({
-      idMensagem: "1",
-      idConta: "8",
-      idConversa: "1",
-      idContato: "1",
-      idInbox: "1",
-      telefone: "+5511999999999",
-      nome: "Teste",
-      mensagem: "Olá",
-      tarefa: {},
-    });
-
-    const criar = tools.find(t => t.name === "Criar_agendamento");
-    expect(criar).toBeDefined();
-    expect(criar!.description).toContain("com duração do evento conforme já especificado nas instruções gerais");
-    expect(criar!.description).toContain("NUNCA CHAME ESSA FERRAMENTA MAIS DE UMA VEZ");
+    for (const numero of [1, 2, 3]) {
+      const audio = tools.find(t => t.name === `Enviar_audio_walker_${numero}`);
+      expect(audio).toBeDefined();
+      expect(audio!.description).toContain("nota de voz");
+    }
   });
 });
 
@@ -154,8 +73,8 @@ describe("tool factory - follow-up", () => {
       accountId: 8,
       boardId: 1,
       taskId: 1,
-      funilSteps: [{ id: 1, name: "Qualificado" }],
-      board_step: { id: 1, name: "Qualificado" },
+      funilSteps: [{ id: 1, name: "Conexão" }],
+      board_step: { id: 1, name: "Conexão" },
     });
 
     expect(tools.length).toBe(1);

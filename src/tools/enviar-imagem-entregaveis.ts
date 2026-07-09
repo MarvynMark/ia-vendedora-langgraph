@@ -13,7 +13,7 @@ const FALLBACK_ENTREGAVEIS = `Além do planejamento, na prática você vai ter:
 
 ✅ Cronograma individual adaptado ao seu tempo e realidade
 ✅ Direcionamento diário do que estudar, revisar e quais questões resolver
-✅ Acompanhamento direto com o Perito Walker pelo WhatsApp
+✅ Acompanhamento direto comigo (Perito Walker) pelo WhatsApp
 ✅ Encontros ao vivo com os mentores
 ✅ Relatório de desempenho mensal
 ✅ Simulados exclusivos

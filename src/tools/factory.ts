@@ -5,6 +5,11 @@ import { criarToolAtualizarTarefa, criarToolAtualizarTarefaFollowup } from "./at
 import { criarToolReagirMensagem } from "./reagir-mensagem.ts";
 import { criarToolEnviarVideo } from "./enviar-video.ts";
 import { criarToolEnviarImagemEntregaveis } from "./enviar-imagem-entregaveis.ts";
+import {
+  criarToolEnviarAudioWalker1,
+  criarToolEnviarAudioWalker2,
+  criarToolEnviarAudioWalker3,
+} from "./enviar-audio-walker.ts";
 import { criarToolBuscarContextoSimilar } from "./buscar-contexto-similar.ts";
 
 interface ContextoMainAgent {
@@ -47,6 +52,18 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idConversa: contexto.idConversa,
     }),
     criarToolEnviarImagemEntregaveis({
+      idConta: contexto.idConta,
+      idConversa: contexto.idConversa,
+    }),
+    criarToolEnviarAudioWalker1({
+      idConta: contexto.idConta,
+      idConversa: contexto.idConversa,
+    }),
+    criarToolEnviarAudioWalker2({
+      idConta: contexto.idConta,
+      idConversa: contexto.idConversa,
+    }),
+    criarToolEnviarAudioWalker3({
       idConta: contexto.idConta,
       idConversa: contexto.idConversa,
     }),
