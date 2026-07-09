@@ -292,6 +292,16 @@ export async function atualizarPresenca(
   return res.json();
 }
 
+// Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
+// de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
+// "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.
+export function calcularDelayDigitando(texto: string, minMs = 2000, maxMs = 9000): number {
+  const chars = (texto ?? "").length;
+  const CHARS_POR_SEGUNDO = 25; // ~digitação rápida no celular
+  const ms = Math.round((chars / CHARS_POR_SEGUNDO) * 1000);
+  return Math.min(Math.max(ms, minMs), maxMs);
+}
+
 // Mostra "digitando" por `ms` milissegundos e desliga em seguida. Usado como intervalo
 // natural entre mensagens e — principalmente — para garantir que uma mídia (áudio/vídeo/imagem)
 // termine de carregar no WhatsApp antes de enviar a próxima mensagem, evitando que o texto

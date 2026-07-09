@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -350,7 +350,8 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   const blocos = dividirMensagem(formatado);
   for (let i = 0; i < blocos.length; i++) {
     if (i > 0) {
-      await pausaComDigitando(state.idConta, state.idConversa, 5000);
+      // Delay proporcional ao tamanho do próximo bloco (simula tempo de digitação)
+      await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(blocos[i]!));
     }
     await enviarMensagem(state.idConta, state.idConversa, blocos[i]!);
   }

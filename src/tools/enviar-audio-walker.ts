@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -47,6 +47,8 @@ export async function enviarAudioWalker(
   // a apresentação do áudio personalizada, para não parecer um áudio gravado solto.
   if (mensagemAntes && mensagemAntes.trim()) {
     try {
+      // "Digitando" proporcional ao tamanho do texto, depois envia, e uma pausa curta antes do áudio
+      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(mensagemAntes));
       await enviarMensagem(idConta, idConversa, mensagemAntes.trim());
       await pausaComDigitando(idConta, idConversa, 3000);
     } catch (e) {
