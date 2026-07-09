@@ -10,7 +10,7 @@ import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
-import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem } from "../../lib/response-formatter.ts";
+import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, quebrarEmLinhas } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
 import { enviarVideoPlataforma } from "../../tools/enviar-video.ts";
 import { enviarImagemEntregaveis } from "../../tools/enviar-imagem-entregaveis.ts";
@@ -356,10 +356,11 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     (b) => !blocoDuplicaMidia(state.idConversa, b),
   );
   for (const bloco of blocos) {
+    const texto = quebrarEmLinhas(bloco);
     // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem (inclusive a 1ª),
     // simulando alguém digitando o texto todo
-    await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(bloco));
-    await enviarMensagem(state.idConta, state.idConversa, bloco);
+    await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(texto));
+    await enviarMensagem(state.idConta, state.idConversa, texto);
   }
 }
 

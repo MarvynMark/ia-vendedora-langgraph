@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
+import { quebrarEmLinhas } from "../lib/response-formatter.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -29,8 +30,9 @@ export async function enviarVideoPlataforma(idConta: string, idConversa: string,
   // Envia o texto de apresentação ANTES do vídeo (garante a ordem texto -> vídeo)
   if (mensagemAntes && mensagemAntes.trim()) {
     try {
-      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(mensagemAntes));
-      await enviarMensagem(idConta, idConversa, mensagemAntes.trim());
+      const texto = quebrarEmLinhas(mensagemAntes.trim());
+      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(texto));
+      await enviarMensagem(idConta, idConversa, texto);
       registrarTextoMidia(idConversa, mensagemAntes);
       await pausaComDigitando(idConta, idConversa, 3000);
     } catch (e) {

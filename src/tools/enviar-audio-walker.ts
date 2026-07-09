@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
+import { quebrarEmLinhas } from "../lib/response-formatter.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -47,9 +48,10 @@ export async function enviarAudioWalker(
   // a apresentação do áudio personalizada, para não parecer um áudio gravado solto.
   if (mensagemAntes && mensagemAntes.trim()) {
     try {
-      // "Digitando" proporcional ao tamanho do texto, depois envia, e uma pausa curta antes do áudio
-      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(mensagemAntes));
-      await enviarMensagem(idConta, idConversa, mensagemAntes.trim());
+      // "Digitando" proporcional ao tamanho do texto, depois envia (com frases quebradas em linhas)
+      const texto = quebrarEmLinhas(mensagemAntes.trim());
+      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(texto));
+      await enviarMensagem(idConta, idConversa, texto);
       // Registra o texto para que o envio do output filtre qualquer repetição feita pelo LLM
       registrarTextoMidia(idConversa, mensagemAntes);
       await pausaComDigitando(idConta, idConversa, 3000);
@@ -78,9 +80,10 @@ export async function enviarAudioWalker(
       isRecordedAudio: true,
     });
 
-    // Pausa com "digitando" para o áudio terminar de carregar no WhatsApp antes da próxima
-    // mensagem — senão o texto seguinte chega antes da nota de voz.
-    await pausaComDigitando(idConta, idConversa, 5000);
+    // Pausa maior para a nota de voz (PTT) terminar de subir no WhatsApp antes da próxima
+    // mensagem — o áudio demora mais que o texto para ser entregue, então sem essa pausa a
+    // pergunta seguinte chega antes do áudio.
+    await pausaComDigitando(idConta, idConversa, 8000);
 
     return `Áudio ${numero} do Walker enviado com sucesso.`;
   } catch (e) {

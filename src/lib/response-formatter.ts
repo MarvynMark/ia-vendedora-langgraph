@@ -317,3 +317,13 @@ export function dividirMensagem(texto: string): string[] {
   const blocos = texto.split("\n\n").filter(b => b.trim());
   return blocos.slice(0, 10);
 }
+
+// Quebra o texto em linhas a cada fim de frase (. ! ?), na MESMA mensagem, para não ficar um
+// parágrafo "blocado". Não cria mensagens separadas (isso é o dividirMensagem por \n\n).
+// Ignora pontos que fazem parte de números (ex: 3.197) porque exige espaço após a pontuação.
+export function quebrarEmLinhas(texto: string): string {
+  return (texto ?? "")
+    .replace(/[ \t]*\n[ \t]*/g, "\n")            // normaliza espaços em volta de quebras existentes
+    .replace(/([.!?])[ \t]+(?=\S)/g, "$1\n")     // quebra de linha após o fim de cada frase
+    .trim();
+}
