@@ -449,15 +449,48 @@ export async function criarContato(
   return contato;
 }
 
+// Resolve o source_id (wa_id) de um contato numa inbox de WhatsApp a partir dos contact_inboxes
+// já existentes. Um mesmo contato pode ter VÁRIOS contact_inboxes na mesma inbox (ex: um wa_id
+// numérico real "5562981384100" e um gerado "BR.xxxx"); preferimos o puramente numérico, que é
+// o único que o Chatwoot aceita ao criar conversa em inbox WhatsApp sem ambiguidade.
+export async function buscarSourceIdWhatsapp(
+  accountId: string | number,
+  contactId: number,
+  inboxId: number,
+): Promise<string | null> {
+  try {
+    const res = await fetchComTimeout(
+      `${urlConta(accountId)}/contacts/${contactId}`,
+      { method: "GET", headers: headers() },
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      payload?: { contact_inboxes?: Array<{ source_id?: string; inbox?: { id?: number } }> };
+    };
+    const vinculos = (data.payload?.contact_inboxes ?? []).filter(
+      ci => ci.inbox?.id === Number(inboxId) && ci.source_id,
+    );
+    // Prefere o source_id puramente numérico (wa_id real)
+    const numerico = vinculos.find(ci => /^\d{1,20}(-\d{1,20})?$/.test(ci.source_id!));
+    return numerico?.source_id ?? vinculos[0]?.source_id ?? null;
+  } catch (e) {
+    logger.warn("source-id-whatsapp", `Erro ao resolver source_id do contato ${contactId}:`, e);
+    return null;
+  }
+}
+
 export async function vincularContatoInbox(
   accountId: string | number,
   contactId: number,
   inboxId: number,
+  sourceId?: string,
 ): Promise<void> {
   logger.debug("vincular-inbox", `Vinculando contato ${contactId} ao inbox ${inboxId} (account ${accountId})...`);
+  const body: Record<string, unknown> = { inbox_id: inboxId };
+  if (sourceId) body.source_id = sourceId;
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/contacts/${contactId}/contact_inboxes`,
-    { method: "POST", headers: headers(), body: JSON.stringify({ inbox_id: inboxId }) },
+    { method: "POST", headers: headers(), body: JSON.stringify(body) },
   );
   // Ignorar erro 422 (já vinculado)
   if (res.status === 422) {
@@ -474,14 +507,26 @@ export async function vincularContatoInbox(
 
 export async function criarConversa(
   accountId: string | number,
-  dados: { inbox_id: number; contact_id: number },
+  dados: { inbox_id: number; contact_id: number; source_id?: string },
 ): Promise<{ id: number }> {
   logger.debug("criar-conversa", `Criando conversa: contact_id=${dados.contact_id} inbox_id=${dados.inbox_id} account=${accountId}`);
 
-  // Para inboxes WhatsApp o contato precisa estar vinculado antes
-  await vincularContatoInbox(accountId, dados.contact_id, dados.inbox_id);
+  // Resolve o source_id: usa o fornecido ou busca o wa_id válido dos vínculos existentes.
+  // Inboxes WhatsApp exigem source_id numérico válido ao criar conversa — sem ele, o Chatwoot
+  // rejeita com 422 quando o contato tem vínculos ambíguos.
+  let sourceId = dados.source_id;
+  if (!sourceId) {
+    sourceId = (await buscarSourceIdWhatsapp(accountId, dados.contact_id, dados.inbox_id)) ?? undefined;
+  }
 
-  const body = JSON.stringify(dados);
+  // Para inboxes WhatsApp o contato precisa estar vinculado antes (com o source_id quando disponível)
+  await vincularContatoInbox(accountId, dados.contact_id, dados.inbox_id, sourceId);
+
+  const body = JSON.stringify({
+    inbox_id: dados.inbox_id,
+    contact_id: dados.contact_id,
+    ...(sourceId ? { source_id: sourceId } : {}),
+  });
   logger.debug("criar-conversa", `POST /conversations body=${body}`);
   const res = await fetchComTimeout(
     `${urlConta(accountId)}/conversations`,
