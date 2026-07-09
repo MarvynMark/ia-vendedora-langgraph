@@ -6,6 +6,12 @@ export async function buscarDadosFormulario(telefone: string): Promise<string> {
 
   // Normaliza o telefone para comparar (remove +, espaços, traços)
   const telefoneLimpo = telefone.replace(/\D/g, "");
+  // Compara pelos últimos 8 dígitos (o número local), que são estáveis mesmo quando
+  // o formato varia no 9º dígito do celular brasileiro ou no DDI. Ex: o formulário
+  // salva "5562981384100" (com 9) e o contato usa "556281384100" (sem 9) — ambos
+  // terminam em "81384100", então o match funciona.
+  const ultimos8 = telefoneLimpo.slice(-8);
+  if (ultimos8.length < 8) return "";
 
   try {
     const result = await pool.query<{
@@ -28,10 +34,10 @@ export async function buscarDadosFormulario(telefone: string): Promise<string> {
               disposto_investir, pronto_para_garantir, ja_foi_aluno,
               plano_b, o_que_faltou, diferenca_com_mentor, idade
        FROM leads_formulario_mentoria
-       WHERE REGEXP_REPLACE(whatsapp, '\\D', '', 'g') LIKE $1
+       WHERE RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) = $1
        ORDER BY criado_em DESC
        LIMIT 1`,
-      [`%${telefoneLimpo}`],
+      [ultimos8],
     );
 
     if (result.rows.length === 0) return "";
