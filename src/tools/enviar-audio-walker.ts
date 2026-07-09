@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
-import { quebrarEmLinhas } from "../lib/response-formatter.ts";
+import { dividirEmFrases } from "../lib/response-formatter.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -48,10 +48,11 @@ export async function enviarAudioWalker(
   // a apresentação do áudio personalizada, para não parecer um áudio gravado solto.
   if (mensagemAntes && mensagemAntes.trim()) {
     try {
-      // "Digitando" proporcional ao tamanho do texto, depois envia (com frases quebradas em linhas)
-      const texto = quebrarEmLinhas(mensagemAntes.trim());
-      await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(texto));
-      await enviarMensagem(idConta, idConversa, texto);
+      // Cada frase vira uma mensagem separada, com "digitando" proporcional antes de cada
+      for (const frase of dividirEmFrases(mensagemAntes)) {
+        await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(frase));
+        await enviarMensagem(idConta, idConversa, frase);
+      }
       // Registra o texto para que o envio do output filtre qualquer repetição feita pelo LLM
       registrarTextoMidia(idConversa, mensagemAntes);
       await pausaComDigitando(idConta, idConversa, 3000);

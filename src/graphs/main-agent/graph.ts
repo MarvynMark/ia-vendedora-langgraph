@@ -10,7 +10,7 @@ import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
-import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, quebrarEmLinhas } from "../../lib/response-formatter.ts";
+import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
 import { enviarVideoPlataforma } from "../../tools/enviar-video.ts";
 import { enviarImagemEntregaveis } from "../../tools/enviar-imagem-entregaveis.ts";
@@ -351,16 +351,15 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
   const formatado = await formatarTextoFn(state.outputAgente);
-  // Remove blocos que o LLM repetiu do texto já enviado como apresentação de áudio (mensagem_antes)
-  const blocos = dividirMensagem(formatado).filter(
-    (b) => !blocoDuplicaMidia(state.idConversa, b),
-  );
-  for (const bloco of blocos) {
-    const texto = quebrarEmLinhas(bloco);
-    // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem (inclusive a 1ª),
-    // simulando alguém digitando o texto todo
-    await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(texto));
-    await enviarMensagem(state.idConta, state.idConversa, texto);
+  // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu
+  // do texto já enviado como apresentação de áudio/vídeo (mensagem_antes).
+  const frases = dividirMensagem(formatado)
+    .flatMap((bloco) => dividirEmFrases(bloco))
+    .filter((f) => !blocoDuplicaMidia(state.idConversa, f));
+  for (const frase of frases) {
+    // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem, simulando digitação
+    await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(frase));
+    await enviarMensagem(state.idConta, state.idConversa, frase);
   }
 }
 
