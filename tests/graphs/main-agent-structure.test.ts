@@ -23,7 +23,7 @@ describe("main agent prompt", () => {
     // Ferramentas críticas, incluindo os 3 áudios do Walker
     expect(prompt).toContain("Enviar_audio_walker_1");
     expect(prompt).toContain("Enviar_audio_walker_2");
-    expect(prompt).toContain("Enviar_audio_walker_3");
+    expect(prompt).not.toContain("Enviar_audio_walker_3");
     expect(prompt).toContain("Enviar_video_plataforma");
     expect(prompt).toContain("Enviar_imagem_entregaveis");
     expect(prompt).toContain("Escalar_humano");

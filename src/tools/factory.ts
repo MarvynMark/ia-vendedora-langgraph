@@ -8,7 +8,6 @@ import { criarToolEnviarImagemEntregaveis } from "./enviar-imagem-entregaveis.ts
 import {
   criarToolEnviarAudioWalker1,
   criarToolEnviarAudioWalker2,
-  criarToolEnviarAudioWalker3,
 } from "./enviar-audio-walker.ts";
 import { criarToolBuscarContextoSimilar } from "./buscar-contexto-similar.ts";
 
@@ -60,10 +59,6 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idConversa: contexto.idConversa,
     }),
     criarToolEnviarAudioWalker2({
-      idConta: contexto.idConta,
-      idConversa: contexto.idConversa,
-    }),
-    criarToolEnviarAudioWalker3({
       idConta: contexto.idConta,
       idConversa: contexto.idConversa,
     }),

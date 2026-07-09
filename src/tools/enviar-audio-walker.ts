@@ -129,15 +129,3 @@ export function criarToolEnviarAudioWalker2(contexto: ContextoEnviarAudio) {
   );
 }
 
-export function criarToolEnviarAudioWalker3(contexto: ContextoEnviarAudio) {
-  return tool(
-    async ({ mensagem_antes }: { mensagem_antes?: string }) =>
-      enviarAudioWalker(3, contexto.idConta, contexto.idConversa, mensagem_antes),
-    {
-      name: "Enviar_audio_walker_3",
-      description:
-        "Envia o TERCEIRO áudio do Perito Walker (alinhamento de expectativas: a mentoria não é cursinho) como nota de voz. Use após os entregáveis, antes da prova social e do convite. Passe em 'mensagem_antes' uma frase pessoal que apresenta o áudio; ela é enviada como texto ANTES do áudio.",
-      schema: SCHEMA_AUDIO,
-    },
-  );
-}

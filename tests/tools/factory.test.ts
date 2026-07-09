@@ -14,12 +14,12 @@ const CONTEXTO_BASE = {
 };
 
 describe("tool factory - main agent", () => {
-  test("cria 10 tools", () => {
+  test("cria 9 tools", () => {
     const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
-    expect(tools.length).toBe(10);
+    expect(tools.length).toBe(9);
   });
 
-  test("tools têm nomes corretos (incluindo os 3 áudios do Walker)", () => {
+  test("tools têm nomes corretos (incluindo os 2 áudios do Walker)", () => {
     const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
 
     const nomes = tools.map(t => t.name).sort();
@@ -28,7 +28,6 @@ describe("tool factory - main agent", () => {
       "Buscar_contexto_similar",
       "Enviar_audio_walker_1",
       "Enviar_audio_walker_2",
-      "Enviar_audio_walker_3",
       "Enviar_imagem_entregaveis",
       "Enviar_video_plataforma",
       "Escalar_humano",
@@ -56,14 +55,16 @@ describe("tool factory - main agent", () => {
     expect(atualizar!.description).toContain("Aguardando Pagamento: 2");
   });
 
-  test("cada tool de áudio do Walker é enviada uma única vez (schema sem parâmetros)", () => {
+  test("as tools de áudio do Walker (1 e 2) existem e enviam nota de voz", () => {
     const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
 
-    for (const numero of [1, 2, 3]) {
+    for (const numero of [1, 2]) {
       const audio = tools.find(t => t.name === `Enviar_audio_walker_${numero}`);
       expect(audio).toBeDefined();
       expect(audio!.description).toContain("nota de voz");
     }
+    // O áudio 3 foi removido do fluxo
+    expect(tools.find(t => t.name === "Enviar_audio_walker_3")).toBeUndefined();
   });
 });
 
