@@ -34,12 +34,25 @@ export async function enviarAudioWalker(
   numero: 1 | 2 | 3,
   idConta: string,
   idConversa: string,
+  mensagemAntes?: string,
 ): Promise<string> {
   const chaveDedupe = `${idConversa}:${numero}`;
   if (audiosEnviados.has(chaveDedupe)) {
     return `Áudio ${numero} já enviado nesta conversa.`;
   }
   audiosEnviados.add(chaveDedupe);
+
+  // Envia o texto de contexto ANTES do áudio. Garante a ordem texto -> áudio (que a
+  // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e deixa
+  // a apresentação do áudio personalizada, para não parecer um áudio gravado solto.
+  if (mensagemAntes && mensagemAntes.trim()) {
+    try {
+      await enviarMensagem(idConta, idConversa, mensagemAntes.trim());
+      await pausaComDigitando(idConta, idConversa, 3000);
+    } catch (e) {
+      logger.warn("tool:enviar-audio-walker", "Erro ao enviar mensagem antes do áudio:", e);
+    }
+  }
 
   const url = URLS_AUDIO[numero];
   try {
@@ -79,38 +92,50 @@ export async function enviarAudioWalker(
   }
 }
 
+const SCHEMA_AUDIO = z.object({
+  mensagem_antes: z
+    .string()
+    .optional()
+    .describe(
+      "Texto curto, personalizado e humano enviado como mensagem ANTES do áudio, apresentando-o de forma natural (use o nome e a dor do lead). Ex: 'Deixa eu te explicar uma coisa sobre isso num áudio rapidinho, [Nome]'. Sempre preencha este campo para o áudio não parecer solto.",
+    ),
+});
+
 export function criarToolEnviarAudioWalker1(contexto: ContextoEnviarAudio) {
   return tool(
-    async () => enviarAudioWalker(1, contexto.idConta, contexto.idConversa),
+    async ({ mensagem_antes }: { mensagem_antes?: string }) =>
+      enviarAudioWalker(1, contexto.idConta, contexto.idConversa, mensagem_antes),
     {
       name: "Enviar_audio_walker_1",
       description:
-        "Envia o PRIMEIRO áudio do Perito Walker (sobre falta de direcionamento e método) como nota de voz no WhatsApp. Use logo após confirmar a dificuldade do lead na abertura, imediatamente depois de escrever 'Vou te mandar um áudio'. Chame esta tool ANTES de qualquer outro texto. Não precisa de parâmetros.",
-      schema: z.object({}),
+        "Envia o PRIMEIRO áudio do Perito Walker (sobre falta de direcionamento e método) como nota de voz. Use na qualificação inicial, depois de reagir à dor do lead. Passe em 'mensagem_antes' uma frase pessoal que apresenta o áudio; ela é enviada como texto ANTES do áudio, garantindo a ordem correta.",
+      schema: SCHEMA_AUDIO,
     },
   );
 }
 
 export function criarToolEnviarAudioWalker2(contexto: ContextoEnviarAudio) {
   return tool(
-    async () => enviarAudioWalker(2, contexto.idConta, contexto.idConversa),
+    async ({ mensagem_antes }: { mensagem_antes?: string }) =>
+      enviarAudioWalker(2, contexto.idConta, contexto.idConversa, mensagem_antes),
     {
       name: "Enviar_audio_walker_2",
       description:
-        "Envia o SEGUNDO áudio do Perito Walker (como funciona a mentoria por dentro) como nota de voz no WhatsApp. Use depois que o lead responder sobre sentir falta de direcionamento, ANTES de enviar o vídeo da plataforma. Chame esta tool ANTES de qualquer outro texto. Não precisa de parâmetros.",
-      schema: z.object({}),
+        "Envia o SEGUNDO áudio do Perito Walker (como funciona a mentoria por dentro) como nota de voz. Use quando for apresentar a mentoria. Passe em 'mensagem_antes' uma frase pessoal que apresenta o áudio; ela é enviada como texto ANTES do áudio.",
+      schema: SCHEMA_AUDIO,
     },
   );
 }
 
 export function criarToolEnviarAudioWalker3(contexto: ContextoEnviarAudio) {
   return tool(
-    async () => enviarAudioWalker(3, contexto.idConta, contexto.idConversa),
+    async ({ mensagem_antes }: { mensagem_antes?: string }) =>
+      enviarAudioWalker(3, contexto.idConta, contexto.idConversa, mensagem_antes),
     {
       name: "Enviar_audio_walker_3",
       description:
-        "Envia o TERCEIRO áudio do Perito Walker (alinhamento de expectativas: a mentoria não é cursinho) como nota de voz no WhatsApp. Use depois de enviar a imagem de entregáveis, ANTES do texto sobre os 93% de aprovação e o convite de vaga. Chame esta tool ANTES de qualquer outro texto. Não precisa de parâmetros.",
-      schema: z.object({}),
+        "Envia o TERCEIRO áudio do Perito Walker (alinhamento de expectativas: a mentoria não é cursinho) como nota de voz. Use após os entregáveis, antes da prova social e do convite. Passe em 'mensagem_antes' uma frase pessoal que apresenta o áudio; ela é enviada como texto ANTES do áudio.",
+      schema: SCHEMA_AUDIO,
     },
   );
 }
