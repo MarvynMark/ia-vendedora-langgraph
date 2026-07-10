@@ -21,6 +21,10 @@ const BOARD_ID = env.KANBAN_BOARD_ID;
 const STEP_GANHO = 9;
 const STEP_PERDIDO = 11;
 const MAX_PERDIDOS = 50;
+// Fonte primária de compradores: a etiqueta "mentoria" que o webhook de pagamento adiciona.
+// Mais robusta que o step "Ganho" do Kanban (que pode estar indisponível) e pega todos os
+// compradores históricos, não só os que estão no step Ganho agora.
+const LABEL_COMPRADOR = "mentoria";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -68,6 +72,53 @@ async function buscarLabels(conversationId: number): Promise<string[]> {
   }
 }
 
+interface ConversaComprador {
+  id: number;
+  nome: string;
+  telefone: string;
+  labels: string[];
+  concurso: string;
+}
+
+// Busca todas as conversas que têm a etiqueta informada, paginando o endpoint de filtro do Chatwoot.
+async function buscarConversasComLabel(label: string): Promise<ConversaComprador[]> {
+  const out: ConversaComprador[] = [];
+  for (let page = 1; page <= 40; page++) {
+    let convs: any[] = [];
+    try {
+      const res = await fetchComTimeout(
+        `${env.CHATWOOT_BASE_URL}/api/v1/accounts/${ACCOUNT_ID}/conversations/filter?page=${page}`,
+        {
+          method: "POST",
+          headers: { api_access_token: env.CHATWOOT_API_TOKEN, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            payload: [{ attribute_key: "labels", filter_operator: "equal_to", values: [label], query_operator: null }],
+          }),
+          timeout: 20000,
+        },
+      );
+      if (!res.ok) break;
+      const data = (await res.json()) as { payload?: any[] };
+      convs = data.payload ?? [];
+    } catch {
+      break;
+    }
+    if (convs.length === 0) break;
+    for (const c of convs) {
+      const sender = c.meta?.sender ?? {};
+      const attrs = sender.custom_attributes ?? {};
+      out.push({
+        id: c.id,
+        nome: sender.name ?? "Lead",
+        telefone: sender.phone_number ?? "",
+        labels: c.labels ?? [],
+        concurso: attrs.concurso_interesse ?? attrs.qual_concurso ?? "não informado",
+      });
+    }
+  }
+  return out;
+}
+
 async function buscarMensagens(conversationId: number): Promise<Mensagem[]> {
   try {
     const data = (await listarMensagens(ACCOUNT_ID, conversationId)) as { payload?: Mensagem[] };
@@ -110,40 +161,24 @@ function extrairConcurso(titulo: string, descricao: string): string {
 // ─── Ingestão de conversas ganhas ─────────────────────────────────────────────
 
 async function ingerirConversasGanhas() {
-  log("=== Iniciando ingestão de CONVERSAS GANHAS ===");
+  log("=== Iniciando ingestão de CONVERSAS DE COMPRADORES (label 'mentoria') ===");
 
-  // Busca todas as páginas do step Ganho
-  const tasks: KanbanTask[] = [];
-  for (let page = 1; page <= 5; page++) {
-    const pagina = await listarKanbanTasks(ACCOUNT_ID, BOARD_ID, STEP_GANHO, page) as KanbanTask[];
-    if (pagina.length === 0) break;
-    const doPasso = pagina.filter((t) => t.board_step_id === STEP_GANHO);
-    tasks.push(...doPasso);
-    if (doPasso.length < pagina.length) break;
-  }
-
-  log(`Encontradas ${tasks.length} tasks no step Ganho`);
+  const compradores = await buscarConversasComLabel(LABEL_COMPRADOR);
+  log(`Encontrados ${compradores.length} compradores (conversas com label '${LABEL_COMPRADOR}')`);
 
   let indexadas = 0;
-  for (const task of tasks) {
-    const convIds = task.conversation_ids ?? [];
-    if (convIds.length === 0) {
-      log(`  [skip] "${task.title}" — sem conversation_id vinculado`);
-      continue;
-    }
+  for (const c of compradores) {
+    const convId = c.id;
+    log(`  Processando conv #${convId} — "${c.nome}"`);
 
-    const convId = convIds[0]!;
-    log(`  Processando conv #${convId} — "${task.title}"`);
-
-    const [msgs, labels] = await Promise.all([buscarMensagens(convId), buscarLabels(convId)]);
-
+    const msgs = await buscarMensagens(convId);
     if (msgs.length === 0) {
       log(`    [skip] sem mensagens visíveis`);
       continue;
     }
 
-    const autoria = labels.includes("nao") ? "IA" : labels.includes("sim") ? "Pedro (humano)" : "desconhecida";
-    const concurso = extrairConcurso(task.title, task.description ?? "");
+    const autoria = c.labels.includes("nao") ? "IA" : c.labels.includes("sim") ? "Pedro (humano)" : "desconhecida";
+    const concurso = c.concurso;
 
     // Divide em abertura / meio / fechamento
     const abertura = msgs.slice(0, 5).map(formatarMensagem).join("\n");
@@ -156,11 +191,11 @@ async function ingerirConversasGanhas() {
       : 0;
 
     const conteudo = `CONVERSA GANHA #${convId}
-Lead: ${task.title}
+Lead: ${c.nome}
 Concurso: ${concurso}
 Atendimento: ${autoria}
 Total de mensagens: ${numMsgs} | Duração aproximada: ${durHoras}h
-Labels: ${labels.join(", ") || "nenhuma"}
+Labels: ${c.labels.join(", ") || "nenhuma"}
 
 ABERTURA:
 ${abertura || "(sem mensagens de abertura visíveis)"}
@@ -171,22 +206,21 @@ ${meio || "(não disponível)"}
 FECHAMENTO:
 ${fechamento}
 
-PADRÃO: Lead com label "${labels.includes("nao") ? "nao" : "sim"}" fechou a compra após ${numMsgs} mensagens em ~${durHoras}h.`;
+PADRÃO: Comprador atendido por "${autoria}" fechou a compra após ${numMsgs} mensagens em ~${durHoras}h.`;
 
-    const textoParaEmbedding = `Venda fechada para ${task.title}. Concurso: ${concurso}. Atendimento: ${autoria}. ${task.description ?? ""}`;
+    const textoParaEmbedding = `Venda fechada para ${c.nome}. Concurso: ${concurso}. Atendimento: ${autoria}.`;
 
     try {
       const embedding = await gerarEmbedding(textoParaEmbedding);
       await inserirDocumento({
         tipo: "conversa_ganha",
-        titulo: `${task.title} — ${concurso} (${autoria})`,
+        titulo: `${c.nome} — ${concurso} (${autoria})`,
         conteudo,
         metadata: {
           conversation_id: convId,
-          task_id: task.id,
           concurso,
           autoria,
-          labels,
+          labels: c.labels,
           num_mensagens: numMsgs,
           duracao_horas: durHoras,
         },
@@ -202,7 +236,7 @@ PADRÃO: Lead com label "${labels.includes("nao") ? "nao" : "sim"}" fechou a com
     await new Promise((r) => setTimeout(r, 300));
   }
 
-  log(`=== Conversas ganhas: ${indexadas}/${tasks.length} indexadas ===\n`);
+  log(`=== Compradores: ${indexadas}/${compradores.length} indexados ===\n`);
 }
 
 // ─── Ingestão de objeções (conversas perdidas) ────────────────────────────────
@@ -309,7 +343,11 @@ if (!apenasObjecoes) {
 }
 
 if (!apenasGanhas) {
-  await ingerirObjecoes();
+  try {
+    await ingerirObjecoes();
+  } catch (e) {
+    log(`⚠️ Objeções puladas — o Kanban (step Perdido) parece indisponível: ${e}`);
+  }
 }
 
 const totalGanhas = await contarDocumentos("conversa_ganha");

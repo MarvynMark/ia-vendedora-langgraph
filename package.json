@@ -7,6 +7,8 @@
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "setup": "bun run src/db/setup.ts",
+    "ingest": "bun run src/scripts/ingest-conversas.ts",
+    "analisar-compradores": "bun run src/scripts/analisar-compradores.ts",
     "visualize": "bun run src/visualize-graphs.ts",
     "typecheck": "bunx tsc --noEmit",
     "test": "NODE_ENV=test bun test"
