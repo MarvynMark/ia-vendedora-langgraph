@@ -1,4 +1,15 @@
+import { readFileSync } from "fs";
 import { env } from "../../config/env.ts";
+
+// Aprendizados destilados das conversas de compradores (gerado por scripts/analisar-compradores.ts
+// e revisado pela equipe). Lido uma vez no load do módulo; se o arquivo não existir, fica vazio.
+const APRENDIZADOS_COMPRADORES: string = (() => {
+  try {
+    return readFileSync(new URL("./aprendizados-compradores.md", import.meta.url), "utf-8").trim();
+  } catch {
+    return "";
+  }
+})();
 
 interface ContextoPrompt {
   tarefa: Record<string, unknown>;
@@ -522,7 +533,15 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   **Após oferta de downsell:**
   Mova o card para "Perdido" usando "Atualizar_tarefa" e atualize a descrição com o status atual.
 </produtos>
+${APRENDIZADOS_COMPRADORES ? `
+# APRENDIZADOS DE FECHAMENTOS REAIS
 
+<aprendizados>
+  O texto abaixo foi destilado de conversas REAIS de quem comprou a mentoria e revisado pela equipe. Use como guia do que funciona nos fechamentos (perfil de quem compra, o que fecha, como contornar objeções, sinais de compra). Adapte ao seu tom, nunca copie literalmente. As regras de preço e produtos das seções acima continuam valendo.
+
+${APRENDIZADOS_COMPRADORES}
+</aprendizados>
+` : ""}
 # FERRAMENTA DE CONTEXTO (RAG)
 
 <rag>
