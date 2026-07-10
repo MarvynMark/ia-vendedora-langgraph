@@ -2,6 +2,7 @@ import { env } from "../config/env.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { comRetry } from "../lib/retry.ts";
 import { logger } from "../lib/logger.ts";
+import { TEMPLATE_META } from "../lib/templates.ts";
 
 const BASE_URL = env.CHATWOOT_BASE_URL;
 const TOKEN = env.CHATWOOT_API_TOKEN;
@@ -407,7 +408,18 @@ export async function enviarTemplate(
   conversationId: string | number,
   templateName: string,
   conteudo?: string,
+  processedParams?: Record<string, string>,
 ) {
+  // Idioma e cabeçalho de mídia vêm do mapa TEMPLATE_META (default: pt_BR, sem mídia).
+  const meta = TEMPLATE_META[templateName];
+  const language = meta?.language ?? "pt_BR";
+  const bodyParams = processedParams ?? {};
+  // Sem mídia: params do corpo na raiz ({ "1": "João" }). Com cabeçalho de mídia, o Chatwoot
+  // exige o formato estruturado { body: {...}, header: { media_url, media_type } }.
+  const processedParamsFinal = meta?.mediaUrl
+    ? { body: bodyParams, header: { media_url: meta.mediaUrl, media_type: meta.mediaType ?? "image" } }
+    : bodyParams;
+
   const payload = {
     message_type: "outgoing",
     content_type: "text",
@@ -415,8 +427,9 @@ export async function enviarTemplate(
     template_params: {
       name: templateName,
       category: "MARKETING",
-      language: "pt_BR",
-      processed_params: {},
+      language,
+      // Variáveis do corpo do template Meta (posicionais): { "1": "João" } → {{1}}
+      processed_params: processedParamsFinal,
     },
   };
   logger.debug("enviar-template", `Enviando template "${templateName}" para conversa ${conversationId} (account ${accountId})`);

@@ -343,8 +343,9 @@ async function agenteBoasVindas(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
-// Sequência de recuperação para leads em "Primeira mensagem" (template inicial já enviado)
-const SEQUENCIA_RECUPERACAO_PM = ["ta_ai", "corrido_followup", "olhinho_followup"] as const;
+// Sequência de recuperação para leads em "Primeira mensagem" (template inicial já enviado).
+// Cada mensagem traz um ângulo novo (reforço → prova social → urgência) em vez de só cobrar resposta.
+const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup2_prova_social", "fup3_urgencia"] as const;
 
 // Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual)
 // Dentro da janela 24h: 3 tentativas no mesmo dia (4h→2h→2h max 20h), encerramento 24h depois
@@ -368,6 +369,7 @@ function atualizarContadorTemplates(description: string, novoValor: number): str
 
 async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", "executando sequência Primeira mensagem...");
+  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
 
   // Verificar se o lead já respondeu — se sim, para a sequência
   try {
@@ -411,7 +413,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_RECUPERACAO_PM.length}) — janela: ${dentroJanela}`);
 
   // Dentro da janela: mensagem normal (não cobra template). Fora: template aprovado.
-  const conteudo = CONTEUDO_TEMPLATES[nomeMsg];
+  const conteudo = (CONTEUDO_TEMPLATES[nomeMsg] ?? "").replace(/\[Nome\]/g, primeiroNome);
   try {
     if (dentroJanela && conteudo) {
       logger.info("follow-up", `Janela 24h ativa — mensagem normal: ${nomeMsg}`);
@@ -421,7 +423,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
       }
     } else {
       logger.info("follow-up", `Fora da janela — template: ${nomeMsg}`);
-      await enviarTemplate(state.accountId, state.conversationId, nomeMsg, conteudo);
+      await enviarTemplate(state.accountId, state.conversationId, nomeMsg, conteudo, { "1": primeiroNome });
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
@@ -602,6 +604,7 @@ async function enviarMensagemNo(state: FollowUpStateType) {
 
 async function agenteTemplateInicial(state: FollowUpStateType) {
   logger.info("follow-up", "executando template inicial (Novo Lead)...");
+  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
 
   const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
 
@@ -620,7 +623,7 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
     logger.warn("follow-up", "Erro ao verificar incoming:", e);
   }
 
-  const conteudo = CONTEUDO_TEMPLATES["abertura_esta_estudando"];
+  const conteudo = (CONTEUDO_TEMPLATES["abertura02"] ?? "").replace(/\[Nome\]/g, primeiroNome);
 
   try {
     if (dentroJanela && conteudo) {
@@ -630,8 +633,8 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      logger.info("follow-up", "Enviando template inicial: abertura_esta_estudando");
-      await enviarTemplate(state.accountId, state.conversationId, "abertura_esta_estudando", conteudo);
+      logger.info("follow-up", "Enviando template inicial: abertura02");
+      await enviarTemplate(state.accountId, state.conversationId, "abertura02", conteudo, { "1": primeiroNome });
     }
   } catch (e) {
     logger.error("follow-up", "Erro ao enviar template inicial:", e);

@@ -49,11 +49,21 @@ export async function verificarTemplatesPendentes() {
         continue;
       }
 
-      // Nenhuma mensagem — envia o template
-      const templateName = "abertura_esta_estudando";
-      const conteudoTemplate = CONTEUDO_TEMPLATES[templateName];
+      // Nenhuma mensagem — envia o template. Busca o primeiro nome do lead para a variável {{1}}.
+      let primeiroNome = "";
+      try {
+        const conv = await buscarConversa(row.account_id, row.conversation_id) as {
+          meta?: { sender?: { name?: string } };
+        };
+        primeiroNome = (conv.meta?.sender?.name ?? "").split(" ")[0] ?? "";
+      } catch (e) {
+        logger.warn("template-timer", "Não foi possível obter o nome do lead para o template:", e);
+      }
+
+      const templateName = "abertura02";
+      const conteudoTemplate = (CONTEUDO_TEMPLATES[templateName] ?? "").replace(/\[Nome\]/g, primeiroNome);
       logger.debug("template-timer", `Enviando template "${templateName}" para conversa ${row.conversation_id}...`);
-      await enviarTemplate(row.account_id, row.conversation_id, templateName, conteudoTemplate);
+      await enviarTemplate(row.account_id, row.conversation_id, templateName, conteudoTemplate, { "1": primeiroNome });
       await pool.query(
         "UPDATE leads_template_pendente SET template_enviado = TRUE WHERE id = $1",
         [row.id],

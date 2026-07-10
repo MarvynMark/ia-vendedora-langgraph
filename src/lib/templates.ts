@@ -1,14 +1,25 @@
 // Conteúdo real dos templates de WhatsApp — usado para enviar mensagem normal
 // quando o lead já está dentro da janela de 24h (template não é necessário)
 export const CONTEUDO_TEMPLATES: Record<string, string> = {
-  // --- Abertura inicial (Novo Lead) ---
-  abertura_esta_estudando:
-    "Olá, tudo bem?\n\nAqui é o Perito Walker.\nAcabei de ver seu formulário e queria confirmar uma coisa rapidinho.\n\nHoje você já está estudando pra algum concurso de Perito ou ainda está se organizando?",
+  // --- Abertura inicial (Novo Lead) — variável {{1}} = primeiro nome do lead ---
+  // Gancho de curiosidade ("tem uma coisa que eu queria te falar"): puxa muito mais
+  // resposta que a pergunta genérica anterior ("já está estudando ou se organizando?").
+  // Nome/idioma na Meta: abertura02 / pt_BR.
+  abertura02:
+    "Oi, [Nome]! Aqui é o Perito Walker. Recebi seu formulário da mentoria e estou lendo suas respostas.\n\nTem uma coisa ali que você escreveu que quero te falar.\nEstá podendo agora? 👀",
 
-  // --- Sequência de recuperação: Primeira mensagem ---
-  // Usados como template (janela fechada) ou mensagem normal (janela aberta)
+  // --- Sequência de recuperação: Primeira mensagem (lead não respondeu a abertura) ---
+  // variável {{1}} = primeiro nome. Cada mensagem traz um ângulo NOVO (reforço → prova social
+  // → urgência), em vez de só perguntar "cadê você?". Template (janela fechada) ou msg normal (aberta).
+  fup1_reforco:
+    "Oi [Nome], imagino que a rotina tá corrida.\n\nMas separei um tempo pra ver seu caso e não quero que você perca essa chance. Me dá um oi rapidinho?",
+  fup2_prova_social:
+    "Ei [Nome], essa semana tivemos mais alunos aprovando em Perito.\n\nO que eles têm em comum é que começaram com direção, não sozinhos. Ainda dá tempo de você entrar nesse caminho. Quer que eu te mostre como?",
+  fup3_urgencia:
+    "Olha [Nome], tô organizando minha agenda de análises e não quero deixar seu caso de fora.\n\nSe ainda quer a aprovação como Perito, me manda um \"sim\" que eu priorizo seu direcionamento hoje.",
+
+  // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
-  corrido_followup: "Opa, sei que deve estar corrido por aí, mas você conseguiu ver minha mensagem anterior?",
   olhinho_followup: "👀",
   encerramento_02:
     "Como você não respondeu, vou encerrar seu atendimento por aqui para organizar as prioridades.\nSe decidir começar sua preparação de forma estratégica, me chama aqui, ok?",
@@ -54,4 +65,29 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   lembrete_urgencia_meta:
     "Vou liberar sua vaga amanhã se não tiver retorno. Ainda consigo segurar até lá — quer confirmar?",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
+};
+
+// Metadados por template aprovado na Meta (idioma e cabeçalho de mídia, quando houver).
+// enviarTemplate() consulta este mapa: templates ausentes aqui usam o default (pt_BR, sem mídia),
+// então as sequências antigas continuam funcionando sem alteração.
+export interface TemplateMeta {
+  /** Código do idioma como cadastrado na Meta (ex: "pt_BR", "en"). */
+  language: string;
+  /** URL PÚBLICA da imagem do cabeçalho (só para templates com header de mídia). */
+  mediaUrl?: string;
+  mediaType?: "image" | "video" | "document";
+}
+
+export const TEMPLATE_META: Record<string, TemplateMeta> = {
+  // Abertura criada em Portuguese (BR)
+  abertura02: { language: "pt_BR" },
+  // Sequência de recuperação criada em English (o texto do corpo é português mesmo)
+  fup1_reforco: { language: "en" },
+  // fup2 tem cabeçalho de imagem (prova social visual) — precisa da URL pública da imagem
+  fup2_prova_social: {
+    language: "en",
+    mediaUrl: "", // TODO: preencher com a URL pública da imagem (ex: hospedar no s3.stkd.site)
+    mediaType: "image",
+  },
+  fup3_urgencia: { language: "en" },
 };
