@@ -16,7 +16,7 @@ import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
 import { verificarNoticias } from "./lib/monitor-noticias.ts";
 import { monitorNoticiasRouter } from "./routes/monitor-noticias.ts";
-import { obterLogs } from "./lib/webhook-logger.ts";
+import { obterLogs, obterLogsPagamento } from "./lib/webhook-logger.ts";
 
 const app = new Elysia()
   .use(cors())
@@ -32,6 +32,10 @@ const app = new Elysia()
   .get("/webhook/logs", ({ query }) => {
     const limite = Math.min(Number(query.limite ?? 50), 100);
     return obterLogs(limite);
+  })
+  .get("/webhook/logs-pagamento", ({ query }) => {
+    const limite = Math.min(Number(query.limite ?? 50), 50);
+    return obterLogsPagamento(limite);
   })
   .listen(env.PORT);
 

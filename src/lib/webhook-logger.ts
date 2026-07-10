@@ -15,6 +15,21 @@ const MAX_ENTRIES = 100;
 const logs: WebhookLogEntry[] = [];
 let contador = 0;
 
+// Buffer DEDICADO para webhooks de pagamento (TMB, DMGuru). Guarda o body CRU
+// completo e não é descartado pelo tráfego intenso do Chatwoot, que satura o
+// buffer geral em poucos minutos. Essencial para debugar quais campos cada
+// plataforma envia (ex.: qual campo carrega a "Descrição" da oferta na TMB).
+interface WebhookPagamentoEntry {
+  id: number;
+  timestamp: string;
+  endpoint: string;
+  resultado: string;
+  bodyKeys: string[];
+  bodyRaw: unknown;
+}
+const MAX_PAGAMENTO = 50;
+const logsPagamento: WebhookPagamentoEntry[] = [];
+
 export function registrarWebhook(
   endpoint: string,
   body: unknown,
@@ -32,6 +47,23 @@ export function registrarWebhook(
 
   logs.unshift(entry); // mais recente primeiro
   if (logs.length > MAX_ENTRIES) logs.pop();
+
+  // Além do buffer geral, persistir pagamentos num buffer próprio com o body cru.
+  if (endpoint.includes("pagamento")) {
+    logsPagamento.unshift({
+      id: entry.id,
+      timestamp: entry.timestamp,
+      endpoint,
+      resultado,
+      bodyKeys: body && typeof body === "object" ? Object.keys(body as Record<string, unknown>) : [],
+      bodyRaw: body,
+    });
+    if (logsPagamento.length > MAX_PAGAMENTO) logsPagamento.pop();
+  }
+}
+
+export function obterLogsPagamento(limite = 50): WebhookPagamentoEntry[] {
+  return logsPagamento.slice(0, limite);
 }
 
 function resumirBody(body: unknown): Record<string, unknown> {
