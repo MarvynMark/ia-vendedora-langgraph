@@ -458,9 +458,13 @@ export async function contarMensagensIncoming(
   accountId: string | number,
   conversationId: string | number,
 ): Promise<number> {
-  const data = await listarMensagens(accountId, conversationId) as { payload?: Array<{ message_type: number }> };
+  const data = await listarMensagens(accountId, conversationId) as {
+    payload?: Array<{ message_type: number; content_attributes?: { deleted?: boolean } }>;
+  };
   const msgs = data.payload ?? [];
-  return msgs.filter(m => m.message_type === 0).length;
+  // Ignora mensagens excluídas (soft-delete do Chatwoot): uma mensagem apagada não
+  // conta como resposta do lead e não deve bloquear o disparo do template de abertura.
+  return msgs.filter(m => m.message_type === 0 && m.content_attributes?.deleted !== true).length;
 }
 
 // Retorna true se a última mensagem real da conversa foi do lead (type 0)
