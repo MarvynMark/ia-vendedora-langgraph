@@ -344,8 +344,11 @@ async function agenteBoasVindas(state: FollowUpStateType) {
 }
 
 // Sequência de recuperação para leads em "Primeira mensagem" (template inicial já enviado).
-// Cada mensagem traz um ângulo novo (reforço → prova social → urgência) em vez de só cobrar resposta.
-const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup2_prova_social", "fup3_urgencia"] as const;
+// Cada mensagem traz um ângulo novo (reforço → urgência) em vez de só cobrar resposta.
+// NOTA: fup2_prova_social (prova social) está FORA da sequência porque tem cabeçalho de imagem,
+// que o Chatwoot 4.15.1 não repassa corretamente à Meta (erro #132000). Reativar quando a imagem
+// for removida do template OU o bug do Chatwoot for corrigido (basta re-incluir "fup2_prova_social").
+const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup3_urgencia"] as const;
 
 // Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual)
 // Dentro da janela 24h: 3 tentativas no mesmo dia (4h→2h→2h max 20h), encerramento 24h depois
@@ -436,8 +439,8 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   // Calcular próxima data com timing diferente por status da janela
   const delays = dentroJanela ? DELAYS_DENTRO_JANELA_MS : DELAYS_FORA_JANELA_MS;
   const delayMs = delays[contador] ?? (dentroJanela ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
-  // Encerramento (msg 3, delay de 24h): usa horário padrão 18h. Msgs do mesmo dia (delays curtos): max 20h
-  const isEncerramentoAgendado = dentroJanela && contador === 2;
+  // Encerramento (após a última msg da sequência): usa horário padrão 18h. Msgs do mesmo dia: max 20h
+  const isEncerramentoAgendado = dentroJanela && contador === SEQUENCIA_RECUPERACAO_PM.length - 1;
   const horaMax = (!isEncerramentoAgendado && dentroJanela) ? HORA_MAX_FOLLOWUP_JANELA : 18;
   const proximaData = proximoHorarioComercial(new Date(), delayMs, horaMax);
 

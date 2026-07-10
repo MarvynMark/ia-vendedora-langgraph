@@ -13,6 +13,8 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // → urgência), em vez de só perguntar "cadê você?". Template (janela fechada) ou msg normal (aberta).
   fup1_reforco:
     "Oi [Nome], imagino que a rotina tá corrida.\n\nMas separei um tempo pra ver seu caso e não quero que você perca essa chance. Me dá um oi rapidinho?",
+  // DESATIVADO da sequência (ver SEQUENCIA_RECUPERACAO_PM): cabeçalho de imagem não é
+  // repassado corretamente pelo Chatwoot 4.15.1 (erro Meta #132000). Texto pronto para reativar.
   fup2_prova_social:
     "Ei [Nome], essa semana tivemos mais alunos aprovando em Perito.\n\nO que eles têm em comum é que começaram com direção, não sozinhos. Ainda dá tempo de você entrar nesse caminho. Quer que eu te mostre como?",
   fup3_urgencia:
@@ -83,10 +85,11 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   abertura02: { language: "pt_BR" },
   // Sequência de recuperação criada em English (o texto do corpo é português mesmo)
   fup1_reforco: { language: "en" },
-  // fup2 tem cabeçalho de imagem (prova social visual) — precisa da URL pública da imagem
+  // fup2 tem cabeçalho de imagem (prova social visual). A Meta trata a imagem como
+  // parâmetro dinâmico — precisa da URL pública em cada envio (mesma imagem sempre).
   fup2_prova_social: {
     language: "en",
-    mediaUrl: "", // TODO: preencher com a URL pública da imagem (ex: hospedar no s3.stkd.site)
+    mediaUrl: "https://s3.stkd.site/arquivosclientes/Vestigium/fup02_antesdepois.png",
     mediaType: "image",
   },
   fup3_urgencia: { language: "en" },
