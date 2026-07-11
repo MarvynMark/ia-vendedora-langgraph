@@ -172,9 +172,10 @@ export const webhookRouter = new Elysia()
             const dadosFormulario = await buscarDadosFormulario(introTelefone);
 
             const g = await obterGrafo();
+            const idMensagemIntro = `intro_${Date.now()}`;
             await g.invoke({
               messages: [],
-              idMensagem: `intro_${Date.now()}`,
+              idMensagem: idMensagemIntro,
               idMensagemReferenciada: null,
               idConta: introIdConta,
               idConversa: introIdConversa,
@@ -206,7 +207,7 @@ export const webhookRouter = new Elysia()
               respostaFormatada: "",
               ssml: "",
               audioBuffer: null,
-            }, { configurable: { thread_id: introTelefone } });
+            }, { configurable: { thread_id: `${introTelefone}_${idMensagemIntro}` } });
             logger.info("webhook", "Intro automática enviada:", { telefone: introTelefone });
           } catch (e) {
             logger.error("webhook", "Erro ao enviar intro automática para lead de formulário:", e);
@@ -250,13 +251,14 @@ export const webhookRouter = new Elysia()
         await limparLock(lockKey);
         await limparHistorico(telefone);
 
-        // Limpar checkpoint tables
-        const threadIds = [telefone, `followup_${telefone}`];
-        for (const tid of threadIds) {
+        // Limpar checkpoint tables. O thread_id do grafo principal agora é `telefone_idMensagem`
+        // (único por invocação), então cobrimos o telefone exato, os por-mensagem e o followup.
+        for (const tbl of ["checkpoints", "checkpoint_blobs", "checkpoint_writes"]) {
           try {
-            await pool.query("DELETE FROM checkpoints WHERE thread_id = $1", [tid]);
-            await pool.query("DELETE FROM checkpoint_blobs WHERE thread_id = $1", [tid]);
-            await pool.query("DELETE FROM checkpoint_writes WHERE thread_id = $1", [tid]);
+            await pool.query(
+              `DELETE FROM ${tbl} WHERE thread_id = $1 OR thread_id LIKE $2 OR thread_id = $3`,
+              [telefone, `${telefone}_%`, `followup_${telefone}`],
+            );
           } catch (e) {
             logger.warn("webhook", "checkpoint cleanup:", e);
           }
@@ -313,44 +315,57 @@ export const webhookRouter = new Elysia()
       }
 
       const g = await obterGrafo();
-      logger.info("webhook", ">>> Invocando grafo principal", { thread_id: dados.telefone });
+      // thread_id ÚNICO por mensagem: invocações concorrentes (lead dando "enter" várias vezes) no
+      // mesmo thread corrompiam o estado uma da outra no checkpointer, quebrando o debounce/stale que
+      // agrupa as mensagens. O histórico real vem de buscarHistorico, então o checkpoint é transitório.
+      const threadIdUnico = `${dados.telefone}_${dados.idMensagem}`;
+      logger.info("webhook", ">>> Invocando grafo principal", { thread_id: threadIdUnico });
 
-      await g.invoke({
-        messages: [],
-        idMensagem: dados.idMensagem,
-        idMensagemReferenciada: dados.idMensagemReferenciada,
-        idConta: dados.idConta,
-        idConversa: dados.idConversa,
-        idContato: dados.idContato,
-        idInbox: dados.idInbox,
-        telefone: dados.telefone,
-        nome: dados.nome,
-        mensagem: dados.mensagem,
-        mensagemDeAudio: dados.mensagemDeAudio,
-        timestamp: dados.timestamp,
-        tipoArquivo: dados.tipoArquivo,
-        idAnexo: dados.idAnexo,
-        urlArquivo: dados.urlArquivo,
-        etiquetas: dados.etiquetas,
-        atributosContato: dados.atributosContato,
-        atributosConversa: dados.atributosConversa,
-        dadosFormulario,
-        tarefa,
-        funil,
-        mensagemProcessada: dados.mensagemProcessada,
-        mensagemReferenciada: null,
-        mensagensAgregadas: "",
-        stale: false,
-        lockTentativas: 0,
-        locked: false,
-        erroFatal: false,
-        outputAgente: "",
-        novasMensagens: false,
-        respostaFormatada: "",
-        ssml: "",
-        audioBuffer: null,
-      }, { configurable: { thread_id: dados.telefone } });
-      logger.info("webhook", "<<< Grafo principal concluído", { thread_id: dados.telefone });
+      try {
+        await g.invoke({
+          messages: [],
+          idMensagem: dados.idMensagem,
+          idMensagemReferenciada: dados.idMensagemReferenciada,
+          idConta: dados.idConta,
+          idConversa: dados.idConversa,
+          idContato: dados.idContato,
+          idInbox: dados.idInbox,
+          telefone: dados.telefone,
+          nome: dados.nome,
+          mensagem: dados.mensagem,
+          mensagemDeAudio: dados.mensagemDeAudio,
+          timestamp: dados.timestamp,
+          tipoArquivo: dados.tipoArquivo,
+          idAnexo: dados.idAnexo,
+          urlArquivo: dados.urlArquivo,
+          etiquetas: dados.etiquetas,
+          atributosContato: dados.atributosContato,
+          atributosConversa: dados.atributosConversa,
+          dadosFormulario,
+          tarefa,
+          funil,
+          mensagemProcessada: dados.mensagemProcessada,
+          mensagemReferenciada: null,
+          mensagensAgregadas: "",
+          stale: false,
+          lockTentativas: 0,
+          locked: false,
+          erroFatal: false,
+          outputAgente: "",
+          novasMensagens: false,
+          respostaFormatada: "",
+          ssml: "",
+          audioBuffer: null,
+        }, { configurable: { thread_id: threadIdUnico } });
+      } finally {
+        // Checkpoint do grafo é transitório — limpa o thread desta mensagem para não acumular lixo
+        try {
+          await pool.query("DELETE FROM checkpoints WHERE thread_id = $1", [threadIdUnico]);
+          await pool.query("DELETE FROM checkpoint_blobs WHERE thread_id = $1", [threadIdUnico]);
+          await pool.query("DELETE FROM checkpoint_writes WHERE thread_id = $1", [threadIdUnico]);
+        } catch (e) { logger.warn("webhook", "cleanup checkpoint:", e); }
+      }
+      logger.info("webhook", "<<< Grafo principal concluído", { thread_id: threadIdUnico });
     }).catch(async (e) => {
       logger.error("webhook", "!!! Erro no processamento:", e);
       if (lockKeyCatch) {
