@@ -321,6 +321,29 @@ export function blocoDuplicaMidia(idConversa: string | number, bloco: string): b
   return arr.some(t => t.includes(b));
 }
 
+// Retorna true se o bloco é apenas uma NARRAÇÃO de envio de mídia ("vou te mandar o áudio",
+// "vou enviar agora", "vou te mandar agora") emitida pelo LLM no output final. A tool de
+// áudio/vídeo já enviou a mídia junto com o texto de apresentação (mensagem_antes), então essa
+// narração vira uma bolha duplicada. Diferente de blocoDuplicaMidia, pega paráfrases que não
+// batem literalmente com o mensagem_antes registrado.
+// Só vale quando houve mídia apresentada neste turno (há mensagem_antes registrado) — assim NÃO
+// filtra narração legítima em turnos sem mídia (ex.: "vou te passar o link de pagamento agora").
+export function blocoNarraEnvioMidia(idConversa: string | number, bloco: string): boolean {
+  const arr = textosMidiaPorConversa.get(String(idConversa));
+  if (!arr || arr.length === 0) return false;
+  const b = normalizarTextoMidia(bloco);
+  if (!b) return false;
+  const anunciaEnvio =
+    /\bvou\b.{0,15}\b(mandar|enviar|passar|mostrar)\b/.test(b) ||
+    /\bte (mando|envio|mandarei|enviarei)\b/.test(b);
+  if (!anunciaEnvio) return false;
+  // Confirma que é narração de MÍDIA: cita áudio/vídeo, ou é um anúncio curto e sem conteúdo
+  // ("vou te mandar agora"). Num turno de mídia, esse tipo de bolha nunca carrega info nova.
+  const citaMidia = /[áa]udio|v[íi]deo/.test(b);
+  const soAnuncio = b.split(" ").length <= 6;
+  return citaMidia || soAnuncio;
+}
+
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.

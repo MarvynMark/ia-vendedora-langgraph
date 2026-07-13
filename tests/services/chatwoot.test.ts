@@ -19,6 +19,10 @@ import {
   moverKanbanTask,
   removerEtiquetas,
   buscarConversa,
+  registrarTextoMidia,
+  limparTextosMidia,
+  blocoDuplicaMidia,
+  blocoNarraEnvioMidia,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -304,6 +308,47 @@ describe("chatwoot service", () => {
         new Response("Error", { status: 500 })
       );
       await expect(enviarArquivo("8", "100", new Uint8Array([1]), "f.mp3")).rejects.toThrow("500");
+    });
+  });
+
+  // Regressão da conversa 3995: depois de enviar o áudio 2, o LLM emitiu bolhas de narração
+  // ("Vou te mandar agora", "Vou enviar o áudio para você") que a tool já havia enviado.
+  // O filtro literal (blocoDuplicaMidia) não pegava porque não batem com o mensagem_antes.
+  describe("filtro de narração de mídia (blocoNarraEnvioMidia)", () => {
+    const conv = "3995";
+    beforeEach(() => {
+      limparTextosMidia(conv);
+      // mensagem_antes real do áudio 2 registrado pela tool
+      registrarTextoMidia(conv, "Gravei um áudio te mostrando como isso funciona na prática.");
+    });
+
+    test("filtra as narrações exatas que vazaram na 3995", () => {
+      expect(blocoNarraEnvioMidia(conv, "Vou te mandar agora")).toBe(true);
+      expect(blocoNarraEnvioMidia(conv, "Vou enviar o áudio para você")).toBe(true);
+    });
+
+    test("filtra outras paráfrases de envio de áudio/vídeo", () => {
+      expect(blocoNarraEnvioMidia(conv, "Vou te enviar o áudio")).toBe(true);
+      expect(blocoNarraEnvioMidia(conv, "Já te mando o vídeo")).toBe(true);
+      expect(blocoNarraEnvioMidia(conv, "Vou te passar agora")).toBe(true);
+    });
+
+    test("NÃO filtra a pergunta legítima que fecha o turno de áudio", () => {
+      expect(blocoNarraEnvioMidia(conv, "Você também sente isso na hora de estudar?")).toBe(false);
+      expect(blocoNarraEnvioMidia(conv, "Quer que eu te mostre um vídeo rapidinho de como é a mentoria por dentro?")).toBe(false);
+    });
+
+    test("NÃO filtra a introdução longa dos entregáveis", () => {
+      expect(
+        blocoNarraEnvioMidia(conv, "Então deixa eu te mostrar tudo que tá incluso, vou te mandar uma imagem e já te explico"),
+      ).toBe(false);
+    });
+
+    test("NÃO filtra narração fora de turno de mídia (sem mensagem_antes registrado)", () => {
+      limparTextosMidia(conv);
+      // Sem mídia neste turno: "vou te passar o link" (pagamento) deve passar
+      expect(blocoNarraEnvioMidia(conv, "Vou te passar o link agora")).toBe(false);
+      expect(blocoNarraEnvioMidia(conv, "Vou te mandar agora")).toBe(false);
     });
   });
 });

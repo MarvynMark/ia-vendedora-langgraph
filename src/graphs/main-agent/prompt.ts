@@ -136,7 +136,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   **⚠️ REGRA CRÍTICA (não errar):**
   - Para enviar um áudio você CHAMA A FERRAMENTA. O texto que apresenta o áudio vai **EXCLUSIVAMENTE dentro do parâmetro mensagem_antes** da ferramenta, que já o envia ao lead. **NUNCA escreva esse texto também na sua resposta** (isso duplica) e **NUNCA escreva o texto de apresentação sem chamar a ferramenta** (aí o áudio não vai).
-  - **NUNCA narre que vai enviar o áudio** ("vou te mandar um áudio", "ouve esse áudio" fora do mensagem_antes).
+  - **NUNCA narre que vai enviar o áudio** ("vou te mandar um áudio", "vou enviar o áudio", "vou te mandar agora", "ouve esse áudio" fora do mensagem_antes). A ferramenta já enviou o áudio — repetir isso no texto gera bolha duplicada.
   - Depois do áudio, sua resposta em texto é **APENAS a próxima pergunta**.
   - Não conte o conteúdo do áudio em texto, ele já está gravado. Cada áudio é enviado UMA única vez.
 
