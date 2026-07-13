@@ -31,6 +31,20 @@ const CAMPO_MAP: Record<string, string> = {
 
 const COLUNAS_VALIDAS = new Set(Object.values(CAMPO_MAP));
 
+// Monta a descrição de 3 linhas do card do Kanban a partir do formulário parseado.
+// `d` tem as chaves de CAMPO_MAP (ex.: concurso_desejado) — NÃO as dos atributos do Chatwoot
+// (qual_concurso), que só são criadas depois em atributosFormulario.
+export function montarDescricaoTarefa(d: Record<string, string>): string {
+  const dispostoInvestir = (d.disposto_investir ?? "").toLowerCase();
+  const emojiAtendimento = (dispostoInvestir.includes("sim") || dispostoInvestir.includes("quero")) ? "🟢" : "🟣";
+  const concursoDescricao = d.concurso_desejado ?? "não informado";
+  return [
+    `${emojiAtendimento} - Concurso: ${concursoDescricao}`,
+    "🔁 - Follow-ups: 0",
+    "👤 - Descrição: inicio",
+  ].join("\n");
+}
+
 // Schema aceita qualquer objeto com strings — o parse faz o mapeamento
 const formularioSchema = z.record(z.string(), z.string());
 
@@ -147,14 +161,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   logger.info("aplicacao", "Conversa criada:", conversa.id);
 
   // Descrição no novo formato de 3 linhas
-  const dispostoInvestir = (d.disposto_investir ?? "").toLowerCase();
-  const emojiAtendimento = (dispostoInvestir.includes("sim") || dispostoInvestir.includes("quero")) ? "🟢" : "🟣";
-  const concursoDescricao = d.qual_concurso ?? "não informado";
-  const descricaoTarefa = [
-    `${emojiAtendimento} - Concurso: ${concursoDescricao}`,
-    "🔁 - Follow-ups: 0",
-    "👤 - Descrição: inicio",
-  ].join("\n");
+  const descricaoTarefa = montarDescricaoTarefa(d);
 
   // Cria task no Kanban na etapa "Novo Lead"
   const task = await criarKanbanTask(accountId, {
