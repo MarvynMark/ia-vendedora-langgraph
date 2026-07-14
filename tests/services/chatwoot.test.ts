@@ -24,6 +24,7 @@ import {
   blocoDuplicaMidia,
   blocoNarraEnvioMidia,
   blocoNarraAcaoInterna,
+  blocoTemFraseProibida,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -383,6 +384,25 @@ describe("chatwoot service", () => {
       expect(blocoNarraAcaoInterna("Vi que sua maior dificuldade é constância")).toBe(false);
       expect(blocoNarraAcaoInterna("Qual plano se encaixa melhor pra você?")).toBe(false);
       expect(blocoNarraAcaoInterna("Vou incluir Português e Direito Penal no seu plano de estudos")).toBe(false);
+    });
+  });
+
+  // Regressão da conversa 4153: despedida com frases banidas pelo roteiro.
+  describe("filtro de frases proibidas (blocoTemFraseProibida)", () => {
+    test("filtra as despedidas banidas que vazaram na 4153", () => {
+      expect(blocoTemFraseProibida("Boa sorte nos estudos e qualquer coisa, é só me chamar!")).toBe(true);
+      expect(blocoTemFraseProibida("Fico à disposição quando você estiver pronto para dar o próximo passo")).toBe(true);
+    });
+
+    test("filtra variações (sem acento, fique à vontade)", () => {
+      expect(blocoTemFraseProibida("estou a disposicao")).toBe(true);
+      expect(blocoTemFraseProibida("Fique à vontade pra me chamar")).toBe(true);
+    });
+
+    test("NÃO filtra despedidas/mensagens legítimas", () => {
+      expect(blocoTemFraseProibida("Tudo bem, Anibal, assim que estiver pronto é só me chamar")).toBe(false);
+      expect(blocoTemFraseProibida("Qual plano se encaixa melhor pra você?")).toBe(false);
+      expect(blocoTemFraseProibida("Tenha uma excelente tarde também!")).toBe(false);
     });
   });
 });

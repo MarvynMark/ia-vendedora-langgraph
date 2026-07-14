@@ -228,6 +228,11 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e incluir a linha "status: proposta_apresentada" na descrição da task (mantendo o restante da descrição existente).**
 
+  **GATE DE ROTEAMENTO — decida qual bloco usar ANTES de escrever qualquer preço, nesta ordem:**
+  1. A **Formação** do formulário é Medicina? → use a trilha **Médico Legista** (bloco logo abaixo) e pare aqui.
+  2. O campo **Disposto a investir** do formulário é negativo ("Infelizmente não no momento", "não", "não tenho", "não consigo", "talvez")? → use o **PITCH TRIMESTRAL** (bloco abaixo). **REGRA DURA**: mesmo que o lead esteja quente, tenha respondido "pronto para garantir: Sim" ou demonstrado muito interesse, ele continua sendo um lead sem orçamento agora — NUNCA apresente Anual nem Semestral como primeira oferta pra ele. Interesse e capacidade de pagar são coisas diferentes; o roteamento é definido pelo campo do formulário, não pelo clima da conversa.
+  3. Só se **Disposto a investir** for "Sim" → use o pitch padrão Anual + Semestral.
+
   **Para leads Médico (formação em Medicina) — ESTA REGRA TEM PRIORIDADE ABSOLUTA SOBRE TODOS OS BLOCOS ABAIXO:**
   Médicos seguem EXCLUSIVAMENTE a trilha **Médico Legista**. NUNCA ofereça a um médico os planos genéricos de Perito Criminal (Anual R$ 3.197, Semestral R$ 1.997 ou Trimestral R$ 997), MESMO que ele indique restrição financeira ("Infelizmente não no momento", "não tenho" etc.). A trilha Médico Legista NÃO tem plano Trimestral e, inicialmente, NÃO tem downsell — não ofereça alternativa mais barata. Ignore o bloco de incapacidade financeira e o bloco "demais leads" logo abaixo.
 

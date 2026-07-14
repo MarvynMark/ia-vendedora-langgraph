@@ -360,6 +360,22 @@ export function blocoNarraAcaoInterna(bloco: string): boolean {
   return false;
 }
 
+// Retorna true se o bloco contém uma frase de despedida/robótica explicitamente BANIDA pelo
+// roteiro ("boa sorte", "à disposição", "fica à vontade"). O prompt já as proíbe, mas o LLM às
+// vezes as usa no fim da conversa. Rede de segurança determinística que remove o bloco.
+export function blocoTemFraseProibida(bloco: string): boolean {
+  const b = normalizarTextoMidia(bloco);
+  if (!b) return false;
+  const proibidas = [
+    /\bboa sorte\b/,
+    // "estou/fico à disposição" — ancorado no verbo (o \b não funciona antes de "à", que não é
+    // caractere \w) e evita falso-positivo com "a disposição das questões"
+    /\b(estou|fico|fica|ficamos|estamos|sigo|seguimos)\s+[àa]\s+disposi[çc][ãa]o\b/,
+    /\bfi(ca|que) [àa] vontade\b/, // "fica à vontade", "fique à vontade"
+  ];
+  return proibidas.some((re) => re.test(b));
+}
+
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.
