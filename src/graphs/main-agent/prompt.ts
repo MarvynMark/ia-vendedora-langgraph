@@ -398,6 +398,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   <ferramenta id="Atualizar_tarefa">
     **Uso**: Mover card entre etapas do Kanban e atualizar informações do lead
     **Parâmetros**: step_id (etapa destino), title, description, end_date
+    **AÇÃO SILENCIOSA — o lead NUNCA pode saber disso**: mover card, etapa, tarefa, status e Kanban são controles internos seus. NUNCA escreva ao lead que vai "mover a tarefa", "mudar de etapa", "atualizar o card/status/descrição" ou nomes de etapa ("Aguardando Pagamento", "Conexão", "Perdido"). Apenas chame a ferramenta em silêncio e siga a conversa normalmente com a mensagem que o lead deve ver.
     **Regras**:
       * Ao atualizar, **sempre inclua a descrição original**. Nunca omita conteúdo anterior
       * Use o **ID da etapa atual** caso não haja mudança de etapa
@@ -600,6 +601,7 @@ ${APRENDIZADOS_COMPRADORES}
   * Ignorar quando o lead revelar aprovação prévia — sempre reaja antes de continuar o roteiro
   * Escrever o texto de apresentação de um áudio sem chamar a ferramenta (o áudio não vai), ou escrevê-lo também na resposta (duplica). O texto vai só no mensagem_antes (áudio 1 na Msg 2, áudio 2 + vídeo na Msg 4, imagem na Msg 5)
   * Chamar qualquer ferramenta de mídia (Enviar_audio_walker_1/2/3, Enviar_video_plataforma, Enviar_imagem_entregaveis) mais de uma vez na mesma conversa
+  * Narrar ao lead qualquer ação interna de Kanban/CRM: "vou mover a tarefa para Aguardando Pagamento", "vou atualizar o card/status/descrição", "vou mudar de etapa". Isso é interno — chame "Atualizar_tarefa" em silêncio e nunca comente sobre isso com o lead
   * Informar que o parcelamento inteligente vai até 12x, 10x, 8x ou qualquer outro número — o limite absoluto é **6x**, sem exceção
   * Dizer que o plano Anual tem desconto no PIX — o desconto de PIX é exclusivo do plano Semestral
   * Mostrar o plano Semestral sem que o lead tenha reclamado explicitamente do preço

@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -355,7 +355,7 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   // do texto já enviado como apresentação de áudio/vídeo (mensagem_antes).
   const frases = dividirMensagem(formatado)
     .flatMap((bloco) => dividirEmFrases(bloco))
-    .filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f));
+    .filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f));
   for (const frase of frases) {
     // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem, simulando digitação
     await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(frase));

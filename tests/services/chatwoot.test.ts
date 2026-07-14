@@ -23,6 +23,7 @@ import {
   limparTextosMidia,
   blocoDuplicaMidia,
   blocoNarraEnvioMidia,
+  blocoNarraAcaoInterna,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -359,6 +360,29 @@ describe("chatwoot service", () => {
       // Sem mídia neste turno: "vou te passar o link" (pagamento) deve passar
       expect(blocoNarraEnvioMidia(conv, "Vou te passar o link agora")).toBe(false);
       expect(blocoNarraEnvioMidia(conv, "Vou te mandar agora")).toBe(false);
+    });
+  });
+
+  // Regressão da conversa 4153: a IA verbalizou pro lead a ação interna de Kanban
+  // ("vou mover a tarefa para Aguardando Pagamento" + "E incluir o status na descrição").
+  describe("filtro de narração de ação interna (blocoNarraAcaoInterna)", () => {
+    test("filtra as narrações exatas que vazaram na 4153", () => {
+      expect(blocoNarraAcaoInterna('Antes de prosseguir, vou mover a tarefa para "Aguardando Pagamento"')).toBe(true);
+      expect(blocoNarraAcaoInterna("E incluir o status na descrição")).toBe(true);
+    });
+
+    test("filtra outras variações de operação de CRM", () => {
+      expect(blocoNarraAcaoInterna("Vou atualizar o card com essas informações")).toBe(true);
+      expect(blocoNarraAcaoInterna("Vou te mover para a etapa de Conexão")).toBe(true);
+      expect(blocoNarraAcaoInterna("Deixa eu mudar de etapa aqui")).toBe(true);
+    });
+
+    test("NÃO filtra mensagens legítimas ao lead", () => {
+      expect(blocoNarraAcaoInterna("Vou te passar o link de pagamento agora")).toBe(false);
+      expect(blocoNarraAcaoInterna("Vou te mandar um áudio rapidinho")).toBe(false);
+      expect(blocoNarraAcaoInterna("Vi que sua maior dificuldade é constância")).toBe(false);
+      expect(blocoNarraAcaoInterna("Qual plano se encaixa melhor pra você?")).toBe(false);
+      expect(blocoNarraAcaoInterna("Vou incluir Português e Direito Penal no seu plano de estudos")).toBe(false);
     });
   });
 });

@@ -344,6 +344,22 @@ export function blocoNarraEnvioMidia(idConversa: string | number, bloco: string)
   return citaMidia || soAnuncio;
 }
 
+// Retorna true se o bloco narra ao lead uma AÇÃO INTERNA de Kanban/CRM ("vou mover a tarefa
+// para Aguardando Pagamento", "vou atualizar o status na descrição", "vou mudar de etapa").
+// Mover card / etapa / tarefa / status é controle interno — o lead nunca deve ver isso. O LLM
+// às vezes verbaliza a instrução do Atualizar_tarefa em vez de só chamar a ferramenta. Rede de
+// segurança determinística (independente do prompt).
+export function blocoNarraAcaoInterna(bloco: string): boolean {
+  const b = normalizarTextoMidia(bloco);
+  if (!b) return false;
+  const acao = /\b(mover|movendo|movi|atualiz\w+|incluir|registrar|mudar|mudando)\b/;
+  const objeto = /\b(tarefa|o card|no card|do card|a etapa|de etapa|no kanban|na descri\w+|o status|status na descri\w+)\b/;
+  if (acao.test(b) && objeto.test(b)) return true;
+  // menção ao nome interno da etapa como destino de um movimento
+  if (/\bmov\w+\b/.test(b) && /\b(aguardando pagamento|conex[ãa]o|perdido|novo lead|nutrir)\b/.test(b)) return true;
+  return false;
+}
+
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.
