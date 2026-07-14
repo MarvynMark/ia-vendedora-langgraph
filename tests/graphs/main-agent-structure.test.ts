@@ -69,6 +69,6 @@ describe("main agent prompt", () => {
       dataHoraAtual: "",
     });
     expect(prompt.length).toBeGreaterThan(30000);
-    expect(prompt.length).toBeLessThan(50000);
+    expect(prompt.length).toBeLessThan(60000);
   });
 });

@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
+import { dividirEmFrases } from "../lib/response-formatter.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -35,11 +36,27 @@ interface ContextoEnviarImagem {
 // Envia a imagem de entregáveis para a conversa (com dedupe e fallback em texto).
 // Exportado para ser reutilizado tanto pela tool do LLM quanto pela guarda determinística
 // do grafo principal (garante o envio mesmo quando o LLM narra o envio sem chamar a tool).
-export async function enviarImagemEntregaveis(idConta: string, idConversa: string): Promise<string> {
+export async function enviarImagemEntregaveis(idConta: string, idConversa: string, mensagemAntes?: string): Promise<string> {
   if (conversasComImagemEnviada.has(idConversa)) {
     return "Imagem já enviada nesta conversa.";
   }
   conversasComImagemEnviada.add(idConversa);
+
+  // Envia o texto de apresentação ANTES da imagem (garante a ordem texto -> imagem, que a
+  // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e registra o
+  // texto para o envio do output filtrar qualquer repetição feita pelo LLM.
+  if (mensagemAntes && mensagemAntes.trim()) {
+    try {
+      for (const frase of dividirEmFrases(mensagemAntes)) {
+        await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(frase));
+        await enviarMensagem(idConta, idConversa, frase);
+      }
+      registrarTextoMidia(idConversa, mensagemAntes);
+      await pausaComDigitando(idConta, idConversa, 3000);
+    } catch (e) {
+      logger.warn("tool:enviar-imagem-entregaveis", "Erro ao enviar mensagem antes da imagem:", e);
+    }
+  }
   try {
     logger.info("tool:enviar-imagem-entregaveis", "Baixando imagem de:", IMAGEM_ENTREGAVEIS_URL);
     const res = await fetchComTimeout(IMAGEM_ENTREGAVEIS_URL, { method: "GET", timeout: 30_000 });
@@ -74,12 +91,20 @@ export async function enviarImagemEntregaveis(idConta: string, idConversa: strin
 
 export function criarToolEnviarImagemEntregaveis(contexto: ContextoEnviarImagem) {
   return tool(
-    async () => enviarImagemEntregaveis(contexto.idConta, contexto.idConversa),
+    async ({ mensagem_antes }: { mensagem_antes?: string }) =>
+      enviarImagemEntregaveis(contexto.idConta, contexto.idConversa, mensagem_antes),
     {
       name: "Enviar_imagem_entregaveis",
       description:
-        "Envia a imagem com todos os entregáveis e bônus da mentoria diretamente no WhatsApp do lead. Use no PASSO 1 da Mensagem 5C, antes de fazer a pergunta sobre material de estudo. Não precisa de parâmetros.",
-      schema: z.object({}),
+        "Envia a imagem com todos os entregáveis e bônus da mentoria no WhatsApp do lead. Passe em 'mensagem_antes' a frase que apresenta a imagem; ela é enviada como texto ANTES da imagem, garantindo a ordem. NUNCA escreva esse texto também na resposta (duplica).",
+      schema: z.object({
+        mensagem_antes: z
+          .string()
+          .optional()
+          .describe(
+            "Texto enviado ANTES da imagem, apresentando-a. Ex: 'Então deixa eu te mostrar tudo que tá incluso, vou te mandar uma imagem e já te explico.'",
+          ),
+      }),
     },
   );
 }

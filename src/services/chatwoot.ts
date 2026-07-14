@@ -337,9 +337,9 @@ export function blocoNarraEnvioMidia(idConversa: string | number, bloco: string)
     /\bvou\b.{0,15}\b(mandar|enviar|passar|mostrar)\b/.test(b) ||
     /\bte (mando|envio|mandarei|enviarei)\b/.test(b);
   if (!anunciaEnvio) return false;
-  // Confirma que é narração de MÍDIA: cita áudio/vídeo, ou é um anúncio curto e sem conteúdo
-  // ("vou te mandar agora"). Num turno de mídia, esse tipo de bolha nunca carrega info nova.
-  const citaMidia = /[áa]udio|v[íi]deo/.test(b);
+  // Confirma que é narração de MÍDIA: cita áudio/vídeo/imagem, ou é um anúncio curto e sem
+  // conteúdo ("vou te mandar agora"). Num turno de mídia, esse tipo de bolha nunca carrega info nova.
+  const citaMidia = /[áa]udio|v[íi]deo|imagem/.test(b);
   const soAnuncio = b.split(" ").length <= 6;
   return citaMidia || soAnuncio;
 }

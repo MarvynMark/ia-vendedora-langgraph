@@ -338,9 +338,19 @@ describe("chatwoot service", () => {
       expect(blocoNarraEnvioMidia(conv, "Quer que eu te mostre um vídeo rapidinho de como é a mentoria por dentro?")).toBe(false);
     });
 
-    test("NÃO filtra a introdução longa dos entregáveis", () => {
+    test("filtra a narração da imagem de entregáveis (agora vai via mensagem_antes)", () => {
+      // A intro "vou te mandar uma imagem" agora é enviada pela tool como mensagem_antes;
+      // se o LLM repetir no output, é duplicata e deve ser removida.
       expect(
         blocoNarraEnvioMidia(conv, "Então deixa eu te mostrar tudo que tá incluso, vou te mandar uma imagem e já te explico"),
+      ).toBe(true);
+      expect(blocoNarraEnvioMidia(conv, "Vou te mandar a imagem agora")).toBe(true);
+    });
+
+    test("NÃO filtra reação/pergunta longa sem narração de envio de mídia", () => {
+      // Bloco longo que NÃO narra envio de mídia deve passar, mesmo em turno de mídia.
+      expect(
+        blocoNarraEnvioMidia(conv, "Além do acompanhamento comigo, você tem meu método gravado, encontros ao vivo e a comunidade de mentorados. O que você achou?"),
       ).toBe(false);
     });
 
