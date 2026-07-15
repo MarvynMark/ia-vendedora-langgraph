@@ -273,12 +273,14 @@ async function enviarVideoPlataforma(accountId: number, conversationId: number):
 async function agenteBoasVindas(state: FollowUpStateType) {
   logger.info("follow-up", "iniciando sequência de boas-vindas...");
 
-  const nome = state.title ?? "aluno(a)";
+  // Só o primeiro nome deixa a saudação mais natural (evita "Renan Martins Paludo").
+  // Alinhado aos demais agentes do grafo, que já usam o primeiro nome.
+  const primeiroNome = (state.title ?? "").split(" ")[0] || "aluno(a)";
   const accountId = state.accountId;
   const conversationId = state.conversationId;
 
   // Etapa 1 — Imediato
-  const msg1 = `🚀 ${nome}, parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já foi liberada e agora começa o seu processo rumo à aprovação.`;
+  const msg1 = `🚀 ${primeiroNome}, parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já foi liberada e agora começa o seu processo rumo à aprovação.`;
   try {
     await enviarMensagem(accountId, conversationId, msg1);
     logger.info("follow-up", "boas-vindas etapa 1 enviada");
