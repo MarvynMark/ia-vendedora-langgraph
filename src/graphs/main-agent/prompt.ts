@@ -241,7 +241,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   São 12x de R$ 394 no cartão ou R$ 3.997 à vista no PIX. As vagas dessa turma estão acabando, me confirma que quer garantir a sua que eu já te passo o link pra finalizar agora."
 
   > Se o lead perguntar qual é o material de estudos (ou de qual material/matéria se trata): diga que é o material do Estratégia Concursos.
-  > Se o lead quiser um plano mais longo (ex.: vai prestar o concurso daqui a mais tempo, está no internato): ofereça o Médico Legista Anual — 12x de R$ 591,59 no cartão ou R$ 5.997 à vista no PIX. Nunca o Anual genérico de Perito Criminal.
+  > Se o lead quiser um plano mais longo (ex.: vai prestar o concurso daqui a mais tempo, está no internato): ofereça o Médico Legista Anual — 12x de R$ 641 no cartão ou R$ 6.497,90 à vista no PIX. Nunca o Anual genérico de Perito Criminal.
 
   ---
 
@@ -528,7 +528,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   | Plano           | PIX à vista (já com desconto 10%)   | Parcelado no cartão | Link de pagamento                                        |
   |-----------------|--------------------------------------|---------------------|----------------------------------------------------------|
   | Médico Legista - semestral | R$ 3.997                            | 12x de R$ 394       | https://peritowalker.com.br/medicolegista                |
-  | Médico Legista - anual | R$ 5.997                             | 12x de R$ 591,59       | https://clkdmg.site/pay/black-1-ano-medico-legista-mentoria-vestigium               |
+  | Médico Legista - anual | R$ 6.497,90                          | 12x de R$ 641       | https://clkdmg.site/pay/black-1-ano-medico-legista-mentoria-vestigium               |
   | Anual           | R$ 3.197                             | 12x de R$ 315       | clkdmg.site/pay/mentoria-vestigium-perito-criminal-anual |
   | Semestral       | R$ 1.997                             | 12x de R$ 197       | https://peritowalker.com.br/mentoriaperito               |
   | Trimestral      | R$ 997                               | 12x de R$ 98,35     | https://clkdmg.site/pay/plano-3-meses-mentoria-vestigium |
