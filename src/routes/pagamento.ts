@@ -19,6 +19,8 @@ import { VIDEO_BOAS_VINDAS_URL } from "../tools/enviar-video.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
+import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
+import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 
 const INBOX_ALUNOS_WALKER = 15;
 const DELAY_BOAS_VINDAS_WALKER_MS = 15 * 60 * 1000; // 15 minutos
@@ -149,6 +151,29 @@ export interface PagamentoAprovadoDados {
 // localiza o contato/card no Chatwoot, move para "Ganho", notifica o grupo e
 // dispara as boas-vindas. Reusada por todos os webhooks de pagamento.
 export async function processarPagamentoAprovado(dados: PagamentoAprovadoDados) {
+  // Idempotência: plataformas de pagamento reenviam o mesmo evento de aprovação
+  // (às vezes 2x em poucos segundos). Sem lock, duas execuções concorrentes passam
+  // pela checagem "boas-vindas: enviado" antes de qualquer uma gravar o marcador
+  // (TOCTOU) e o grupo + o aluno recebem a notificação e as boas-vindas em dobro.
+  // tentarAdquirirLock é um UPSERT atômico: só a 1ª execução prossegue; a 2ª aborta.
+  // A chave namespaced ("pagamento:") evita colisão com o lock do agente principal,
+  // que usa o telefone puro como session_id. O marcador "boas-vindas: enviado" no
+  // card segue como backstop para duplicatas sequenciais (após o lock ser liberado).
+  const chaveIdempotencia = montarChaveIdempotenciaPagamento(dados);
+  if (!(await tentarAdquirirLock(chaveIdempotencia))) {
+    logger.info("pagamento", "Webhook de pagamento duplicado ignorado (lock ativo)", { chave: chaveIdempotencia });
+    return;
+  }
+  try {
+    await processarPagamentoAprovadoInterno(dados);
+  } finally {
+    await liberarLock(chaveIdempotencia).catch((e) =>
+      logger.warn("pagamento", "Falha ao liberar lock de idempotência", { chave: chaveIdempotencia, erro: String(e) }),
+    );
+  }
+}
+
+async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) {
   const accountId = Number(env.CHATWOOT_ACCOUNT_ID);
 
   // Localizar contato no Chatwoot — prioriza telefone (múltiplos formatos) e email.
