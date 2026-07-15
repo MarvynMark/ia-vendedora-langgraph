@@ -350,14 +350,29 @@ export function blocoNarraEnvioMidia(idConversa: string | number, bloco: string)
 // às vezes verbaliza a instrução do Atualizar_tarefa em vez de só chamar a ferramenta. Rede de
 // segurança determinística (independente do prompt).
 export function blocoNarraAcaoInterna(bloco: string): boolean {
+  // Nota/resumo em 3ª pessoa sobre o lead vazada como mensagem ("Conversei com Fulana, que está
+  // interessada...", "no caso dela"). "Conversei com <Nome próprio>" = a IA falando do lead para
+  // terceiros. Casa a frase sem ligar pra maiúscula, mas exige que a palavra seguinte comece com
+  // MAIÚSCULA (nome próprio) — distingue de "conversei com o time financeiro".
+  const mConversei = bloco.match(/\bconversei com\s+(\S)/i);
+  if (mConversei && /[A-ZÀ-Ú]/.test(mConversei[1]!)) return true;
   const b = normalizarTextoMidia(bloco);
   if (!b) return false;
+  if (/\bno caso (dela|dele)\b/.test(b)) return true;
   const acao = /\b(mover|movendo|movi|atualiz\w+|incluir|registrar|mudar|mudando)\b/;
   const objeto = /\b(tarefa|o card|no card|do card|a etapa|de etapa|no kanban|na descri\w+|o status|status na descri\w+)\b/;
   if (acao.test(b) && objeto.test(b)) return true;
   // menção ao nome interno da etapa como destino de um movimento
   if (/\bmov\w+\b/.test(b) && /\b(aguardando pagamento|conex[ãa]o|perdido|novo lead|nutrir)\b/.test(b)) return true;
   return false;
+}
+
+// Retorna true se o bloco é (ou contém) o NOME LITERAL de uma ferramenta interna. O LLM às vezes
+// escreve "Enviar_audio_walker_2" como texto em vez de chamar a tool (conversa 4154). Esses nomes
+// com underscore nunca aparecem em conversa real, então basta detectá-los.
+const NOMES_TOOLS = /\b(enviar_audio_walker_\d|enviar_video_plataforma|enviar_imagem_entregaveis|atualizar_tarefa|escalar_humano|reagir_mensagem|buscar_contexto_similar)\b/i;
+export function blocoEhNomeDeTool(bloco: string): boolean {
+  return NOMES_TOOLS.test(bloco);
 }
 
 // Retorna true se o bloco contém uma frase de despedida/robótica explicitamente BANIDA pelo

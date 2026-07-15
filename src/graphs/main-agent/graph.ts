@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -141,6 +141,26 @@ async function garantirMidiaEntregue(
       await enviarAudioWalker(1, idConta, idConversa);
     } catch (e) {
       logger.error("main-agent", "garantirMidiaEntregue (áudio 1) erro:", e);
+    }
+  }
+
+  // O LLM às vezes escreve o NOME da tool de mídia como texto ("Enviar_audio_walker_2") em vez de
+  // chamá-la (conversa 4154), então a mídia nunca chega. Se o nome aparece e a tool não foi
+  // chamada, dispara deterministicamente. O dedupe interno de cada tool evita envio duplicado.
+  const midiasPorNome: Array<[RegExp, string, () => Promise<unknown>]> = [
+    [/enviar_audio_walker_1/, "Enviar_audio_walker_1", () => enviarAudioWalker(1, idConta, idConversa)],
+    [/enviar_audio_walker_2/, "Enviar_audio_walker_2", () => enviarAudioWalker(2, idConta, idConversa)],
+    [/enviar_video_plataforma/, "Enviar_video_plataforma", () => enviarVideoPlataforma(idConta, idConversa)],
+    [/enviar_imagem_entregaveis/, "Enviar_imagem_entregaveis", () => enviarImagemEntregaveis(idConta, idConversa)],
+  ];
+  for (const [re, nome, enviar] of midiasPorNome) {
+    if (re.test(txt) && !toolsChamadas.has(nome)) {
+      logger.warn("main-agent", `Guarda de mídia: nome da tool ${nome} vazou como texto sem chamada — enviando deterministicamente`);
+      try {
+        await enviar();
+      } catch (e) {
+        logger.error("main-agent", `garantirMidiaEntregue (${nome}) erro:`, e);
+      }
     }
   }
 }
@@ -355,7 +375,7 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   // do texto já enviado como apresentação de áudio/vídeo (mensagem_antes).
   const frases = dividirMensagem(formatado)
     .flatMap((bloco) => dividirEmFrases(bloco))
-    .filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f));
+    .filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f));
   for (const frase of frases) {
     // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem, simulando digitação
     await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(frase));

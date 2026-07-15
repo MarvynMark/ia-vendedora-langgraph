@@ -25,6 +25,7 @@ import {
   blocoNarraEnvioMidia,
   blocoNarraAcaoInterna,
   blocoTemFraseProibida,
+  blocoEhNomeDeTool,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -384,6 +385,35 @@ describe("chatwoot service", () => {
       expect(blocoNarraAcaoInterna("Vi que sua maior dificuldade é constância")).toBe(false);
       expect(blocoNarraAcaoInterna("Qual plano se encaixa melhor pra você?")).toBe(false);
       expect(blocoNarraAcaoInterna("Vou incluir Português e Direito Penal no seu plano de estudos")).toBe(false);
+    });
+
+    // Regressão da conversa 4171: nota interna em 3ª pessoa sobre a lead vazada como mensagem.
+    test("filtra nota em 3ª pessoa sobre o lead (4171)", () => {
+      expect(blocoNarraAcaoInterna("Conversei com Mylla, que está interessada na mentoria")).toBe(true);
+      expect(blocoNarraAcaoInterna("Vamos retomar a conversa para ver o que podemos fazer no caso dela")).toBe(true);
+    });
+
+    test("NÃO filtra 'conversei com' sem nome próprio (ex.: financeiro)", () => {
+      expect(blocoNarraAcaoInterna("Conversei com o time financeiro e consegui uma condição")).toBe(false);
+    });
+  });
+
+  // Regressão da conversa 4154: nome literal da tool escrito como mensagem pro lead.
+  describe("filtro de nome de ferramenta (blocoEhNomeDeTool)", () => {
+    test("filtra os nomes de tool que vazaram na 4154", () => {
+      expect(blocoEhNomeDeTool("Enviar_audio_walker_1")).toBe(true);
+      expect(blocoEhNomeDeTool("Enviar_audio_walker_2")).toBe(true);
+    });
+
+    test("filtra outros nomes de tool", () => {
+      expect(blocoEhNomeDeTool("Enviar_video_plataforma")).toBe(true);
+      expect(blocoEhNomeDeTool("Enviar_imagem_entregaveis")).toBe(true);
+      expect(blocoEhNomeDeTool("Atualizar_tarefa")).toBe(true);
+    });
+
+    test("NÃO filtra mensagens legítimas", () => {
+      expect(blocoEhNomeDeTool("Vou te enviar um áudio rapidinho")).toBe(false);
+      expect(blocoEhNomeDeTool("Qual plano se encaixa melhor pra você?")).toBe(false);
     });
   });
 
