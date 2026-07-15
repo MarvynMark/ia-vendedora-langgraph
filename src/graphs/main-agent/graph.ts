@@ -231,7 +231,7 @@ async function executarAgente(state: MainAgentStateType) {
   const model = new ChatOpenAI({
     modelName: env.OPENAI_MODEL,
     openAIApiKey: env.OPENAI_API_KEY,
-    temperature: 0.7,
+    temperature: 0.3,
   });
 
   const agent = createReactAgent({

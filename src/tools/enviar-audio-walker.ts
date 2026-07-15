@@ -105,7 +105,7 @@ const SCHEMA_AUDIO = z.object({
     .string()
     .optional()
     .describe(
-      "Texto curto, personalizado e humano enviado como mensagem ANTES do áudio, apresentando-o de forma natural (use o nome e a dor do lead). Ex: 'Deixa eu te explicar uma coisa sobre isso num áudio rapidinho, [Nome]'. Sempre preencha este campo para o áudio não parecer solto.",
+      "Texto curto que apresenta o áudio, enviado como mensagem ANTES dele. Sempre preencha.",
     ),
 });
 
@@ -116,7 +116,7 @@ export function criarToolEnviarAudioWalker1(contexto: ContextoEnviarAudio) {
     {
       name: "Enviar_audio_walker_1",
       description:
-        "Envia o PRIMEIRO áudio do Perito Walker (sobre falta de direcionamento e método) como nota de voz. Use na qualificação inicial, depois de reagir à dor do lead. Passe em 'mensagem_antes' uma frase pessoal que apresenta o áudio; ela é enviada como texto ANTES do áudio, garantindo a ordem correta.",
+        "Envia o 1º áudio do Perito Walker (falta de direcionamento e método) como nota de voz, na qualificação inicial. 'mensagem_antes' = frase que apresenta o áudio, enviada antes dele.",
       schema: SCHEMA_AUDIO,
     },
   );
@@ -129,7 +129,7 @@ export function criarToolEnviarAudioWalker2(contexto: ContextoEnviarAudio) {
     {
       name: "Enviar_audio_walker_2",
       description:
-        "Envia o SEGUNDO áudio do Perito Walker (como funciona a mentoria por dentro) como nota de voz. Use quando for apresentar a mentoria. Passe em 'mensagem_antes' uma frase pessoal que apresenta o áudio; ela é enviada como texto ANTES do áudio.",
+        "Envia o 2º áudio do Perito Walker (como a mentoria funciona por dentro) como nota de voz, ao apresentar a mentoria. 'mensagem_antes' = frase que apresenta o áudio, enviada antes dele.",
       schema: SCHEMA_AUDIO,
     },
   );

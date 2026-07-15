@@ -36,7 +36,7 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
     },
     {
       name: "Atualizar_tarefa",
-      description: `Use essa ferramenta para atualizar a tarefa.\n\n### IDs etapas\n\n${etapasDescricao}\n\n**USAR ID DA ETAPA ATUAL CASO NÃO HAJA ATUALIZAÇÃO NA ETAPA**\n\n### Descrição\n\nAo adicionar informações na descrição, sempre inclua a descrição original. NUNCA omita a descrição original, a não ser que o objetivo seja remover a informação.`,
+      description: `Atualiza a tarefa (mover etapa, título, descrição, prazo). Ação interna e silenciosa — nunca comente com o lead.\n\nIDs das etapas:\n${etapasDescricao}\nUse o ID da etapa atual se não houver mudança de etapa. Ao editar a descrição, sempre mantenha o conteúdo original.`,
       schema: z.object({
         stepId: z.string().describe("ID da etapa destino no Kanban"),
         title: z.string().describe("Título da tarefa"),
