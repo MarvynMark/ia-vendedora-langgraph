@@ -14,6 +14,7 @@ import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
+import { iniciarVarreduraFilaOrfa } from "./lib/varredura-fila.ts";
 import { verificarNoticias } from "./lib/monitor-noticias.ts";
 import { monitorNoticiasRouter } from "./routes/monitor-noticias.ts";
 import { obterLogs, obterLogsPagamento } from "./lib/webhook-logger.ts";
@@ -58,6 +59,10 @@ setInterval(async () => {
     logger.error("followup-timer", "Erro no job de follow-ups:", e);
   }
 }, 5 * 60_000);
+
+// Job: varredura de fila órfã — recupera atendimentos travados (deploy/crash deixou lock preso e
+// a mensagem do lead órfã na fila). Reprocessa via grafo. Roda a cada 3 minutos.
+iniciarVarreduraFilaOrfa();
 
 // Job: monitorar sites de notícias e alertar sobre "perito criminal"
 if (env.MONITOR_ATIVO) {
