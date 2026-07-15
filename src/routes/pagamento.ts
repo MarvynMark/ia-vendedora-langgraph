@@ -7,6 +7,7 @@ import {
   atualizarKanbanTask,
   buscarKanbanBoard,
   adicionarEtiquetas,
+  removerEtiquetas,
   enviarMensagem,
   reabrirConversa,
   criarConversa,
@@ -326,6 +327,17 @@ export async function processarPagamentoAprovado(dados: PagamentoAprovadoDados) 
     } catch (e) {
       logger.warn("pagamento", "Erro ao adicionar etiqueta mentoria:", e);
     }
+  }
+
+  // Desliga o main agent nesta conversa: com o pagamento confirmado, quem conduz o onboarding é a
+  // sequência determinística de boas-vindas (abaixo) + o time. Sem isso, o agente continuaria
+  // respondendo o lead (ex.: pedindo pra descrever o comprovante) e colidiria com as boas-vindas,
+  // gerando mensagens fora de ordem. O webhook do agente ignora conversas sem "agente-on".
+  try {
+    await removerEtiquetas(accountId, conversaComTask.id, ["agente-on"]);
+    logger.info("pagamento", "Etiqueta 'agente-on' removida (main agent desligado pós-pagamento):", conversaComTask.id);
+  } catch (e) {
+    logger.warn("pagamento", "Erro ao remover etiqueta agente-on:", e);
   }
 
   // Descrição final (já persista no Kanban acima) — usada no invoke do grafo
