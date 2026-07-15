@@ -1,12 +1,15 @@
-// São Paulo é UTC-3 fixo (Brasil aboliu horário de verão em 2019)
+// São Paulo é UTC-3 fixo (Brasil aboliu horário de verão em 2019).
+// Convenção: horário SP = horário UTC + SP_OFFSET_MS (offset negativo).
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 
-const HORA_ABERTURA = 7;
-const HORA_FECHAMENTO = 23;
-const HORA_REABERTURA = 7; // hora para reagendar quando cai fora do intervalo permitido
+// Janela de envio de follow-ups: 9h às 18h (horário de São Paulo), seg-sex.
+const HORA_ABERTURA = 9;
+const HORA_FECHAMENTO = 18;
+const HORA_REABERTURA = 9; // hora para reagendar quando cai fora do intervalo permitido
 
 function getComponentesSP(date: Date): { hora: number; diaSemana: number } {
-  const spTime = new Date(date.getTime() - SP_OFFSET_MS);
+  // Para ler a hora de PAREDE em SP a partir de um instante UTC, soma o offset (negativo).
+  const spTime = new Date(date.getTime() + SP_OFFSET_MS);
   return {
     hora: spTime.getUTCHours(),
     diaSemana: spTime.getUTCDay(), // 0=dom, 6=sab
@@ -19,10 +22,10 @@ function ehFimDeSemana(diaSemana: number): boolean {
 
 /**
  * Dado um momento e um delay em ms, retorna quando a mensagem deve ser
- * enviada respeitando horário comercial (seg-sex, 8h-18h por padrão, fuso SP).
+ * enviada respeitando horário comercial (seg-sex, 9h-18h, fuso SP).
  * Se o alvo cair fora desse intervalo, avança para o próximo dia útil às 9h.
  *
- * @param horaFechamento - hora máxima (padrão 18). Use 20 para follow-ups dentro da janela de 24h.
+ * @param horaFechamento - hora máxima (padrão 18).
  */
 export function proximoHorarioComercial(agora: Date, delayMs: number, horaFechamento = HORA_FECHAMENTO): Date {
   const alvo = new Date(agora.getTime() + delayMs);
@@ -33,8 +36,8 @@ export function proximoHorarioComercial(agora: Date, delayMs: number, horaFecham
     return alvo;
   }
 
-  // Trabalhar em "SP time UTC" para manipular sem conversão de offset a cada passo
-  const spTime = new Date(alvo.getTime() - SP_OFFSET_MS);
+  // Trabalhar na "hora de parede SP" (UTC + offset) para manipular os componentes direto.
+  const spTime = new Date(alvo.getTime() + SP_OFFSET_MS);
 
   if (!ehFimDeSemana(diaSemana) && hora < HORA_ABERTURA) {
     // Antes do expediente: mesmo dia às 9h
@@ -49,6 +52,6 @@ export function proximoHorarioComercial(agora: Date, delayMs: number, horaFecham
     }
   }
 
-  // Converter de volta para UTC real
-  return new Date(spTime.getTime() + SP_OFFSET_MS);
+  // Converter de volta para UTC real (desfaz o offset aplicado).
+  return new Date(spTime.getTime() - SP_OFFSET_MS);
 }

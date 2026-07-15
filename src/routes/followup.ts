@@ -78,13 +78,13 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
   // Calcular due_date conforme a etapa
   let proximaData: Date;
   if (newStepName.includes("novo lead")) {
-    proximaData = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+    proximaData = proximoHorarioComercial(new Date(), 5 * 60 * 1000); // 5 min
   } else if (newStepName.includes("primeira mensagem")) {
     proximaData = proximoHorarioComercial(new Date(), 2 * 60 * 60 * 1000); // 2h
   } else if (newStepName.includes("aguardando pagamento")) {
     proximaData = proximoHorarioComercial(new Date(), 30 * 60 * 1000); // 30 min (igual DELAYS_LEMBRETE_MS[0])
   } else {
-    const d = new Date(); d.setDate(d.getDate() + 1); proximaData = d; // amanhã
+    proximaData = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000); // amanhã
   }
 
   // Ao mover para etapa que inicia nova sequência, zerar o contador de follow-ups

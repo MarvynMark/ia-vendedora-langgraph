@@ -141,7 +141,7 @@ async function agenteFollowup(state: FollowUpStateType) {
     await atualizarKanbanTask(state.accountId, state.taskId, {
       board_step_id: state.idEtapaPerdido || undefined,
       description: atualizarContadorNutrir(state.description ?? "", contador),
-      due_date: new Date(Date.now() + delayEncerramento).toISOString(),
+      due_date: proximoHorarioComercial(new Date(), delayEncerramento).toISOString(),
     });
     return { respostaAgente: "" };
   }
@@ -212,7 +212,7 @@ async function agenteLembrete(state: FollowUpStateType) {
     await atualizarKanbanTask(state.accountId, state.taskId, {
       board_step_id: state.idEtapaPerdido || undefined,
       description: atualizarContadorNutrir(state.description ?? "", contador),
-      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      due_date: proximoHorarioComercial(new Date(), 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
     return { respostaAgente: "" };
   }
@@ -357,7 +357,8 @@ const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup3_urgencia"] as const;
 const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 4 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fora da janela: uma por dia (Dia 1 → Dia 2 → Dia 3), encerramento Dia 4
 const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-const HORA_MAX_FOLLOWUP_JANELA = 23;
+// Follow-ups sempre dentro do horário comercial (9h-18h SP), inclusive dentro da janela de 24h.
+const HORA_MAX_FOLLOWUP_JANELA = 18;
 
 function lerContadorTemplates(description: string): number {
   const match = description.match(/followup-templates:\s*(\d+)/i);
