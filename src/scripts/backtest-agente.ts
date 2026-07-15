@@ -90,12 +90,19 @@ const CENARIOS: Cenario[] = [
     turns: [
       "estou começando agora, mas já estudo pra concurso faz um tempo",
       "sim, sinto isso na hora de estudar",
-      "gostei bastante, muito profissional. só preciso saber os valores",
+      "quero ver sim",
+      "muito boa a plataforma, gostei bastante",
+      "e quais são os valores? não precisa mostrar mais nada, só o valor por favor",
+      "pode mandar o valor à vista e o parcelado",
     ],
     checagens: ({ textos }) => {
       const p: string[] = [];
-      if (contem(textos, /997|98,35|3 meses|trimestral/i) === false) p.push("NÃO ofereceu o Trimestral (R$997) como oferta de entrada");
-      if (contem(textos, /3\.?197|1\.?997|anual|semestral/i)) p.push("Ofereceu Anual/Semestral pra lead sem grana (deveria ser Trimestral)");
+      const trimestral = contem(textos, /98,?35|\b997\b|3 meses/i);
+      const generico = contem(textos, /3\.?197|1\.?997|\b315\b/i);
+      const deuPreco = trimestral || generico;
+      if (!deuPreco) { p.push("(inconclusivo — não chegou a dar preço mesmo após insistência)"); return p; }
+      if (!trimestral) p.push("NÃO ofereceu o Trimestral (R$997) como oferta de entrada");
+      if (generico) p.push("Ofereceu Anual/Semestral pra lead sem grana (deveria ser Trimestral)");
       return p;
     },
   },
