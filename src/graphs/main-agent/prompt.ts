@@ -484,7 +484,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   👤 - Descrição: [status]
   \`\`\`
 
-  **emoji_atendimento**: 🟢 se o lead tem a tag "sim" (humano atende) | 🟣 se tem a tag "nao" (IA atende)
+  **emoji_atendimento**: 🟢 se o lead tem a tag "sim" (disposto a investir) | 🟣 se tem a tag "nao" (não disposto/talvez). Em ambos os casos VOCÊ (IA) conduz o atendimento — nunca diga que vai transferir para um humano.
 
   **concurso**: use o concurso do formulário ou da conversa. Se não souber ainda, escreva "(a confirmar)"
 

@@ -182,10 +182,11 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   if (ehMedico) etiquetas.push("medico");
 
   // sim / nao: disposição para investir
-  // agente-on só é adicionado para quem respondeu "não" — humano atende os que disseram "sim"
+  // agente-on é adicionado para AMBOS (sim e não/talvez) — a IA atende todos os leads novos.
   const disposto = (d.disposto_investir ?? "").toLowerCase();
   if (disposto.includes("sim") || disposto.includes("quero")) {
     etiquetas.push("sim");
+    etiquetas.push("agente-on");
   } else if (disposto.includes("nao") || disposto.includes("não") || disposto.includes("talvez")) {
     etiquetas.push("nao");
     etiquetas.push("agente-on");
