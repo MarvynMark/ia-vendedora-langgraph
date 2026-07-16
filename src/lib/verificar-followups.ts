@@ -74,10 +74,14 @@ export async function verificarFollowupsPendentes() {
           continue;
         }
 
-        // Busca telefone na conversa completa
+        // Busca telefone na conversa completa.
+        // ATENÇÃO: a API do Chatwoot usa o display_id, não o id interno do banco
+        // (conversa.id = id interno; conversa.display_id = id da API). Usar conversa.id aqui
+        // fazia o fetch falhar → telefone vazio → card pulado sem avançar due_date → follow-up preso.
+        const convApiId = conversa.display_id ?? conversa.id;
         let telefone = "";
         try {
-          const conversaCompleta = await buscarConversa(accountId, conversa.id) as {
+          const conversaCompleta = await buscarConversa(accountId, convApiId) as {
             meta?: { sender?: { phone_number?: string } };
             contact?: { phone_number?: string; additional_attributes?: { social_profiles?: { instagram?: string } } };
           };
@@ -122,7 +126,7 @@ export async function verificarFollowupsPendentes() {
               description: task.description ?? "",
               dueDate: task.due_date ?? "",
               telefone,
-              conversationId: conversa.id,
+              conversationId: convApiId,
               inboxId: conversa.inbox.id,
               displayId: conversa.display_id,
               funilSteps: [],

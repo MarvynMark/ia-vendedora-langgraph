@@ -194,9 +194,10 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
         description: task.description ?? "",
         dueDate: task.due_date ?? "",
         telefone,
-        conversationId: conversa.id,
+        // API do Chatwoot usa display_id, não o id interno (com fallback por segurança)
+        conversationId: conversa.display_id ?? conversa.id,
         inboxId: conversa.inbox_id,
-        displayId: conversa.id,
+        displayId: conversa.display_id ?? conversa.id,
         funilSteps: [],
         idEtapaPerdido: 0,
         tipoFollowup,
