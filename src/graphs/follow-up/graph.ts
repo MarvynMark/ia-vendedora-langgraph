@@ -7,6 +7,7 @@ import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, conta
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
 import { VIDEO_BOAS_VINDAS_URL } from "../../tools/enviar-video.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
+import { primeiroNomeSaudacao, substituirNome } from "../../lib/nome.ts";
 import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
@@ -135,7 +136,7 @@ async function agenteFollowup(state: FollowUpStateType) {
   const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
   const dentroJanela = msRestantes > 0;
   const contador = lerContadorNutrir(state.description ?? "");
-  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+  const primeiroNome = primeiroNomeSaudacao(state.title);
   const isPosPreco = /status:\s*proposta_apresentada/i.test(state.description ?? "");
 
   // Seleciona sequência, fallbacks e delays conforme contexto
@@ -149,7 +150,7 @@ async function agenteFollowup(state: FollowUpStateType) {
   // Após N mensagens sem resposta: encerramento → Perdido
   if (contador >= sequencia.length) {
     logger.info("follow-up", `${contador} follow-ups sem resposta — encerrando`);
-    const conteudoEnc = (CONTEUDO_TEMPLATES[nomeEncerramento] ?? "").replace(/\[Nome\]/g, primeiroNome);
+    const conteudoEnc = substituirNome(CONTEUDO_TEMPLATES[nomeEncerramento] ?? "", state.title);
     try {
       if (dentroJanela) {
         await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
@@ -168,7 +169,7 @@ async function agenteFollowup(state: FollowUpStateType) {
 
   const nomeMsg = sequencia[contador]!;
   const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
-  const conteudo = conteudoRaw.replace(/\[Nome\]/g, primeiroNome);
+  const conteudo = substituirNome(conteudoRaw, state.title);
 
   logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${sequencia.length}) — janela: ${dentroJanela}`);
 
@@ -213,12 +214,12 @@ async function agenteLembrete(state: FollowUpStateType) {
   const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
   const dentroJanela = msRestantes > 0;
   const contador = lerContadorNutrir(state.description ?? "");
-  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+  const primeiroNome = primeiroNomeSaudacao(state.title);
 
   // Após 4 lembretes sem resposta: encerramento → Perdido
   if (contador >= SEQUENCIA_LEMBRETE.length) {
     logger.info("follow-up", `${contador} lembretes sem resposta — encerrando`);
-    const conteudoEnc = (CONTEUDO_TEMPLATES["lembrete_encerramento"] ?? "").replace(/\[Nome\]/g, primeiroNome);
+    const conteudoEnc = substituirNome(CONTEUDO_TEMPLATES["lembrete_encerramento"] ?? "", state.title);
     try {
       if (dentroJanela) {
         await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
@@ -237,7 +238,7 @@ async function agenteLembrete(state: FollowUpStateType) {
 
   const nomeMsg = SEQUENCIA_LEMBRETE[contador]!;
   const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
-  const conteudo = conteudoRaw.replace(/\[Nome\]/g, primeiroNome);
+  const conteudo = substituirNome(conteudoRaw, state.title);
 
   logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_LEMBRETE.length}) — janela: ${dentroJanela}`);
 
@@ -293,7 +294,7 @@ async function agenteBoasVindas(state: FollowUpStateType) {
 
   // Só o primeiro nome deixa a saudação mais natural (evita "Renan Martins Paludo").
   // Alinhado aos demais agentes do grafo, que já usam o primeiro nome.
-  const primeiroNome = (state.title ?? "").split(" ")[0] || "aluno(a)";
+  const primeiroNome = primeiroNomeSaudacao(state.title, "aluno(a)");
   const accountId = state.accountId;
   const conversationId = state.conversationId;
 
@@ -393,7 +394,7 @@ function atualizarContadorTemplates(description: string, novoValor: number): str
 
 async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", "executando sequência Primeira mensagem...");
-  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+  const primeiroNome = primeiroNomeSaudacao(state.title);
 
   // Verificar se o lead já respondeu — se sim, para a sequência
   try {
@@ -434,7 +435,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_RECUPERACAO_PM.length}) — janela: ${dentroJanela}`);
 
   // Dentro da janela: mensagem normal (não cobra template). Fora: template aprovado.
-  const conteudo = (CONTEUDO_TEMPLATES[nomeMsg] ?? "").replace(/\[Nome\]/g, primeiroNome);
+  const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
   try {
     if (dentroJanela && conteudo) {
       logger.info("follow-up", `Janela 24h ativa — mensagem normal: ${nomeMsg}`);
@@ -626,7 +627,7 @@ async function enviarMensagemNo(state: FollowUpStateType) {
 
 async function agenteTemplateInicial(state: FollowUpStateType) {
   logger.info("follow-up", "executando template inicial (Novo Lead)...");
-  const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
+  const primeiroNome = primeiroNomeSaudacao(state.title);
 
   const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
 
@@ -645,7 +646,7 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
     logger.warn("follow-up", "Erro ao verificar incoming:", e);
   }
 
-  const conteudo = (CONTEUDO_TEMPLATES["abertura02"] ?? "").replace(/\[Nome\]/g, primeiroNome);
+  const conteudo = substituirNome(CONTEUDO_TEMPLATES["abertura02"] ?? "", state.title);
 
   try {
     if (dentroJanela && conteudo) {

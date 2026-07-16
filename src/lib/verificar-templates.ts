@@ -4,6 +4,7 @@ import { enviarTemplate, enviarMensagem, contarMensagensIncoming, buscarConversa
 import { salvarMensagem } from "../db/memoria.ts";
 import { logger } from "./logger.ts";
 import { CONTEUDO_TEMPLATES } from "./templates.ts";
+import { primeiroNomeSaudacao, substituirNome } from "./nome.ts";
 
 export async function verificarTemplatesPendentes() {
   if (env.MODO_TESTE) {
@@ -49,19 +50,21 @@ export async function verificarTemplatesPendentes() {
         continue;
       }
 
-      // Nenhuma mensagem — envia o template. Busca o primeiro nome do lead para a variável {{1}}.
-      let primeiroNome = "";
+      // Nenhuma mensagem — envia o template. Busca o nome do lead para a variável {{1}}.
+      let nomeContato = "";
       try {
         const conv = await buscarConversa(row.account_id, row.conversation_id) as {
           meta?: { sender?: { name?: string } };
         };
-        primeiroNome = (conv.meta?.sender?.name ?? "").split(" ")[0] ?? "";
+        nomeContato = conv.meta?.sender?.name ?? "";
       } catch (e) {
         logger.warn("template-timer", "Não foi possível obter o nome do lead para o template:", e);
       }
+      // Evita saudação com telefone quando o contato está sem nome (ex.: "Oi 5518997537716").
+      const primeiroNome = primeiroNomeSaudacao(nomeContato);
 
       const templateName = "abertura02";
-      const conteudoTemplate = (CONTEUDO_TEMPLATES[templateName] ?? "").replace(/\[Nome\]/g, primeiroNome);
+      const conteudoTemplate = substituirNome(CONTEUDO_TEMPLATES[templateName] ?? "", nomeContato);
       logger.debug("template-timer", `Enviando template "${templateName}" para conversa ${row.conversation_id}...`);
       await enviarTemplate(row.account_id, row.conversation_id, templateName, conteudoTemplate, { "1": primeiroNome });
       await pool.query(
