@@ -3,7 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
 import { VIDEO_BOAS_VINDAS_URL } from "../../tools/enviar-video.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
@@ -168,20 +168,26 @@ async function agenteFollowup(state: FollowUpStateType) {
   }
 
   const nomeMsg = sequencia[contador]!;
-  const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
-  const conteudo = substituirNome(conteudoRaw, state.title);
+  const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
+  const templateFallback = fallbacks[contador] ?? "encerramento_02";
+  const textoEnviar = dentroJanela ? conteudo : (CONTEUDO_TEMPLATES[templateFallback] ?? "");
 
-  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${sequencia.length}) — janela: ${dentroJanela}`);
+  // Trava anti-duplicata: não reenvia se for idêntico ao último que o agente mandou.
+  const ultimaAgente = await ultimaMensagemAgente(state.accountId, state.conversationId);
+  const ehDuplicata = textoEnviar.trim() !== "" && ultimaAgente.trim() === textoEnviar.trim();
+
+  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${sequencia.length}) — janela: ${dentroJanela}${ehDuplicata ? " — PULADO (idêntico ao último)" : ""}`);
 
   try {
-    if (dentroJanela) {
+    if (ehDuplicata) {
+      // idêntico ao último envio — não reenvia
+    } else if (dentroJanela) {
       await enviarMensagem(state.accountId, state.conversationId, conteudo);
       if (state.telefone) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      const templateFallback = fallbacks[contador] ?? "encerramento_02";
-      await enviarTemplate(state.accountId, state.conversationId, templateFallback, CONTEUDO_TEMPLATES[templateFallback]);
+      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar);
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
@@ -237,20 +243,27 @@ async function agenteLembrete(state: FollowUpStateType) {
   }
 
   const nomeMsg = SEQUENCIA_LEMBRETE[contador]!;
-  const conteudoRaw = CONTEUDO_TEMPLATES[nomeMsg] ?? "";
-  const conteudo = substituirNome(conteudoRaw, state.title);
+  const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
+  const templateFallback = TEMPLATE_FALLBACK_LEMBRETE[contador] ?? "encerramento_02";
+  const textoEnviar = dentroJanela ? conteudo : (CONTEUDO_TEMPLATES[templateFallback] ?? "");
 
-  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_LEMBRETE.length}) — janela: ${dentroJanela}`);
+  // Trava anti-duplicata: se o texto for idêntico ao último que o agente mandou, não reenvia
+  // (evita repetir o mesmo template de fallback em toques consecutivos). Contador avança normal.
+  const ultimaAgente = await ultimaMensagemAgente(state.accountId, state.conversationId);
+  const ehDuplicata = textoEnviar.trim() !== "" && ultimaAgente.trim() === textoEnviar.trim();
+
+  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_LEMBRETE.length}) — janela: ${dentroJanela}${ehDuplicata ? " — PULADO (idêntico ao último)" : ""}`);
 
   try {
-    if (dentroJanela) {
+    if (ehDuplicata) {
+      // idêntico ao último envio — não reenvia
+    } else if (dentroJanela) {
       await enviarMensagem(state.accountId, state.conversationId, conteudo);
       if (state.telefone) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      const templateFallback = TEMPLATE_FALLBACK_LEMBRETE[contador] ?? "encerramento_02";
-      await enviarTemplate(state.accountId, state.conversationId, templateFallback, CONTEUDO_TEMPLATES[templateFallback]);
+      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar);
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);

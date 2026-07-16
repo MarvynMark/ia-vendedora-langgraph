@@ -551,6 +551,26 @@ export async function verificarLeadRespondeuUltimo(
   return ultima.message_type === 0;
 }
 
+// Conteúdo da última mensagem ENVIADA pelo agente (outgoing, type 1) na conversa.
+// Usado para evitar reenviar um follow-up idêntico ao último (ex.: template de fallback
+// repetido em posições consecutivas fora da janela de 24h). Retorna "" se não houver.
+export async function ultimaMensagemAgente(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<string> {
+  try {
+    const data = await listarMensagens(accountId, conversationId) as {
+      payload?: Array<{ message_type: number; content?: string | null; created_at: number }>;
+    };
+    const outs = (data.payload ?? []).filter(m => m.message_type === 1 && (m.content ?? "").trim() !== "");
+    if (outs.length === 0) return "";
+    return outs.sort((a, b) => b.created_at - a.created_at)[0]!.content ?? "";
+  } catch (e) {
+    logger.warn("chatwoot", "ultimaMensagemAgente erro:", e);
+    return "";
+  }
+}
+
 // Verifica se o lead enviou mensagem nas últimas 24h (janela ativa do WhatsApp)
 export async function verificarJanela24h(
   accountId: string | number,
