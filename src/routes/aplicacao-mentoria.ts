@@ -149,7 +149,9 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     contatoId = novoContato.id;
     logger.info("aplicacao", "Contato criado no Chatwoot:", contatoId);
   } else {
-    await atualizarContato(accountId, contatoId, { custom_attributes: atributosFormulario });
+    // atualizarContato já embrulha em { custom_attributes: ... } — passar os atributos CRUS
+    // (embrulhar aqui de novo geraria custom_attributes.custom_attributes, aninhamento duplo).
+    await atualizarContato(accountId, contatoId, atributosFormulario);
     logger.info("aplicacao", "Atributos do contato atualizados:", contatoId);
   }
 
