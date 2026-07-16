@@ -144,8 +144,9 @@ export const webhookRouter = new Elysia()
         `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
       );
 
-      // Para leads de formulário: disparar intro da IA após 2 minutos (apenas "nao" — "sim" é atendido por humano)
-      if (labels.includes("nao") && !labels.includes("sim")) {
+      // Para leads de formulário (sim OU nao): disparar intro da IA após 2 minutos.
+      // A IA atende ambos os grupos — a intro inicia o roteiro do Walker.
+      if (labels.includes("nao") || labels.includes("sim")) {
         logger.info("webhook", "Lead de formulário detectado (sim/nao): agendando intro em 2 minutos");
         const introIdConta = idConta;
         const introIdConversa = idConversa;
@@ -224,11 +225,9 @@ export const webhookRouter = new Elysia()
       return { status: "ignored", reason: "no_agente-on" };
     }
 
-    // Filtro de qualificação: "nao" = IA atende, "sim" = humano atende
-    if (!labels.includes("nao") || labels.includes("sim")) {
-      logger.info("webhook", "Ignorado: label nao ausente ou sim presente — humano está atendendo");
-      return { status: "ignored", reason: "humano_atendendo" };
-    }
+    // (Filtro de qualificação sim/nao REMOVIDO: a IA agora atende AMBOS os grupos.
+    // A ativação é controlada apenas pelo label "agente-on" acima — o humano assume
+    // uma conversa removendo esse label.)
 
     // Modo teste: só processa conversas com "teste-agente"
     if (env.MODO_TESTE && !labels.includes("teste-agente")) {
