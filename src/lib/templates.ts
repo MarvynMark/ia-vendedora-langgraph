@@ -13,12 +13,11 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // → urgência), em vez de só perguntar "cadê você?". Template (janela fechada) ou msg normal (aberta).
   fup1_reforco:
     "Oi [Nome], imagino que a rotina tá corrida.\n\nMas separei um tempo pra ver seu caso e não quero que você perca essa chance. Me dá um oi rapidinho?",
-  // DESATIVADO da sequência (ver SEQUENCIA_RECUPERACAO_PM): cabeçalho de imagem não é
-  // repassado corretamente pelo Chatwoot 4.15.1 (erro Meta #132000). Texto pronto para reativar.
+  // Prova social em TEXTO (sem cabeçalho de imagem — evita o erro Meta #132000 do Chatwoot 4.15.1).
   fup2_prova_social:
-    "Ei [Nome], essa semana tivemos mais alunos aprovando em Perito.\n\nO que eles têm em comum é que começaram com direção, não sozinhos. Ainda dá tempo de você entrar nesse caminho. Quer que eu te mostre como?",
+    "Ei [Nome], essa semana mais alunos meus passaram na frente estudando com direção, não sozinhos.\n\nSeu perfil tem tudo pra entrar nesse caminho. Quer que eu te mostre como?",
   fup3_urgencia:
-    "Olha [Nome], tô organizando minha agenda de análises e não quero deixar seu caso de fora.\n\nSe ainda quer a aprovação como Perito, me manda um \"sim\" que eu priorizo seu direcionamento hoje.",
+    "Olha [Nome], tô fechando minha agenda de análises e não quero deixar seu caso de fora.\n\nSe ainda quer a aprovação como Perito, me manda um \"sim\" que eu priorizo seu direcionamento hoje.",
 
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
@@ -29,8 +28,9 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Sequência de recuperação: Conexão (janela aberta) ---
   // Leads que já conversaram mas pararam de responder
   conexao_followup_1: "Oi [Nome], ficou alguma dúvida sobre o que conversamos? Pode falar sem compromisso",
-  conexao_followup_2: "Ei [Nome], sei que a rotina aperta. Quando tiver 2 minutos, me conta o que ficou pendente",
-  conexao_followup_3: "👀",
+  conexao_followup_2:
+    "Ei [Nome], quem entra na mentoria para de estudar no escuro: tem direção, material e acompanhamento meu. Foi o que virou o jogo pros meus aprovados. Faz sentido pra você?",
+  conexao_followup_3: "Oi [Nome], ainda dá tempo de você entrar nessa turma. Quer que eu te explique o próximo passo?",
   conexao_encerramento:
     "Oi [Nome], vou deixar o espaço livre por aqui. Se decidir avançar com a mentoria, é só me chamar. Sucesso nos estudos!",
 
@@ -42,8 +42,13 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // Acionada quando lead viu o pitch de preço e sumiu (description contém "status: proposta_apresentada")
   pos_preco_followup_1: "Oi [Nome], ficou alguma dúvida sobre o investimento?",
   pos_preco_followup_2:
-    "Ei [Nome], caso o valor tenha pesado, temos o semestral em 12x de R$ 197 também — qual parcela ficaria melhor pra você?",
-  pos_preco_followup_3: "👀",
+    "Ei [Nome], caso o valor tenha pesado, dá pra fazer o semestral em 12x de R$ 197 também — qual parcela ficaria melhor pra você?",
+  pos_preco_followup_3:
+    "Oi [Nome], consigo garantir os bônus pra você ainda hoje se fecharmos por aqui. Quer que eu te mande o link?",
+  // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
+  // não substitui a variável — igual aos demais fallbacks (conexao_duvida, lembrete_acesso...).
+  pos_preco_urgencia:
+    "Oi, vou seguir com os outros atendimentos, mas consigo segurar sua condição até amanhã. Ainda quer garantir sua vaga?",
   pos_preco_encerramento:
     "Oi [Nome], vou deixar o espaço livre. Se quiser retomar quando fizer sentido, é só me chamar",
 
@@ -55,7 +60,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   lembrete_1: "Oi [Nome], o link ainda tá ativo. Ficou com alguma dúvida antes de confirmar?",
   lembrete_2:
     "Ei [Nome], quando confirmar o pagamento já te envio todos os acessos na hora pra você começar ainda hoje",
-  lembrete_3: "👀",
+  lembrete_3: "Oi [Nome], posso deixar tudo pronto pra você começar hoje. Confirma que eu já libero seus acessos?",
   lembrete_urgencia:
     "Oi [Nome], vou liberar sua vaga amanhã se não tiver retorno. Ainda consigo segurar até lá — quer confirmar?",
   lembrete_encerramento:
@@ -85,12 +90,8 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   abertura02: { language: "pt_BR" },
   // Sequência de recuperação criada em English (o texto do corpo é português mesmo)
   fup1_reforco: { language: "en" },
-  // fup2 tem cabeçalho de imagem (prova social visual). A Meta trata a imagem como
-  // parâmetro dinâmico — precisa da URL pública em cada envio (mesma imagem sempre).
-  fup2_prova_social: {
-    language: "en",
-    mediaUrl: "https://s3.stkd.site/arquivosclientes/Vestigium/fup02_antesdepois.png",
-    mediaType: "image",
-  },
+  // fup2 agora é TEXT-ONLY (sem cabeçalho de imagem) — recriar na Meta sem header de mídia
+  // para evitar o erro #132000 do Chatwoot 4.15.1.
+  fup2_prova_social: { language: "en" },
   fup3_urgencia: { language: "en" },
 };

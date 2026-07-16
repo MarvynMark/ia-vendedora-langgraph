@@ -5,11 +5,13 @@ import { proximoHorarioComercial } from "./horario-comercial.ts";
 import { logger } from "./logger.ts";
 
 // Etapas rastreadas: Novo Lead (1), Primeira mensagem (7), Conexao (10), Aguardando Pagamento (8), Nutrir (12)
+// delayMs = quando disparar o 1º toque ao ENTRAR na etapa (fallback p/ cards sem due_date).
+// Deve bater com processarTaskUpdated em routes/followup.ts.
 const STEPS_RASTREADOS = [
   { id: 1,  name: "Novo Lead",            delayMs: 5  * 60 * 1000,            tipoFollowup: "template_inicial"  as const },
-  { id: 7,  name: "Primeira mensagem",    delayMs: 2  * 60 * 60 * 1000,       tipoFollowup: "template_abertura" as const },
-  { id: 10, name: "Conexao",              delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "followup"          as const },
-  { id: 8,  name: "Aguardando Pagamento", delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "lembrete"          as const },
+  { id: 7,  name: "Primeira mensagem",    delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "template_abertura" as const },
+  { id: 10, name: "Conexao",              delayMs: 3  * 60 * 60 * 1000,       tipoFollowup: "followup"          as const },
+  { id: 8,  name: "Aguardando Pagamento", delayMs: 30 * 60 * 1000,            tipoFollowup: "lembrete"          as const },
   { id: 12, name: "Nutrir",               delayMs: 3  * 24 * 60 * 60 * 1000,  tipoFollowup: "nutrir"            as const },
 ];
 

@@ -76,13 +76,16 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
   }
 
   // Calcular due_date conforme a etapa
+  // Delay do 1º toque ao entrar na etapa. Deve bater com STEPS_RASTREADOS em verificar-followups.ts.
   let proximaData: Date;
   if (newStepName.includes("novo lead")) {
     proximaData = proximoHorarioComercial(new Date(), 5 * 60 * 1000); // 5 min
   } else if (newStepName.includes("primeira mensagem")) {
-    proximaData = proximoHorarioComercial(new Date(), 2 * 60 * 60 * 1000); // 2h
+    proximaData = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000); // 1 dia (lead frio, acabou de receber a abertura)
+  } else if (newStepName.includes("conexão") || newStepName.includes("conexao")) {
+    proximaData = proximoHorarioComercial(new Date(), 3 * 60 * 60 * 1000); // 3h (lead morno, parou de responder)
   } else if (newStepName.includes("aguardando pagamento")) {
-    proximaData = proximoHorarioComercial(new Date(), 30 * 60 * 1000); // 30 min (igual DELAYS_LEMBRETE_MS[0])
+    proximaData = proximoHorarioComercial(new Date(), 30 * 60 * 1000); // 30 min (lead quente, link na mão)
   } else {
     proximaData = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000); // amanhã
   }

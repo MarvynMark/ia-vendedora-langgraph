@@ -3,11 +3,15 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, verificarLeadRespondeuUltimo, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
 import { VIDEO_BOAS_VINDAS_URL } from "../../tools/enviar-video.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
-import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
+import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
+
+// Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
+// da janela de 24h (economiza envios pagos à Meta sem parecer spam).
+const MIN_GAP_JANELA_MS = 60 * 60 * 1000; // 1h
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
@@ -27,15 +31,33 @@ async function buscarFunil(state: FollowUpStateType) {
       steps.find(s => s.cancelled)?.id ??
       steps.find(s => s.name.toLowerCase().includes("perdido"))?.id ??
       0;
+    // Etapa de nutrição de longo prazo — destino do encerramento (em vez de Perdido)
+    const idEtapaNutrir =
+      steps.find(s => s.name.toLowerCase().includes("nutrir"))?.id ?? 0;
 
     return {
       funilSteps: steps,
       idEtapaPerdido,
+      idEtapaNutrir,
     };
   } catch (e) {
     logger.error("follow-up", "Erro ao buscar funil:", e);
-    return { funilSteps: [], idEtapaPerdido: 0 };
+    return { funilSteps: [], idEtapaPerdido: 0, idEtapaNutrir: 0 };
   }
+}
+
+// Encerra a sequência de recuperação e move o lead para a esteira de NUTRIÇÃO de longo prazo
+// (não "Perdido", que o cron nem rastreia). Zera o contador para o agenteNutrir começar do
+// primeiro toque (reengajamento) e agenda o primeiro nurturing em 7 dias. Se a etapa "Nutrir"
+// não existir no board, cai para Perdido como antes.
+async function encerrarParaNutrir(state: FollowUpStateType): Promise<void> {
+  const destino = state.idEtapaNutrir || state.idEtapaPerdido || undefined;
+  await atualizarKanbanTask(state.accountId, state.taskId, {
+    board_step_id: destino,
+    description: atualizarContadorNutrir(state.description ?? "", 0),
+    due_date: proximoHorarioComercial(new Date(), 7 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+  logger.info("follow-up", `Encerrado → Nutrir (step ${destino}), contador zerado, próximo nurturing em 7d`);
 }
 
 async function classificar(state: FollowUpStateType) {
@@ -75,22 +97,24 @@ const SEQUENCIA_RECUPERACAO_CONEXAO = [
   "conexao_followup_3",
 ] as const;
 
-// Delays por posição: 3h → 24h → 24h (encerramento 24h depois)
-const DELAYS_CONEXAO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Toque 1 dispara no delay INICIAL da etapa (3h). Depois: toque 2 "espremido" pra dentro
+// da janela grátis (ideal 24h + clamp da janela); toque 3 no Dia 2 (pago); encerramento Dia 4.
+const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
 
-// Quando fora da janela 24h, usa templates personalizados aprovados
-const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "olhinho_followup", "encerramento_02"] as const;
+// Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_duvida", "conexao_duvida"] as const;
 
 // Sequência pós-preço: acionada quando lead viu o pitch e sumiu (description contém "status: proposta_apresentada")
 const SEQUENCIA_POS_PRECO = [
   "pos_preco_followup_1",
   "pos_preco_followup_2",
   "pos_preco_followup_3",
+  "pos_preco_urgencia",
 ] as const;
 
-// Delays pós-preço: 30min → 1h → 24h → 48h (encerramento 72h depois)
-const DELAYS_POS_PRECO_MS = [30 * 60 * 1000, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_duvida", "olhinho_followup", "encerramento_02"] as const;
+// Pós-preço: t1→t2 3h (dentro), t2→t3 espremido (24h+clamp), t3→t4 Dia 2 (pago), t4→enc Dia 3.
+const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_duvida", "pos_preco_duvida", "pos_preco_duvida", "pos_preco_urgencia"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -108,7 +132,8 @@ async function agenteFollowup(state: FollowUpStateType) {
     logger.warn("follow-up", "Erro ao verificar última mensagem:", e);
   }
 
-  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
+  const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
+  const dentroJanela = msRestantes > 0;
   const contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
   const isPosPreco = /status:\s*proposta_apresentada/i.test(state.description ?? "");
@@ -137,12 +162,7 @@ async function agenteFollowup(state: FollowUpStateType) {
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento:", e);
     }
-    const delayEncerramento = isPosPreco ? 72 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
-    await atualizarKanbanTask(state.accountId, state.taskId, {
-      board_step_id: state.idEtapaPerdido || undefined,
-      description: atualizarContadorNutrir(state.description ?? "", contador),
-      due_date: proximoHorarioComercial(new Date(), delayEncerramento).toISOString(),
-    });
+    await encerrarParaNutrir(state);
     return { respostaAgente: "" };
   }
 
@@ -170,26 +190,28 @@ async function agenteFollowup(state: FollowUpStateType) {
   const novoContador = contador + 1;
   const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
   const delayProximo = delays[contador] ?? 24 * 60 * 60 * 1000;
-  const proxima = proximoHorarioComercial(new Date(), delayProximo);
+  const proxima = agendarMaximizandoJanela(new Date(), delayProximo, msRestantes, { minGapMs: MIN_GAP_JANELA_MS });
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,
     due_date: proxima.toISOString(),
   });
-  logger.info("follow-up", `Follow-up ${novoContador}/${sequencia.length} enviado — próximo em ${delayProximo / 60000}min`);
+  logger.info("follow-up", `Follow-up ${novoContador}/${sequencia.length} enviado — próximo: ${proxima.toISOString()} (janela restante: ${Math.round(msRestantes / 60000)}min)`);
 
   return { respostaAgente: "" };
 }
 
 const SEQUENCIA_LEMBRETE = ["lembrete_1", "lembrete_2", "lembrete_3", "lembrete_urgencia"] as const;
-// Delays: 30min → 1h → 24h → 48h (encerramento 48h depois)
-const DELAYS_LEMBRETE_MS = [30 * 60 * 1000, 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
-// Templates aprovados fora da janela 24h
-const TEMPLATE_FALLBACK_LEMBRETE = ["ta_ai", "lembrete_acesso", "olhinho_followup", "lembrete_urgencia_meta"] as const;
+// Toque 1 dispara no delay INICIAL da etapa (30min). Depois: t1→t2 3h (dentro), t2→t3
+// "espremido" pra dentro da janela (24h+clamp), t3→t4 Dia 2 (pago), t4→encerramento Dia 3.
+const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Fallback pago (fora da janela 24h), por posição do contador — reforço de acesso / urgência.
+const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "lembrete_acesso", "lembrete_acesso", "lembrete_urgencia_meta"] as const;
 
 async function agenteLembrete(state: FollowUpStateType) {
   logger.info("follow-up", "executando lembrete pré-configurado...");
 
-  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
+  const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
+  const dentroJanela = msRestantes > 0;
   const contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = (state.title ?? "").split(" ")[0] ?? state.title ?? "";
 
@@ -209,11 +231,7 @@ async function agenteLembrete(state: FollowUpStateType) {
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento lembrete:", e);
     }
-    await atualizarKanbanTask(state.accountId, state.taskId, {
-      board_step_id: state.idEtapaPerdido || undefined,
-      description: atualizarContadorNutrir(state.description ?? "", contador),
-      due_date: proximoHorarioComercial(new Date(), 7 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+    await encerrarParaNutrir(state);
     return { respostaAgente: "" };
   }
 
@@ -241,12 +259,12 @@ async function agenteLembrete(state: FollowUpStateType) {
   const novoContador = contador + 1;
   const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
   const delayProximo = DELAYS_LEMBRETE_MS[contador] ?? 24 * 60 * 60 * 1000;
-  const proxima = proximoHorarioComercial(new Date(), delayProximo);
+  const proxima = agendarMaximizandoJanela(new Date(), delayProximo, msRestantes, { minGapMs: MIN_GAP_JANELA_MS });
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,
     due_date: proxima.toISOString(),
   });
-  logger.info("follow-up", `Lembrete ${novoContador}/${SEQUENCIA_LEMBRETE.length} enviado — próximo em ${delayProximo / 60000}min`);
+  logger.info("follow-up", `Lembrete ${novoContador}/${SEQUENCIA_LEMBRETE.length} enviado — próximo: ${proxima.toISOString()} (janela restante: ${Math.round(msRestantes / 60000)}min)`);
 
   return { respostaAgente: "" };
 }
@@ -346,17 +364,17 @@ async function agenteBoasVindas(state: FollowUpStateType) {
 }
 
 // Sequência de recuperação para leads em "Primeira mensagem" (template inicial já enviado).
-// Cada mensagem traz um ângulo novo (reforço → urgência) em vez de só cobrar resposta.
-// NOTA: fup2_prova_social (prova social) está FORA da sequência porque tem cabeçalho de imagem,
-// que o Chatwoot 4.15.1 não repassa corretamente à Meta (erro #132000). Reativar quando a imagem
-// for removida do template OU o bug do Chatwoot for corrigido (basta re-incluir "fup2_prova_social").
+// 2 toques com ângulo novo: reforço → urgência.
+// NOTA: a prova social (fup2_prova_social) ficou FORA por ora — a versão persuasiva dela usa
+// mídia (imagem/vídeo) no template, que o Chatwoot 4.15.1 não repassa à Meta (bug #13159).
+// Texto pronto em templates.ts pra reativar quando houver caminho de mídia (Cloud API direta).
 const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup3_urgencia"] as const;
 
-// Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual)
-// Dentro da janela 24h: 3 tentativas no mesmo dia (4h→2h→2h max 20h), encerramento 24h depois
-const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 4 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-// Fora da janela: uma por dia (Dia 1 → Dia 2 → Dia 3), encerramento Dia 4
-const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual).
+// Dentro da janela 24h (lead chegou a responder): toques mais próximos, encerramento depois.
+const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Fora da janela (lead frio, quase sempre): reforço → urgência em ~2 dias, encerramento no Dia 3 seguinte.
+const DELAYS_FORA_JANELA_MS = [2 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
 // Follow-ups sempre dentro do horário comercial (9h-18h SP), inclusive dentro da janela de 24h.
 const HORA_MAX_FOLLOWUP_JANELA = 18;
 
@@ -388,10 +406,11 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
     logger.warn("follow-up", "Erro ao verificar mensagens incoming:", e);
   }
 
-  const dentroJanela = await verificarJanela24h(state.accountId, state.conversationId);
+  const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
+  const dentroJanela = msRestantes > 0;
   const contador = lerContadorTemplates(state.description ?? "");
 
-  // Contador >= 3: todas as mensagens enviadas → enviar encerramento e mover para Perdido
+  // Contador >= 3: todas as mensagens enviadas → enviar encerramento e mover para Nutrir
   if (contador >= SEQUENCIA_RECUPERACAO_PM.length) {
     logger.info("follow-up", "Sequência Primeira mensagem esgotada — enviando encerramento");
     const conteudoEnc = CONTEUDO_TEMPLATES["encerramento_02"];
@@ -407,11 +426,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento Primeira mensagem:", e);
     }
-    await atualizarKanbanTask(state.accountId, state.taskId, {
-      board_step_id: state.idEtapaPerdido || undefined,
-      description: atualizarContadorTemplates(state.description ?? "", contador),
-      due_date: undefined,
-    });
+    await encerrarParaNutrir(state);
     return { respostaAgente: "" };
   }
 
@@ -445,7 +460,8 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   // Encerramento (após a última msg da sequência): usa horário padrão 18h. Msgs do mesmo dia: max 20h
   const isEncerramentoAgendado = dentroJanela && contador === SEQUENCIA_RECUPERACAO_PM.length - 1;
   const horaMax = (!isEncerramentoAgendado && dentroJanela) ? HORA_MAX_FOLLOWUP_JANELA : 18;
-  const proximaData = proximoHorarioComercial(new Date(), delayMs, horaMax);
+  // Espreme o próximo toque pra dentro da janela grátis quando possível (economiza template pago).
+  const proximaData = agendarMaximizandoJanela(new Date(), delayMs, msRestantes, { minGapMs: MIN_GAP_JANELA_MS, horaFechamento: horaMax });
 
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,

@@ -55,3 +55,64 @@ export function proximoHorarioComercial(agora: Date, delayMs: number, horaFecham
   // Converter de volta para UTC real (desfaz o offset aplicado).
   return new Date(spTime.getTime() - SP_OFFSET_MS);
 }
+
+/**
+ * Maximiza o uso da janela GRÁTIS de 24h do WhatsApp ao agendar o próximo follow-up.
+ *
+ * A janela de 24h é um prazo fixo (última mensagem do lead + 24h); dentro dela o envio
+ * é gratuito, fora exige template pago da Meta. Dado o delay "ideal" da cadência e quanto
+ * ainda resta da janela (`msRestantesJanela`), decide quando disparar o próximo toque:
+ *
+ * - Sem janela (`msRestantesJanela <= 0`): agenda normal — o toque cairá no template pago.
+ * - Se o toque ideal já cai DENTRO da janela: mantém (já é grátis).
+ * - Se o toque ideal FURARIA a janela: adianta para pouco antes do fechamento (ainda grátis),
+ *   respeitando horário comercial (9h-18h) e um espaçamento mínimo anti-spam (`minGapMs`).
+ * - Se não dá pra enviar grátis a tempo (janela fecha fora do expediente e não sobra
+ *   expediente hoje, ou o espaçamento mínimo não cabe): agenda normal (template pago).
+ */
+export function agendarMaximizandoJanela(
+  agora: Date,
+  delayIdealMs: number,
+  msRestantesJanela: number,
+  opts: { minGapMs?: number; margemMs?: number; horaFechamento?: number } = {},
+): Date {
+  const minGapMs = opts.minGapMs ?? 60 * 60 * 1000; // 1h anti-spam entre toques
+  const margemMs = opts.margemMs ?? 30 * 60 * 1000; // dispara 30min antes de fechar (folga p/ cron)
+  const horaFechamento = opts.horaFechamento ?? HORA_FECHAMENTO;
+
+  const idealDate = proximoHorarioComercial(agora, delayIdealMs, horaFechamento);
+
+  // Sem janela grátis: nada a otimizar, segue o fluxo normal (cai no template pago).
+  if (msRestantesJanela <= 0) return idealDate;
+
+  const fechamento = agora.getTime() + msRestantesJanela;
+
+  // O toque ideal já cai dentro da janela → já é grátis, mantém.
+  if (idealDate.getTime() < fechamento) return idealDate;
+
+  const pisoGap = agora.getTime() + minGapMs;
+
+  // Alvo: último instante útil pouco antes de a janela fechar.
+  const alvo = fechamento - margemMs;
+  if (alvo >= pisoGap) {
+    const { hora, diaSemana } = getComponentesSP(new Date(alvo));
+    if (!ehFimDeSemana(diaSemana) && hora >= HORA_ABERTURA && hora < horaFechamento) {
+      return new Date(alvo);
+    }
+  }
+
+  // Janela fecha fora do expediente. Se ainda estamos em expediente HOJE e a janela só
+  // fecha depois, dispara perto do fim do expediente de hoje (ainda dentro da janela = grátis).
+  const compAgora = getComponentesSP(agora);
+  if (!ehFimDeSemana(compAgora.diaSemana) && compAgora.hora >= HORA_ABERTURA && compAgora.hora < horaFechamento) {
+    const spNow = new Date(agora.getTime() + SP_OFFSET_MS);
+    spNow.setUTCHours(horaFechamento, 0, 0, 0);
+    const fimExpedienteHoje = spNow.getTime() - SP_OFFSET_MS - margemMs;
+    if (fimExpedienteHoje >= pisoGap && fimExpedienteHoje < fechamento) {
+      return new Date(fimExpedienteHoje);
+    }
+  }
+
+  // Não deu pra manter grátis → agenda normal (template pago).
+  return idealDate;
+}

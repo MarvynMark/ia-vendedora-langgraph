@@ -572,6 +572,29 @@ export async function verificarJanela24h(
   }
 }
 
+// Quanto tempo (ms) ainda resta da janela grátis de 24h, a partir da última mensagem
+// do lead. Retorna <= 0 se a janela já fechou ou o lead nunca escreveu (envio exige
+// template pago). Usado para "espremer" follow-ups pra dentro da janela e economizar
+// envios pagos à Meta.
+export async function msRestantesJanela24h(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<number> {
+  try {
+    const data = await listarMensagens(accountId, conversationId) as {
+      payload?: Array<{ message_type: number; created_at: number }>;
+    };
+    const incomings = (data.payload ?? []).filter(m => m.message_type === 0);
+    if (incomings.length === 0) return 0;
+    const ultima = incomings.sort((a, b) => b.created_at - a.created_at)[0]!;
+    const fechamentoMs = (ultima.created_at + 24 * 60 * 60) * 1000;
+    return fechamentoMs - Date.now();
+  } catch (e) {
+    logger.warn("chatwoot", "msRestantesJanela24h erro:", e);
+    return 0;
+  }
+}
+
 export async function criarContato(
   accountId: string | number,
   dados: { name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> },

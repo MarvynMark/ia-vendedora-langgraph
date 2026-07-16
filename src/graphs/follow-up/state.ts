@@ -21,6 +21,7 @@ export const FollowUpState = Annotation.Root({
   // --- Dados do funil ---
   funilSteps: Annotation<Array<{ id: number; name: string; cancelled?: boolean }>>,
   idEtapaPerdido: Annotation<number>,
+  idEtapaNutrir: Annotation<number>,
 
   // --- Classificação ---
   tipoFollowup: Annotation<"followup" | "lembrete" | "boas_vindas" | "template_abertura" | "template_inicial" | "nutrir" | "ignorar">,
