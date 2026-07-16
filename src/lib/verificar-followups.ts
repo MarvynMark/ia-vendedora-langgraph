@@ -66,7 +66,14 @@ export async function verificarFollowupsPendentes() {
           task.conversations?.find(c => c.inbox.id === env.CHATWOOT_INBOX_ID)
           ?? task.conversations?.[0];
         if (!conversa) {
-          logger.warn("followup-timer", `Task ${task.id} sem conversa associada — ignorando`);
+          // Card órfão (sem conversa: card de teste ou conversa removida) — não há como fazer
+          // follow-up. Empurra o due_date pra frente pra parar de re-escanear a cada ciclo do cron.
+          logger.warn("followup-timer", `Task ${task.id} sem conversa associada — adiando 7 dias`);
+          try {
+            await atualizarKanbanTask(accountId, task.id, {
+              due_date: proximoHorarioComercial(new Date(), 7 * 24 * 60 * 60 * 1000).toISOString(),
+            });
+          } catch { /* noop */ }
           continue;
         }
         if (conversa.inbox.id !== env.CHATWOOT_INBOX_ID) {
