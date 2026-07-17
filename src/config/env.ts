@@ -50,6 +50,10 @@ export const env = {
   MONITOR_INTERVALO_MS: Number(process.env["MONITOR_INTERVALO_MS"] ?? "300000"), // 5 minutos
   MONITOR_ATIVO: process.env["MONITOR_ATIVO"] !== "false", // ligado por default
 
+  // Monitor de edital do Cebraspe (consulta a API oficial e avisa o grupo quando o edital sai)
+  MONITOR_EDITAL_INTERVALO_MS: Number(process.env["MONITOR_EDITAL_INTERVALO_MS"] ?? "120000"), // 2 minutos
+  MONITOR_EDITAL_ATIVO: process.env["MONITOR_EDITAL_ATIVO"] !== "false", // ligado por default
+
   // Webhook Vendas da TMB — validação opcional por header (campos "Chave"/"Valor" da config da TMB).
   // Se TMB_WEBHOOK_SECRET estiver vazio, a validação é ignorada (útil no primeiro teste).
   TMB_WEBHOOK_HEADER: (process.env["TMB_WEBHOOK_HEADER"] ?? "x-tmb-token").toLowerCase(),

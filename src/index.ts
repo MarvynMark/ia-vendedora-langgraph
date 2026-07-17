@@ -17,6 +17,8 @@ import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
 import { iniciarVarreduraFilaOrfa } from "./lib/varredura-fila.ts";
 import { verificarNoticias } from "./lib/monitor-noticias.ts";
 import { monitorNoticiasRouter } from "./routes/monitor-noticias.ts";
+import { verificarEditais } from "./lib/monitor-edital.ts";
+import { monitorEditalRouter } from "./routes/monitor-edital.ts";
 import { obterLogs, obterLogsPagamento } from "./lib/webhook-logger.ts";
 
 const app = new Elysia()
@@ -30,6 +32,7 @@ const app = new Elysia()
   .use(aplicacaoRouter)
   .use(dashboardRouter)
   .use(monitorNoticiasRouter)
+  .use(monitorEditalRouter)
   .get("/webhook/logs", ({ query }) => {
     const limite = Math.min(Number(query.limite ?? 50), 100);
     return obterLogs(limite);
@@ -74,6 +77,18 @@ if (env.MONITOR_ATIVO) {
       logger.error("monitor-noticias", "Erro no job de notícias:", e);
     }
   }, env.MONITOR_INTERVALO_MS);
+}
+
+// Job: monitorar a API do Cebraspe e avisar o grupo quando o edital do concurso sair
+if (env.MONITOR_EDITAL_ATIVO) {
+  logger.info("monitor-edital", `Monitor de edital ativo (intervalo ${env.MONITOR_EDITAL_INTERVALO_MS}ms)`);
+  setInterval(async () => {
+    try {
+      await verificarEditais();
+    } catch (e) {
+      logger.error("monitor-edital", "Erro no job de edital:", e);
+    }
+  }, env.MONITOR_EDITAL_INTERVALO_MS);
 }
 
 async function shutdown() {
