@@ -16,6 +16,7 @@ import {
 } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { VIDEO_BOAS_VINDAS_URL } from "../tools/enviar-video.ts";
+import { primeiroNomeSaudacao } from "../lib/nome.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
@@ -401,17 +402,26 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
   }
 
-  // Boas-vindas do Walker (inbox #ALUNOS WALKER) DESATIVADAS temporariamente.
-  // Reativar removendo o comentário abaixo.
-  // void agendarBoasVindasWalker(accountId, contato.id, dados.nome ?? contato.name, contato.custom_attributes ?? {});
-  logger.info("pagamento", "Boas-vindas Walker DESATIVADAS (inbox #ALUNOS WALKER) — não enviando");
+  // Boas-vindas do Walker (inbox #ALUNOS WALKER, número pessoal do Walker), 15 min após o pagamento.
+  void agendarBoasVindasWalker(accountId, contato.id, dados.nome ?? contato.name, contato.custom_attributes ?? {});
+  logger.info("pagamento", "Boas-vindas Walker agendada (inbox #ALUNOS WALKER)");
 }
 
 function detectarGenero(primeiroNome: string): "m" | "f" {
-  // Nomes masculinos comuns que terminam em 'a' — exceções à regra geral
-  const excecoesMasculinas = new Set(["luca", "elias", "tobias", "matias", "thomas", "barba", "sousa"]);
   const nome = primeiroNome.toLowerCase().trim();
-  return (nome.endsWith("a") && !excecoesMasculinas.has(nome)) ? "f" : "m";
+  // Nomes femininos que NÃO terminam em 'a' (senão cairiam como masculino por engano)
+  const femininas = new Set([
+    "beatriz", "raquel", "ester", "esther", "isabel", "miriam", "míriam", "ruth", "rachel", "íris", "iris",
+    "inês", "ines", "mercedes", "lourdes", "solange", "denise", "elaine", "simone", "ivone", "viviane",
+    "luciane", "eliane", "cristiane", "adriane", "rosane", "josiane", "gabriele", "michele", "daniele",
+    "caroline", "evelyn", "kelly", "jaqueline", "jacqueline", "nicole", "helen", "hellen", "karen", "karin",
+    "liz", "mel", "flor",
+  ]);
+  // Nomes masculinos que terminam em 'a' — exceções à regra geral
+  const masculinas = new Set(["luca", "elias", "tobias", "matias", "thomas", "barba", "sousa", "josua", "noa"]);
+  if (femininas.has(nome)) return "f";
+  if (masculinas.has(nome)) return "m";
+  return nome.endsWith("a") ? "f" : "m";
 }
 
 async function agendarBoasVindasWalker(
@@ -438,16 +448,19 @@ async function agendarBoasVindasWalker(
     return;
   }
 
-  const primeiroNome = nomeAluno.split(" ")[0] ?? nomeAluno;
+  // Nome blindado: nunca usa telefone/wa_id como nome (helper primeiroNomeSaudacao).
+  const primeiroNome = primeiroNomeSaudacao(nomeAluno);
   const genero = detectarGenero(primeiroNome);
   const isMedico = String(customAttributes.qual_formacao ?? "").toLowerCase().includes("medicina");
-  const tratamento = isMedico ? (genero === "f" ? "Dra. " : "Dr. ") : "";
-  const nomeFormatado = `${tratamento}${primeiroNome}`;
-  const teloTela = genero === "f" ? "tê-la" : "tê-lo";
+  // Dr./Dra. só para médicos E só quando há nome válido.
+  const tratamento = (isMedico && primeiroNome) ? (genero === "f" ? "Dra. " : "Dr. ") : "";
+  const nomeFormatado = primeiroNome ? `${tratamento}${primeiroNome}` : "";
+  // Com nome: "Oi Maria!" / "Oi Dr. João!"; sem nome válido: "Oi!"
+  const saudacao = nomeFormatado ? `Oi ${nomeFormatado}!` : "Oi!";
 
   // Mensagem 1
   try {
-    await enviarMensagem(accountId, conversationId, `Olá, ${nomeFormatado}, tudo bem?\n\nProfessor Walker por aqui!`);
+    await enviarMensagem(accountId, conversationId, `${saudacao} É o Walker de novo, agora te falando do meu número pessoal. É por aqui que vou te acompanhar mais de perto agora que você tá oficialmente na mentoria.`);
     logger.info("pagamento", "Walker boas-vindas msg 1 enviada");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar msg 1 Walker:", e);
@@ -457,7 +470,7 @@ async function agendarBoasVindasWalker(
 
   // Mensagem 2
   try {
-    await enviarMensagem(accountId, conversationId, `Passando para desejar as boas-vindas na mentoria Vestigium!\n\nOlha, é um prazer enorme ${teloTela} aqui, rumo à sua aprovação de uma forma mais eficiente e também mais otimizada.`);
+    await enviarMensagem(accountId, conversationId, `Quero te dar as boas-vindas de verdade à Vestigium. Fico muito feliz de ter você comigo nessa caminhada rumo à sua aprovação. 🚀`);
     logger.info("pagamento", "Walker boas-vindas msg 2 enviada");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar msg 2 Walker:", e);
@@ -467,7 +480,7 @@ async function agendarBoasVindasWalker(
 
   // Mensagem 3
   try {
-    await enviarMensagem(accountId, conversationId, `Pra gente começar da melhor maneira possível, até porque a mentoria Vestigium é um acompanhamento bem de perto, vou enviar aqui agora um vídeo falando sobre três recados importantes nesse seu início na mentoria.\n\nEntão assista, aplique e, o que precisar, pode contar comigo, tá bom? 😊`);
+    await enviarMensagem(accountId, conversationId, `Pra gente começar com o pé direito, gravei um vídeo rápido com 3 recados importantes desse seu início na mentoria. Assiste com calma e, o que precisar, é só me chamar por aqui, combinado?`);
     logger.info("pagamento", "Walker boas-vindas msg 3 enviada");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar msg 3 Walker:", e);
