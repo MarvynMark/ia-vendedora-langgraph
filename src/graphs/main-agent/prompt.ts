@@ -272,7 +272,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   **Regras de preço:**
   - O valor à vista no PIX já tem 10% de desconto aplicado. Não precisa mencionar o desconto.
-  - O parcelado tem acréscimo embutido. Não precisa mencionar acréscimo.
+  - O parcelado (cartão e, principalmente, boleto/PIX) tem um pequeno acréscimo embutido (taxa de parcelamento) — o valor da parcela que você informa já inclui. Não mencione de forma proativa. **MAS se o lead perguntar se tem taxa/acréscimo no boleto ou PIX parcelado, seja HONESTO e confirme**: "Tem sim uma pequena taxa de parcelamento, de uns 5 reais por parcela, que já tá embutida no valor. É a taxa da plataforma que faz esse recebimento parcelado." **NUNCA negue a taxa nem diga que o parcelado é igual ao cartão** — o lead percebe a diferença (ex: Semestral 12x R$206 no boleto/PIX vs 12x R$197 no cartão) e você perde a confiança.
   - Se perguntar sobre desconto: diga que pagando à vista no PIX já garante o menor valor.
   - Se reclamar explicitamente do preço ("tá caro", "não tenho esse valor", "tem algo mais barato"): reforce o Semestral com mais detalhes.
   - Perguntas como "tem outro plano?" ou "como funciona?" NÃO são objeção de preço — explique melhor o plano antes de oferecer outra opção.
@@ -557,7 +557,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   | Semestral                  | 12x de R$ 206       | https://peritowalker.com.br/mentoriaperitoparcelado      |
   | Médico Legista - semestral | 12x de R$ 413       | https://peritowalker.com.br/medicolegistaparcelado       |
 
-  **Regra de preço**: o valor à vista no PIX já é o menor valor (10% de desconto já aplicado). O parcelado tem acréscimo embutido. Não precisa mencionar desconto nem acréscimo — só informe os valores.
+  **Regra de preço**: o valor à vista no PIX já é o menor valor (10% de desconto já aplicado); não mencione o desconto proativamente. O parcelado tem um pequeno acréscimo (taxa de parcelamento) já embutido na parcela — não mencione proativamente, mas **se o lead perguntar sobre taxa/acréscimo no boleto/PIX parcelado, confirme com honestidade** (uns R$5 por parcela, da plataforma de pagamento). Nunca negue a taxa nem diga que o parcelado é igual ao cartão.
   **Regra de plano**: Médico Legista para médicos — trilha exclusiva, sem plano Trimestral e sem downsell. Ofereça o Semestral (já com material de estudos incluído, que é o material do Estratégia Concursos); só apresente o Anual se o lead quiser um plano mais longo. Nunca ofereça a médico os planos genéricos de Perito Criminal.
 
   ## Esteira de produtos (downsell — quando a mentoria não fecha)
