@@ -73,26 +73,24 @@ function ehVlibras(arq: ArquivoEdital): boolean {
 function montarMensagem(evento: EventoDetalhe, identificador: string, novos: ArquivoEdital[]): string {
   const nome = evento.eventoNomeCompleto ?? identificador;
   const linhasDocs = novos
-    .map(a => `📄 ${a.descricaoArquivo ?? "Edital"}\n${urlArquivo(identificador, a)}`)
+    .map(a => `📄 *${a.descricaoArquivo ?? "Edital"}*\n👉 ${urlArquivo(identificador, a)}`)
     .join("\n\n");
 
-  const infos: string[] = [];
-  if (evento.eventoTotalVagas) infos.push(`Vagas: ${evento.eventoTotalVagas}`);
-  if (evento.strEventoSalarioMaximo) infos.push(`Remuneração: até ${evento.strEventoSalarioMaximo}`);
-  const linhaInfos = infos.join("  |  ");
-
   return [
-    `🚨📢 EDITAL PUBLICADO — ${nome}`,
+    "🚨🚨🚨 *SAIU O EDITAL!* 🚨🚨🚨",
+    "",
+    `📢 *${nome}*`,
+    "",
+    evento.eventoTotalVagas ? `🎯 Vagas: *${evento.eventoTotalVagas}*` : "",
+    evento.strEventoSalarioMaximo ? `💰 Remuneração: até *${evento.strEventoSalarioMaximo}*` : "",
+    evento.periodoInscricao ? `📅 Inscrições: ${evento.periodoInscricao}` : "",
     "",
     linhasDocs,
     "",
-    linhaInfos,
-    evento.periodoInscricao ? `Inscrições: ${evento.periodoInscricao}` : "",
-    "",
-    `Página: ${PAGINA_BASE}/${identificador}`,
+    `🔗 Página oficial: ${PAGINA_BASE}/${identificador}`,
   ]
     .join("\n")
-    .replace(/\n{3,}/g, "\n\n") // colapsa quebras extras (ex.: sem linha de infos)
+    .replace(/\n{3,}/g, "\n\n") // colapsa quebras extras (ex.: sem linha de vagas/salário)
     .trim();
 }
 
