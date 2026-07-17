@@ -524,4 +524,13 @@ async function agendarBoasVindasWalker(
       await enviarMensagem(accountId, conversationId, `Acesse diretamente por esse link:\n${VIDEO_BOAS_VINDAS_URL}`);
     } catch {}
   }
+
+  // Avisa o grupo que a boas-vindas do Walker foi enviada (mesmo canal do aviso de novo aluno).
+  try {
+    await enviarMensagem(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID, `✅ Boas-vindas do Walker enviada para: ${nomeAluno}`);
+    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
+    logger.info("pagamento", "Aviso de boas-vindas Walker enviado ao grupo");
+  } catch (e) {
+    logger.warn("pagamento", "Falha ao avisar grupo sobre boas-vindas Walker:", e);
+  }
 }
