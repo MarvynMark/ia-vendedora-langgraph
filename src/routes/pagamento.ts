@@ -12,22 +12,14 @@ import {
   reabrirConversa,
   criarConversa,
   criarKanbanTask,
-  enviarArquivo,
 } from "../services/chatwoot.ts";
-import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
-import { VIDEO_BOAS_VINDAS_URL } from "../tools/enviar-video.ts";
-import { primeiroNomeSaudacao } from "../lib/nome.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
+import { agendarBoasVindasWalker } from "../lib/boas-vindas-walker.ts";
 
-const INBOX_ALUNOS_WALKER = 15;
-const DELAY_BOAS_VINDAS_WALKER_MS = 15 * 60 * 1000; // 15 minutos
-const DELAY_ENTRE_MSGS_MS = 30_000; // 30 segundos (ritmo de quem está digitando)
-// URL permanente MinIO — não usar pre-signed URLs (expiram em horas)
-const VIDEO_BOAS_VINDAS_WALKER_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fvideo-walker-boas-vindas-novo-aluno.mp4";
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
 async function obterGrafoFollowup() {
@@ -402,152 +394,8 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
   }
 
-  // Boas-vindas do Walker (inbox #ALUNOS WALKER, número pessoal do Walker), 15 min após o pagamento.
-  void agendarBoasVindasWalker(accountId, contato.id, dados.nome ?? contato.name, contato.custom_attributes ?? {});
-  logger.info("pagamento", "Boas-vindas Walker agendada (inbox #ALUNOS WALKER)");
+  // Boas-vindas do Walker (inbox #ALUNOS WALKER): agenda no BANCO (+15min); o cron dispara dentro
+  // da janela 08h-20h. Persistido pra sobreviver a reinícios/deploys (não é mais setTimeout).
+  await agendarBoasVindasWalker(accountId, contato.id, dados.nome ?? contato.name, contato.custom_attributes ?? {});
 }
 
-function detectarGenero(primeiroNome: string): "m" | "f" | "?" {
-  const nome = primeiroNome.toLowerCase().trim();
-  if (!nome) return "?";
-  // Nomes femininos que NÃO terminam em 'a' (senão cairiam como masculino por engano)
-  const femininas = new Set([
-    "beatriz", "raquel", "ester", "esther", "isabel", "isabelle", "miriam", "míriam", "ruth", "rachel",
-    "íris", "iris", "inês", "ines", "mercedes", "lourdes", "solange", "denise", "elaine", "simone", "ivone",
-    "viviane", "luciane", "eliane", "cristiane", "adriane", "ariane", "fabiane", "juliane", "tatiane",
-    "rosane", "roseane", "silvane", "susane", "josiane", "gabriele", "michele", "daniele", "caroline",
-    "alice", "dulce", "meire", "eloíse", "heloíse", "sarah", "abigail", "jael", "sol",
-    // terminados em y/i (femininos comuns no BR)
-    "marjory", "kelly", "nataly", "sthefany", "emily", "hanny", "mary", "gaby", "any", "dany", "fanny",
-    "jenny", "sthefani", "kamili", "emilli", "jheni", "evelyn", "jaqueline", "jacqueline", "nicole",
-    "helen", "hellen", "karen", "karin", "liz", "mel", "flor",
-  ]);
-  // Nomes masculinos que terminam em 'a' — exceções à regra geral
-  const masculinas = new Set(["luca", "elias", "tobias", "matias", "thomas", "barba", "sousa", "josua", "noa"]);
-  if (femininas.has(nome)) return "f";
-  if (masculinas.has(nome)) return "m";
-  if (nome.endsWith("a")) return "f";   // terminado em "a" → feminino confiável no BR
-  if (nome.endsWith("o")) return "m";   // terminado em "o" → masculino confiável no BR
-  return "?";                           // e/i/y/consoante fora das listas → incerto: NÃO arriscar Dr./Dra.
-}
-
-// Se o momento atual estiver fora da janela 08h-20h (horário de São Paulo), espera até as 08h.
-// Evita mandar a boas-vindas do Walker de madrugada.
-async function esperarJanela0820(): Promise<void> {
-  const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
-  const agoraSP = new Date(Date.now() + SP_OFFSET_MS);
-  const hora = agoraSP.getUTCHours();
-  if (hora >= 8 && hora < 20) return; // dentro da janela
-  const alvo = new Date(agoraSP);
-  if (hora >= 20) alvo.setUTCDate(alvo.getUTCDate() + 1); // depois das 20h → 08h de amanhã
-  alvo.setUTCHours(8, 0, 0, 0);
-  const espera = alvo.getTime() - agoraSP.getTime();
-  logger.info("pagamento", `Boas-vindas Walker fora da janela 08-20 — aguardando ${Math.round(espera / 60000)}min até as 08h`);
-  await new Promise(r => setTimeout(r, espera));
-}
-
-async function agendarBoasVindasWalker(
-  accountId: number,
-  contatoId: number,
-  nomeAluno: string,
-  customAttributes: Record<string, unknown> = {},
-) {
-  await new Promise(r => setTimeout(r, DELAY_BOAS_VINDAS_WALKER_MS));
-  // Só envia entre 08h e 20h (SP); se cair fora, espera até as 08h.
-  await esperarJanela0820();
-
-  logger.info("pagamento", "Enviando boas-vindas do Walker pelo inbox #ALUNOS WALKER para:", nomeAluno);
-
-  // Buscar ou criar conversa no inbox ALUNOS WALKER
-  let conversationId: number;
-  try {
-    const conversa = await criarConversa(accountId, {
-      inbox_id: INBOX_ALUNOS_WALKER,
-      contact_id: contatoId,
-    });
-    conversationId = conversa.id;
-    logger.info("pagamento", "Conversa criada no inbox ALUNOS WALKER:", conversationId);
-  } catch (e) {
-    logger.error("pagamento", "Erro ao criar conversa no inbox ALUNOS WALKER:", e);
-    return;
-  }
-
-  // Nome blindado: nunca usa telefone/wa_id como nome (helper primeiroNomeSaudacao).
-  const primeiroNome = primeiroNomeSaudacao(nomeAluno);
-  const genero = detectarGenero(primeiroNome);
-  const isMedico = String(customAttributes.qual_formacao ?? "").toLowerCase().includes("medicina");
-  // Dr./Dra. só para médicos, com nome válido E gênero CERTO. Na dúvida ("?"), não arrisca.
-  const tratamento = (isMedico && primeiroNome && genero !== "?") ? (genero === "f" ? "Dra. " : "Dr. ") : "";
-  const nomeFormatado = primeiroNome ? `${tratamento}${primeiroNome}` : "";
-  // Com nome: "Oi Maria!" / "Oi Dr. João!"; sem nome válido: "Oi!"
-  const saudacao = nomeFormatado ? `Oi ${nomeFormatado}!` : "Oi!";
-
-  // Mensagem 1
-  try {
-    await enviarMensagem(accountId, conversationId, `${saudacao} É o Walker de novo, agora te falando do meu número pessoal. É por aqui que vou te acompanhar mais de perto agora que você tá oficialmente na mentoria.`);
-    logger.info("pagamento", "Walker boas-vindas msg 1 enviada");
-  } catch (e) {
-    logger.error("pagamento", "Erro ao enviar msg 1 Walker:", e);
-  }
-
-  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
-
-  // Mensagem 2
-  try {
-    await enviarMensagem(accountId, conversationId, `Quero te dar as boas-vindas de verdade à Vestigium. Fico muito feliz de ter você comigo nessa caminhada rumo à sua aprovação. 🚀`);
-    logger.info("pagamento", "Walker boas-vindas msg 2 enviada");
-  } catch (e) {
-    logger.error("pagamento", "Erro ao enviar msg 2 Walker:", e);
-  }
-
-  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
-
-  // Mensagem 3
-  try {
-    await enviarMensagem(accountId, conversationId, `Pra gente começar com o pé direito, gravei um vídeo rápido com 3 recados importantes desse seu início na mentoria. Assiste com calma e, o que precisar, é só me chamar por aqui, combinado?`);
-    logger.info("pagamento", "Walker boas-vindas msg 3 enviada");
-  } catch (e) {
-    logger.error("pagamento", "Erro ao enviar msg 3 Walker:", e);
-  }
-
-  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
-
-  // Mensagem 4 — vídeo do celular do Walker
-  try {
-    const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_WALKER_URL, { method: "GET", timeout: 60_000 });
-    if (!res.ok) throw new Error(`Download do vídeo falhou: ${res.status}`);
-    const buffer = await res.arrayBuffer();
-    await enviarArquivo(accountId, conversationId, new Uint8Array(buffer), "video-walker-boas-vindas.mp4", "video/mp4");
-    logger.info("pagamento", "Walker boas-vindas vídeo enviado");
-  } catch (e) {
-    logger.error("pagamento", "Erro ao enviar vídeo Walker boas-vindas:", e);
-    try {
-      await enviarMensagem(accountId, conversationId, `Acesse diretamente por esse link:\n${VIDEO_BOAS_VINDAS_WALKER_URL}`);
-    } catch {}
-  }
-
-  await new Promise(r => setTimeout(r, DELAY_ENTRE_MSGS_MS));
-
-  // Mensagem 5 — vídeo de onboarding da plataforma
-  try {
-    const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_URL, { method: "GET", timeout: 60_000 });
-    if (!res.ok) throw new Error(`Download do vídeo de onboarding falhou: ${res.status}`);
-    const buffer = await res.arrayBuffer();
-    await enviarArquivo(accountId, conversationId, new Uint8Array(buffer), "onboarding-plataforma.mp4", "video/mp4");
-    logger.info("pagamento", "Vídeo de onboarding da plataforma enviado");
-  } catch (e) {
-    logger.error("pagamento", "Erro ao enviar vídeo de onboarding da plataforma:", e);
-    try {
-      await enviarMensagem(accountId, conversationId, `Acesse diretamente por esse link:\n${VIDEO_BOAS_VINDAS_URL}`);
-    } catch {}
-  }
-
-  // Avisa o grupo que a boas-vindas do Walker foi enviada (mesmo canal do aviso de novo aluno).
-  try {
-    await enviarMensagem(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID, `✅ Boas-vindas do Walker enviada para: ${nomeAluno}`);
-    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
-    logger.info("pagamento", "Aviso de boas-vindas Walker enviado ao grupo");
-  } catch (e) {
-    logger.warn("pagamento", "Falha ao avisar grupo sobre boas-vindas Walker:", e);
-  }
-}
