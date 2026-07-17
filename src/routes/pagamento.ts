@@ -407,8 +407,9 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
   logger.info("pagamento", "Boas-vindas Walker agendada (inbox #ALUNOS WALKER)");
 }
 
-function detectarGenero(primeiroNome: string): "m" | "f" {
+function detectarGenero(primeiroNome: string): "m" | "f" | "?" {
   const nome = primeiroNome.toLowerCase().trim();
+  if (!nome) return "?";
   // Nomes femininos que NÃO terminam em 'a' (senão cairiam como masculino por engano)
   const femininas = new Set([
     "beatriz", "raquel", "ester", "esther", "isabel", "isabelle", "miriam", "míriam", "ruth", "rachel",
@@ -425,7 +426,9 @@ function detectarGenero(primeiroNome: string): "m" | "f" {
   const masculinas = new Set(["luca", "elias", "tobias", "matias", "thomas", "barba", "sousa", "josua", "noa"]);
   if (femininas.has(nome)) return "f";
   if (masculinas.has(nome)) return "m";
-  return nome.endsWith("a") ? "f" : "m";
+  if (nome.endsWith("a")) return "f";   // terminado em "a" → feminino confiável no BR
+  if (nome.endsWith("o")) return "m";   // terminado em "o" → masculino confiável no BR
+  return "?";                           // e/i/y/consoante fora das listas → incerto: NÃO arriscar Dr./Dra.
 }
 
 async function agendarBoasVindasWalker(
@@ -456,8 +459,8 @@ async function agendarBoasVindasWalker(
   const primeiroNome = primeiroNomeSaudacao(nomeAluno);
   const genero = detectarGenero(primeiroNome);
   const isMedico = String(customAttributes.qual_formacao ?? "").toLowerCase().includes("medicina");
-  // Dr./Dra. só para médicos E só quando há nome válido.
-  const tratamento = (isMedico && primeiroNome) ? (genero === "f" ? "Dra. " : "Dr. ") : "";
+  // Dr./Dra. só para médicos, com nome válido E gênero CERTO. Na dúvida ("?"), não arrisca.
+  const tratamento = (isMedico && primeiroNome && genero !== "?") ? (genero === "f" ? "Dra. " : "Dr. ") : "";
   const nomeFormatado = primeiroNome ? `${tratamento}${primeiroNome}` : "";
   // Com nome: "Oi Maria!" / "Oi Dr. João!"; sem nome válido: "Oi!"
   const saudacao = nomeFormatado ? `Oi ${nomeFormatado}!` : "Oi!";
