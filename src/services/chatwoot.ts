@@ -524,17 +524,30 @@ export async function enviarTemplate(
   return result;
 }
 
+// Palavras do gatilho de "grupo de espera" (mensagem inicial de anúncio, NÃO uma resposta real).
+const GRUPO_ESPERA_KEYWORDS_MSG = ["grupo de espera", "grupo de espero", "acesso ao grupo", "entrar no grupo"];
+
 export async function contarMensagensIncoming(
   accountId: string | number,
   conversationId: string | number,
+  opts?: { ignorarGrupoEspera?: boolean },
 ): Promise<number> {
   const data = await listarMensagens(accountId, conversationId) as {
-    payload?: Array<{ message_type: number; content_attributes?: { deleted?: boolean } }>;
+    payload?: Array<{ message_type: number; content?: string | null; content_attributes?: { deleted?: boolean } }>;
   };
   const msgs = data.payload ?? [];
-  // Ignora mensagens excluídas (soft-delete do Chatwoot): uma mensagem apagada não
-  // conta como resposta do lead e não deve bloquear o disparo do template de abertura.
-  return msgs.filter(m => m.message_type === 0 && m.content_attributes?.deleted !== true).length;
+  return msgs.filter(m => {
+    if (m.message_type !== 0) return false;
+    // Ignora mensagens excluídas (soft-delete do Chatwoot).
+    if (m.content_attributes?.deleted === true) return false;
+    // Ignora o "quero acesso ao grupo de espera": é o gatilho do anúncio, não resposta do lead.
+    // Sem isso, TODO lead de anúncio conta como "já respondeu" e a sequência de follow-up nunca dispara.
+    if (opts?.ignorarGrupoEspera) {
+      const c = (m.content ?? "").toLowerCase();
+      if (GRUPO_ESPERA_KEYWORDS_MSG.some(k => c.includes(k))) return false;
+    }
+    return true;
+  }).length;
 }
 
 // Retorna true se a última mensagem real da conversa foi do lead (type 0)

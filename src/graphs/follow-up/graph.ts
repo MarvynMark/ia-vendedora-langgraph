@@ -409,9 +409,11 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", "executando sequência Primeira mensagem...");
   const primeiroNome = primeiroNomeSaudacao(state.title);
 
-  // Verificar se o lead já respondeu — se sim, para a sequência
+  // Verificar se o lead já respondeu — se sim, para a sequência.
+  // ignorarGrupoEspera: o "quero grupo de espera" é o gatilho do anúncio, não uma resposta;
+  // sem isso, TODO lead de anúncio conta como "já respondeu" e a sequência nunca dispara.
   try {
-    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
+    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId, { ignorarGrupoEspera: true });
     if (totalIncoming > 0) {
       logger.info("follow-up", "Lead já respondeu — encerrando sequência Primeira mensagem");
       return { respostaAgente: "" };
