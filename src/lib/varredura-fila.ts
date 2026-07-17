@@ -14,9 +14,10 @@
 import { pool } from "../db/pool.ts";
 import { logger } from "./logger.ts";
 import { env } from "../config/env.ts";
-import { buscarContatoPorQuery, buscarConversasDoContato, buscarConversa } from "../services/chatwoot.ts";
+import { buscarContatoPorQuery, buscarConversasDoContato, buscarConversa, listarMensagens } from "../services/chatwoot.ts";
 import { buscarDadosFormulario } from "../db/formulario.ts";
-import { limparFila } from "../db/fila.ts";
+import { limparFila, enfileirarMensagem } from "../db/fila.ts";
+import { liberarLock } from "../db/lock.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 
 const CONTA = env.CHATWOOT_ACCOUNT_ID;
@@ -144,6 +145,97 @@ async function reprocessarTelefone(telefone: string): Promise<void> {
       await pool.query("DELETE FROM checkpoint_writes WHERE thread_id = $1", [thread]);
     } catch { /* noop */ }
   }
+}
+
+/**
+ * Rede de segurança de BOOT: recupera conversas travadas por lock preso.
+ *
+ * Cobre o gap que a varredura de fila NÃO pega: quando o processo morre DEPOIS de
+ * consumir a mensagem da fila mas ANTES de responder (janela ampliada por um redeploy),
+ * a mensagem do lead vira uma órfã "invisível" — não está na fila, mas o lead ficou sem
+ * resposta e o lock ficou preso. Foi o que travou a conversa 4304.
+ *
+ * Roda uma vez na subida do app: para cada lock preso além do TTL, se a conversa ainda é
+ * da IA (agente-on) e a ÚLTIMA mensagem é do lead (sem resposta posterior do agente),
+ * reenfileira e reprocessa pelo caminho testado. Caso contrário, apenas libera o lock.
+ */
+export async function recuperarConversasTravadasNoBoot(): Promise<void> {
+  let sessions: string[] = [];
+  try {
+    const r = await pool.query<{ session_id: string }>(
+      `SELECT session_id FROM n8n_status_atendimento
+       WHERE lock_conversa = true
+         AND updated_at < NOW() - INTERVAL '1 minute' * $1`,
+      [env.LOCK_TTL_MINUTES],
+    );
+    sessions = r.rows.map((x) => x.session_id);
+  } catch (e) {
+    logger.error("recuperacao-boot", "erro ao buscar locks presos:", e);
+    return;
+  }
+  if (sessions.length === 0) {
+    logger.info("recuperacao-boot", "nenhum lock preso além do TTL no boot");
+    return;
+  }
+  logger.warn("recuperacao-boot", `${sessions.length} lock(s) preso(s) além do TTL — avaliando:`, sessions);
+  for (const sessionId of sessions) {
+    try {
+      await recuperarLockPreso(sessionId);
+    } catch (e) {
+      logger.error("recuperacao-boot", `erro ao recuperar ${sessionId}:`, e);
+    }
+  }
+}
+
+async function recuperarLockPreso(sessionId: string): Promise<void> {
+  // session_id do agente principal = `${inbox}_${telefone}` (telefone em E.164, começa com "+").
+  // Locks de outra natureza (ex.: "pagamento:...") não têm esse formato — só liberamos.
+  const idx = sessionId.indexOf("_");
+  const telefone = idx >= 0 ? sessionId.slice(idx + 1) : "";
+  if (!telefone.startsWith("+")) {
+    await liberarLock(sessionId);
+    logger.info("recuperacao-boot", `lock não-conversa liberado: ${sessionId}`);
+    return;
+  }
+
+  const contato = await buscarContatoPorQuery(CONTA, telefone);
+  if (!contato) {
+    await liberarLock(sessionId);
+    return;
+  }
+  const convs = await buscarConversasDoContato(CONTA, contato.id);
+  const conv = convs.find((c) => Number(c.inbox_id) === Number(INBOX)) ?? convs[0];
+  if (!conv) {
+    await liberarLock(sessionId);
+    return;
+  }
+  const full = (await buscarConversa(CONTA, conv.id)) as { labels?: string[] };
+  if (!(full?.labels ?? []).includes("agente-on")) {
+    // Humano assumiu ou lead perdido — nada a reprocessar, só destrava.
+    await liberarLock(sessionId);
+    logger.info("recuperacao-boot", `${telefone}: sem agente-on, lock liberado sem reprocessar`);
+    return;
+  }
+
+  // Última mensagem de conversa (só incoming=0 / outgoing=1). Se for do lead, ficou sem resposta.
+  const resp = (await listarMensagens(CONTA, conv.id)) as {
+    payload?: Array<{ message_type: number; content?: string; id: number }>;
+  };
+  const dialogo = (resp.payload ?? []).filter((m) => m.message_type === 0 || m.message_type === 1);
+  const ultima = dialogo[dialogo.length - 1];
+  if (!ultima || ultima.message_type !== 0 || !(ultima.content ?? "").trim()) {
+    // Última é do agente (já respondeu) ou vazia — nada pendente. Só destrava.
+    await liberarLock(sessionId);
+    logger.info("recuperacao-boot", `${telefone}: sem mensagem pendente do lead, lock liberado`);
+    return;
+  }
+
+  // Há mensagem do lead sem resposta → reprocessar pelo caminho testado.
+  const conteudo = (ultima.content ?? "").trim();
+  logger.warn("recuperacao-boot", `${telefone}: mensagem do lead sem resposta ("${conteudo.slice(0, 60)}") — reprocessando`);
+  await liberarLock(sessionId); // o grafo readquire o lock ao reprocessar
+  await enfileirarMensagem(String(ultima.id), telefone, conteudo, new Date().toISOString());
+  await reprocessarTelefone(telefone);
 }
 
 export function iniciarVarreduraFilaOrfa(intervaloMs = 3 * 60 * 1000): void {

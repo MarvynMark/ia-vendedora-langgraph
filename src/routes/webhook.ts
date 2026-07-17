@@ -5,6 +5,7 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila } from "../db/fila.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
+import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
 import { limparHistorico } from "../db/memoria.ts";
 import { buscarDadosFormulario } from "../db/formulario.ts";
 import { pool } from "../db/pool.ts";
@@ -59,7 +60,14 @@ async function obterGrafo() {
 }
 
 export const webhookRouter = new Elysia()
-  .post("/webhook/chatwoot", async ({ body }) => {
+  .post("/webhook/chatwoot", async ({ body, set }) => {
+    // Desligamento gracioso em andamento: recusa novos turnos para não morrer no meio.
+    // A rede de segurança no boot reprocessa o que ficar sem resposta após o restart.
+    if (estaEncerrando()) {
+      set.status = 503;
+      logger.warn("webhook", "Recusando webhook: desligamento em andamento");
+      return { status: "unavailable", reason: "shutting_down" };
+    }
     logger.info("webhook", ">>> Webhook recebido", {
       message_type: (body as Record<string, unknown>).message_type,
       content: (body as Record<string, unknown>).content,
@@ -372,8 +380,9 @@ export const webhookRouter = new Elysia()
       }
     });
 
-    // Não esperar - processar em background
-    void processamento;
+    // Não esperar - processar em background, mas RASTREAR para o desligamento gracioso
+    // conseguir aguardar este turno terminar antes de encerrar o processo.
+    void rastrear(processamento);
 
     return { status: "accepted" };
   });
