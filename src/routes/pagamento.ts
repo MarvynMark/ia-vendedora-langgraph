@@ -25,7 +25,7 @@ import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.
 
 const INBOX_ALUNOS_WALKER = 15;
 const DELAY_BOAS_VINDAS_WALKER_MS = 15 * 60 * 1000; // 15 minutos
-const DELAY_ENTRE_MSGS_MS = 15_000; // 15 segundos
+const DELAY_ENTRE_MSGS_MS = 30_000; // 30 segundos (ritmo de quem está digitando)
 // URL permanente MinIO — não usar pre-signed URLs (expiram em horas)
 const VIDEO_BOAS_VINDAS_WALKER_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fvideo-walker-boas-vindas-novo-aluno.mp4";
 
@@ -431,6 +431,21 @@ function detectarGenero(primeiroNome: string): "m" | "f" | "?" {
   return "?";                           // e/i/y/consoante fora das listas → incerto: NÃO arriscar Dr./Dra.
 }
 
+// Se o momento atual estiver fora da janela 08h-20h (horário de São Paulo), espera até as 08h.
+// Evita mandar a boas-vindas do Walker de madrugada.
+async function esperarJanela0820(): Promise<void> {
+  const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
+  const agoraSP = new Date(Date.now() + SP_OFFSET_MS);
+  const hora = agoraSP.getUTCHours();
+  if (hora >= 8 && hora < 20) return; // dentro da janela
+  const alvo = new Date(agoraSP);
+  if (hora >= 20) alvo.setUTCDate(alvo.getUTCDate() + 1); // depois das 20h → 08h de amanhã
+  alvo.setUTCHours(8, 0, 0, 0);
+  const espera = alvo.getTime() - agoraSP.getTime();
+  logger.info("pagamento", `Boas-vindas Walker fora da janela 08-20 — aguardando ${Math.round(espera / 60000)}min até as 08h`);
+  await new Promise(r => setTimeout(r, espera));
+}
+
 async function agendarBoasVindasWalker(
   accountId: number,
   contatoId: number,
@@ -438,6 +453,8 @@ async function agendarBoasVindasWalker(
   customAttributes: Record<string, unknown> = {},
 ) {
   await new Promise(r => setTimeout(r, DELAY_BOAS_VINDAS_WALKER_MS));
+  // Só envia entre 08h e 20h (SP); se cair fora, espera até as 08h.
+  await esperarJanela0820();
 
   logger.info("pagamento", "Enviando boas-vindas do Walker pelo inbox #ALUNOS WALKER para:", nomeAluno);
 
