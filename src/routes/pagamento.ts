@@ -411,11 +411,15 @@ function detectarGenero(primeiroNome: string): "m" | "f" {
   const nome = primeiroNome.toLowerCase().trim();
   // Nomes femininos que NÃO terminam em 'a' (senão cairiam como masculino por engano)
   const femininas = new Set([
-    "beatriz", "raquel", "ester", "esther", "isabel", "miriam", "míriam", "ruth", "rachel", "íris", "iris",
-    "inês", "ines", "mercedes", "lourdes", "solange", "denise", "elaine", "simone", "ivone", "viviane",
-    "luciane", "eliane", "cristiane", "adriane", "rosane", "josiane", "gabriele", "michele", "daniele",
-    "caroline", "evelyn", "kelly", "jaqueline", "jacqueline", "nicole", "helen", "hellen", "karen", "karin",
-    "liz", "mel", "flor",
+    "beatriz", "raquel", "ester", "esther", "isabel", "isabelle", "miriam", "míriam", "ruth", "rachel",
+    "íris", "iris", "inês", "ines", "mercedes", "lourdes", "solange", "denise", "elaine", "simone", "ivone",
+    "viviane", "luciane", "eliane", "cristiane", "adriane", "ariane", "fabiane", "juliane", "tatiane",
+    "rosane", "roseane", "silvane", "susane", "josiane", "gabriele", "michele", "daniele", "caroline",
+    "alice", "dulce", "meire", "eloíse", "heloíse", "sarah", "abigail", "jael", "sol",
+    // terminados em y/i (femininos comuns no BR)
+    "marjory", "kelly", "nataly", "sthefany", "emily", "hanny", "mary", "gaby", "any", "dany", "fanny",
+    "jenny", "sthefani", "kamili", "emilli", "jheni", "evelyn", "jaqueline", "jacqueline", "nicole",
+    "helen", "hellen", "karen", "karin", "liz", "mel", "flor",
   ]);
   // Nomes masculinos que terminam em 'a' — exceções à regra geral
   const masculinas = new Set(["luca", "elias", "tobias", "matias", "thomas", "barba", "sousa", "josua", "noa"]);
