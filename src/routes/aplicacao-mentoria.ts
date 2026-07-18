@@ -183,15 +183,18 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   const ehMedico = area.includes("medic") && !area.includes("biomedic") && !area.includes("veterin");
   if (ehMedico) etiquetas.push("medico");
 
-  // sim / nao: disposição para investir
-  // agente-on é adicionado para AMBOS (sim e não/talvez) — a IA atende todos os leads novos.
+  // agente-on é adicionado SEMPRE — a IA atende TODOS os leads novos, inclusive quando o
+  // formulário vem incompleto (sem a resposta de "disposto a investir"). Antes o agente-on só
+  // era aplicado nos branches sim/não, então aplicação incompleta (disposto_investir vazio)
+  // ficava SEM automação (bug do contato Omilto, conv 4394).
+  etiquetas.push("agente-on");
+
+  // sim / nao: qualificação adicional pela disposição para investir (não gateia a automação)
   const disposto = (d.disposto_investir ?? "").toLowerCase();
   if (disposto.includes("sim") || disposto.includes("quero")) {
     etiquetas.push("sim");
-    etiquetas.push("agente-on");
   } else if (disposto.includes("nao") || disposto.includes("não") || disposto.includes("talvez")) {
     etiquetas.push("nao");
-    etiquetas.push("agente-on");
   }
 
   await adicionarEtiquetas(accountId, conversa.id, etiquetas);
