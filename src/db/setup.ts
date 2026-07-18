@@ -71,6 +71,23 @@ export async function criarTabelas() {
 
       CREATE INDEX IF NOT EXISTS idx_template_pendente_enviado ON leads_template_pendente(template_enviado, criado_em);
 
+      CREATE TABLE IF NOT EXISTS intro_pendente (
+        id            SERIAL PRIMARY KEY,
+        account_id    TEXT NOT NULL,
+        conversa_id   TEXT NOT NULL,
+        contato_id    TEXT NOT NULL,
+        inbox_id      TEXT NOT NULL,
+        telefone      TEXT NOT NULL,
+        nome          TEXT,
+        labels        JSONB NOT NULL DEFAULT '[]',
+        agendado_para TIMESTAMPTZ NOT NULL,
+        enviado       BOOLEAN NOT NULL DEFAULT FALSE,
+        tentativas    INTEGER NOT NULL DEFAULT 0,
+        criado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_intro_pendente ON intro_pendente(enviado, agendado_para);
+
       CREATE TABLE IF NOT EXISTS rag_documentos (
         id         SERIAL PRIMARY KEY,
         tipo       VARCHAR(50)  NOT NULL,

@@ -18,7 +18,7 @@ import {
   atualizarAtributosConversa,
   removerEtiquetas,
 } from "../services/chatwoot.ts";
-import { houveAiRecente } from "../db/memoria.ts";
+import { agendarIntroPendente } from "../lib/intro-pendente.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
@@ -152,77 +152,21 @@ export const webhookRouter = new Elysia()
         `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
       );
 
-      // Para leads de formulário (sim OU nao): disparar intro da IA após 2 minutos.
-      // A IA atende ambos os grupos — a intro inicia o roteiro do Walker.
+      // Para leads de formulário (sim OU nao): agendar intro da IA (dispara ~2min depois pelo cron).
+      // A IA atende ambos os grupos — a intro inicia o roteiro do Walker. PERSISTIDA no banco
+      // (não é mais setTimeout em memória, que morria em deploy/crash e deixava o lead só com o
+      // link do grupo, sem apresentação — bug da conv 4413).
       if (labels.includes("nao") || labels.includes("sim")) {
-        logger.info("webhook", "Lead de formulário detectado (sim/nao): agendando intro em 2 minutos");
-        const introIdConta = idConta;
-        const introIdConversa = idConversa;
-        const introIdContato = parsed.data.sender.id.toString();
-        const introTelefone = parsed.data.sender.phone_number ?? "";
-        const introNome = parsed.data.sender.name;
-        const introIdInbox = String(
-          (payload.conversation as unknown as Record<string, unknown>).inbox_id ?? env.CHATWOOT_INBOX_ID
-        );
-        const introLabels = labels;
-
-        setTimeout(async () => {
-          try {
-            // Evita intro duplicada quando a conversa está ATIVA agora (dois timers ou o agente
-            // acabou de responder). Só pula se a IA falou nos últimos 5 min — histórico ANTIGO não
-            // bloqueia: lead que some por semanas e volta pedindo o grupo deve ser re-engajado.
-            if (await houveAiRecente(introTelefone, 5)) {
-              logger.info("webhook", "Intro automática ignorada: conversa ativa (IA falou nos últimos 5min)", { telefone: introTelefone });
-              return;
-            }
-
-            const conversa = await buscarConversa(introIdConta, introIdConversa) as Record<string, unknown>;
-            const tarefa = (conversa["kanban_task"] ?? {}) as Record<string, unknown>;
-            const funil = (conversa["kanban_board"] ?? {}) as Record<string, unknown>;
-            const dadosFormulario = await buscarDadosFormulario(introTelefone);
-
-            const g = await obterGrafo();
-            const idMensagemIntro = `intro_${Date.now()}`;
-            await g.invoke({
-              messages: [],
-              idMensagem: idMensagemIntro,
-              idMensagemReferenciada: null,
-              idConta: introIdConta,
-              idConversa: introIdConversa,
-              idContato: introIdContato,
-              idInbox: introIdInbox,
-              telefone: introTelefone,
-              nome: introNome,
-              mensagem: "[SISTEMA: O lead pediu o grupo de espera e você já mandou o link. Agora INICIE a conversa de vendas. Se você NUNCA falou com esse lead antes (sem histórico seu na conversa), apresente-se em 1ª pessoa como o Perito Walker, diga que recebeu o formulário e comece pela Mensagem 1 do roteiro. Se JÁ houver histórico seu com ele (lead que está voltando), NÃO se reapresente: dê as boas-vindas de volta de forma natural e retome de onde pararam.]",
-              mensagemDeAudio: false,
-              timestamp: new Date().toISOString(),
-              tipoArquivo: null,
-              idAnexo: null,
-              urlArquivo: null,
-              etiquetas: introLabels,
-              atributosContato: {},
-              atributosConversa: "",
-              dadosFormulario,
-              tarefa,
-              funil,
-              mensagemProcessada: "[SISTEMA: Lead preencheu o formulário de aplicação.]",
-              mensagemReferenciada: null,
-              mensagensAgregadas: "",
-              stale: false,
-              lockTentativas: 0,
-              locked: false,
-              erroFatal: false,
-              outputAgente: "",
-              novasMensagens: false,
-              respostaFormatada: "",
-              ssml: "",
-              audioBuffer: null,
-            }, { configurable: { thread_id: `${introTelefone}_${idMensagemIntro}` } });
-            logger.info("webhook", "Intro automática enviada:", { telefone: introTelefone });
-          } catch (e) {
-            logger.error("webhook", "Erro ao enviar intro automática para lead de formulário:", e);
-          }
-        }, 2 * 60 * 1000);
+        logger.info("webhook", "Lead de formulário detectado (sim/nao): agendando intro (+2min, persistida)");
+        await agendarIntroPendente({
+          idConta,
+          idConversa,
+          idContato: parsed.data.sender.id.toString(),
+          idInbox: String((payload.conversation as unknown as Record<string, unknown>).inbox_id ?? env.CHATWOOT_INBOX_ID),
+          telefone: parsed.data.sender.phone_number ?? "",
+          nome: parsed.data.sender.name,
+          labels,
+        });
       }
 
       return { status: "ok", action: "grupo_espera" };

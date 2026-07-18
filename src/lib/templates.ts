@@ -44,7 +44,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   pos_preco_followup_2:
     "Ei [Nome], caso o valor tenha pesado, dá pra fazer o semestral em 12x de R$ 197 também — qual parcela ficaria melhor pra você?",
   pos_preco_followup_3:
-    "Oi [Nome], consigo garantir os bônus pra você ainda hoje se fecharmos por aqui. Quer que eu te mande o link?",
+    "Oi [Nome], ficou alguma dúvida sobre o valor ou como a mentoria funciona por dentro? Me fala que eu te ajudo a ver o que faz mais sentido pro seu momento, sem compromisso.",
   // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
   // não substitui a variável — igual aos demais fallbacks (conexao_duvida, lembrete_acesso...).
   pos_preco_urgencia:
