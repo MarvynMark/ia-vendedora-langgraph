@@ -27,6 +27,14 @@ const CAMPO_MAP: Record<string, string> = {
   "O você acha que seria diferente na sua preparação caso tenha o perito Walker como mentor?": "diferenca_com_mentor",
   "Você está disposto e teria condições de investir cerca de R$ 197 por mês (12x de 197) para ser acompanhado pelo Perito Walker?": "disposto_investir",
   "Por fim: se sua aplicação for aprovada, você estaria pronto para garantir sua vaga hoje?": "pronto_para_garantir",
+
+  // --- Variantes do formulário MÉDICO LEGISTA (perguntas com texto diferente do Perito Criminal).
+  // Sem estas, todo lead de Médico Legista perdia concurso/formação/dificuldade/disposição (ficavam
+  // null): concurso e trilha errados, sem label "medico". (Ex.: contato Omilto, conv 4394.)
+  "Você é?": "area_graduacao",
+  "Qual é o concurso de Perito Médico Legista você deseja prestar?": "concurso_desejado",
+  "Qual é sua maior dificuldade frente aos estudos para concurso?": "maior_dificuldade",
+  "Você está disposto e teria condições de investir cerca de R$ 400 por mês (pagamento em 12x de 400) para ser acompanhado pelo Perito Walker e pela Dra. Natália na Mentoria?": "disposto_investir",
 };
 
 const COLUNAS_VALIDAS = new Set(Object.values(CAMPO_MAP));
