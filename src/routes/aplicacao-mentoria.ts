@@ -50,11 +50,25 @@ const formularioSchema = z.record(z.string(), z.string());
 
 function parsearFormulario(raw: Record<string, string>): Record<string, string> {
   const resultado: Record<string, string> = {};
+  const naoMapeadas: string[] = [];
   for (const [pergunta, resposta] of Object.entries(raw)) {
     const coluna = CAMPO_MAP[pergunta];
     if (coluna) {
       resultado[coluna] = resposta;
+    } else {
+      naoMapeadas.push(pergunta);
     }
+  }
+  // Visibilidade: perguntas do payload que NÃO bateram com nenhuma chave do CAMPO_MAP são
+  // descartadas silenciosamente. Se o texto de uma pergunta mudar no formulário, isso avisa
+  // (senão o campo viraria null pra todos sem ninguém perceber).
+  if (naoMapeadas.length) {
+    logger.warn("aplicacao", "Perguntas do formulário SEM mapeamento (campo será descartado):", naoMapeadas);
+  }
+  // Campos esperados que não vieram no payload (lead deixou em branco ou pergunta ausente).
+  const faltando = [...COLUNAS_VALIDAS].filter(c => !(c in resultado));
+  if (faltando.length) {
+    logger.info("aplicacao", "Campos do formulário ausentes no payload (não respondidos):", faltando);
   }
   return resultado;
 }
