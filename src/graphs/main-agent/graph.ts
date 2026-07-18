@@ -501,6 +501,20 @@ function rotaErroOuProximo(proximo: string) {
   return (state: MainAgentStateType) => state.erroFatal ? "liberar_lock" : proximo;
 }
 
+// Após coletar a fila: se veio VAZIA, significa que uma execução concorrente já drenou e
+// respondeu a esta mensagem (corrida debounce/lock). Reprocessar aqui cairia no fallback
+// `mensagemProcessada` do executarAgente e geraria uma resposta DUPLICADA e fora de ordem
+// (bug da conv 4407: a IA reenviou o convite de vaga depois de já ter feito o pitch). Aborta.
+export function rotaColeta(state: MainAgentStateType): string {
+  if (state.erroFatal) return "liberar_lock";
+  const vazia = !state.mensagensAgregadas || state.mensagensAgregadas.trim() === "";
+  if (vazia) {
+    logger.info("main-agent", "rotaColeta → liberar_lock (fila vazia: mensagem já tratada por execução concorrente)");
+    return "liberar_lock";
+  }
+  return "executar_agente";
+}
+
 export async function criarGrafoAgenteClinica() {
   const checkpointer = await obterCheckpointer();
   const grafo = new StateGraph(MainAgentState)
@@ -539,7 +553,7 @@ export async function criarGrafoAgenteClinica() {
       coletar_mensagens: "coletar_mensagens",
       liberar_lock: "liberar_lock",
     })
-    .addConditionalEdges("coletar_mensagens", rotaErroOuProximo("executar_agente"), {
+    .addConditionalEdges("coletar_mensagens", rotaColeta, {
       executar_agente: "executar_agente",
       liberar_lock: "liberar_lock",
     })

@@ -220,7 +220,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   Reaja curto ao "sim" e feche convidando:
 
-  "Show. Como eu acompanho cada mentorado de perto, abro poucas vagas por turma, e as dessa turma já estão acabando. Consigo garantir a sua se você entrar agora. Faz sentido eu te mostrar os planos?"
+  "Show. Como eu acompanho cada mentorado de perto, abro poucas vagas por turma, e as dessa turma já estão acabando. Consigo garantir a sua se você entrar agora. Posso te mostrar os planos?"
 
   > Após a confirmação, continue para o PITCH DE PREÇO.
 
