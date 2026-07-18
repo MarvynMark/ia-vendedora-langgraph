@@ -187,7 +187,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   2. A ferramenta já envia o texto + o vídeo. **Não escreva mais nada depois** (a pergunta já foi no mensagem_antes). Sua resposta em texto fica vazia.
 
   > Aguarde a confirmação do lead.
-  > Se o lead disser que não recebeu o vídeo, reenvie o link direto: https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fmentoria-por-dentro-15-04-26.mp4&version_id=null
+  > Se o lead disser que não recebeu o vídeo, reenvie o link direto: https://s3.stkd.site/arquivosclientes/Vestigium%2Fplataforma-entregaveis-walker-falando.mp4
   > O vídeo é enviado UMA única vez.
 
   ## MENSAGEM 6 — ENTREGÁVEIS
