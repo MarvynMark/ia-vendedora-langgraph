@@ -71,20 +71,6 @@ export async function criarTabelas() {
 
       CREATE INDEX IF NOT EXISTS idx_template_pendente_enviado ON leads_template_pendente(template_enviado, criado_em);
 
-      CREATE TABLE IF NOT EXISTS boas_vindas_walker_pendente (
-        id                SERIAL PRIMARY KEY,
-        account_id        INTEGER NOT NULL,
-        contact_id        INTEGER NOT NULL,
-        nome_aluno        TEXT NOT NULL,
-        custom_attributes JSONB NOT NULL DEFAULT '{}',
-        agendado_para     TIMESTAMPTZ NOT NULL,
-        enviado           BOOLEAN NOT NULL DEFAULT FALSE,
-        tentativas        INTEGER NOT NULL DEFAULT 0,
-        criado_em         TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_bv_walker_pendente ON boas_vindas_walker_pendente(enviado, agendado_para);
-
       CREATE TABLE IF NOT EXISTS rag_documentos (
         id         SERIAL PRIMARY KEY,
         tipo       VARCHAR(50)  NOT NULL,

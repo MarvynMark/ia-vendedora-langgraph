@@ -18,7 +18,6 @@ import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
-import { agendarBoasVindasWalker } from "../lib/boas-vindas-walker.ts";
 
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -393,9 +392,5 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
   } catch (e) {
     logger.error("pagamento", "Erro ao disparar grafo de boas-vindas:", e);
   }
-
-  // Boas-vindas do Walker (inbox #ALUNOS WALKER): agenda no BANCO (+15min); o cron dispara dentro
-  // da janela 08h-20h. Persistido pra sobreviver a reinícios/deploys (não é mais setTimeout).
-  await agendarBoasVindasWalker(accountId, contato.id, dados.nome ?? contato.name, contato.custom_attributes ?? {});
 }
 
