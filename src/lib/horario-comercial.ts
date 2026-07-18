@@ -2,16 +2,21 @@
 // Convenção: horário SP = horário UTC + SP_OFFSET_MS (offset negativo).
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 
-// Janela de envio de follow-ups: 9h às 18h (horário de São Paulo), seg-sex.
-const HORA_ABERTURA = 9;
+// Janela de envio de follow-ups: 08h20 às 18h (horário de São Paulo), seg-sex.
+// A abertura às 08:20 é o horário em que o Pedro (comercial) já consegue acompanhar,
+// então o primeiro follow-up da manhã sai a partir daí.
+const HORA_ABERTURA = 8;
+const MINUTO_ABERTURA = 20;
 const HORA_FECHAMENTO = 18;
-const HORA_REABERTURA = 9; // hora para reagendar quando cai fora do intervalo permitido
+const HORA_REABERTURA = 8; // hora para reagendar quando cai fora do intervalo permitido
+const MINUTO_REABERTURA = 20;
 
-function getComponentesSP(date: Date): { hora: number; diaSemana: number } {
+function getComponentesSP(date: Date): { hora: number; minuto: number; diaSemana: number } {
   // Para ler a hora de PAREDE em SP a partir de um instante UTC, soma o offset (negativo).
   const spTime = new Date(date.getTime() + SP_OFFSET_MS);
   return {
     hora: spTime.getUTCHours(),
+    minuto: spTime.getUTCMinutes(),
     diaSemana: spTime.getUTCDay(), // 0=dom, 6=sab
   };
 }
@@ -20,32 +25,42 @@ function ehFimDeSemana(diaSemana: number): boolean {
   return diaSemana === 0 || diaSemana === 6;
 }
 
+// Antes da abertura da janela (08:20)?
+function antesDaAbertura(hora: number, minuto: number): boolean {
+  return hora < HORA_ABERTURA || (hora === HORA_ABERTURA && minuto < MINUTO_ABERTURA);
+}
+
+// Dentro da janela útil (>= 08:20 e < horaFechamento), em dia útil?
+function dentroDaJanela(hora: number, minuto: number, diaSemana: number, horaFechamento: number): boolean {
+  return !ehFimDeSemana(diaSemana) && !antesDaAbertura(hora, minuto) && hora < horaFechamento;
+}
+
 /**
  * Dado um momento e um delay em ms, retorna quando a mensagem deve ser
- * enviada respeitando horário comercial (seg-sex, 9h-18h, fuso SP).
- * Se o alvo cair fora desse intervalo, avança para o próximo dia útil às 9h.
+ * enviada respeitando horário comercial (seg-sex, 08h20-18h, fuso SP).
+ * Se o alvo cair fora desse intervalo, avança para o próximo dia útil às 08:20.
  *
  * @param horaFechamento - hora máxima (padrão 18).
  */
 export function proximoHorarioComercial(agora: Date, delayMs: number, horaFechamento = HORA_FECHAMENTO): Date {
   const alvo = new Date(agora.getTime() + delayMs);
-  const { hora, diaSemana } = getComponentesSP(alvo);
+  const { hora, minuto, diaSemana } = getComponentesSP(alvo);
 
   // Já está dentro do expediente
-  if (!ehFimDeSemana(diaSemana) && hora >= HORA_ABERTURA && hora < horaFechamento) {
+  if (dentroDaJanela(hora, minuto, diaSemana, horaFechamento)) {
     return alvo;
   }
 
   // Trabalhar na "hora de parede SP" (UTC + offset) para manipular os componentes direto.
   const spTime = new Date(alvo.getTime() + SP_OFFSET_MS);
 
-  if (!ehFimDeSemana(diaSemana) && hora < HORA_ABERTURA) {
-    // Antes do expediente: mesmo dia às 9h
-    spTime.setUTCHours(HORA_REABERTURA, 0, 0, 0);
+  if (!ehFimDeSemana(diaSemana) && antesDaAbertura(hora, minuto)) {
+    // Antes do expediente: mesmo dia às 08:20
+    spTime.setUTCHours(HORA_REABERTURA, MINUTO_REABERTURA, 0, 0);
   } else {
-    // Após o expediente ou fim de semana: próximo dia às 9h
+    // Após o expediente ou fim de semana: próximo dia às 08:20
     spTime.setUTCDate(spTime.getUTCDate() + 1);
-    spTime.setUTCHours(HORA_REABERTURA, 0, 0, 0);
+    spTime.setUTCHours(HORA_REABERTURA, MINUTO_REABERTURA, 0, 0);
     // Pular sábado e domingo
     while (ehFimDeSemana(spTime.getUTCDay())) {
       spTime.setUTCDate(spTime.getUTCDate() + 1);
@@ -66,7 +81,7 @@ export function proximoHorarioComercial(agora: Date, delayMs: number, horaFecham
  * - Sem janela (`msRestantesJanela <= 0`): agenda normal — o toque cairá no template pago.
  * - Se o toque ideal já cai DENTRO da janela: mantém (já é grátis).
  * - Se o toque ideal FURARIA a janela: adianta para pouco antes do fechamento (ainda grátis),
- *   respeitando horário comercial (9h-18h) e um espaçamento mínimo anti-spam (`minGapMs`).
+ *   respeitando horário comercial (08h20-18h) e um espaçamento mínimo anti-spam (`minGapMs`).
  * - Se não dá pra enviar grátis a tempo (janela fecha fora do expediente e não sobra
  *   expediente hoje, ou o espaçamento mínimo não cabe): agenda normal (template pago).
  */
@@ -95,8 +110,8 @@ export function agendarMaximizandoJanela(
   // Alvo: último instante útil pouco antes de a janela fechar.
   const alvo = fechamento - margemMs;
   if (alvo >= pisoGap) {
-    const { hora, diaSemana } = getComponentesSP(new Date(alvo));
-    if (!ehFimDeSemana(diaSemana) && hora >= HORA_ABERTURA && hora < horaFechamento) {
+    const { hora, minuto, diaSemana } = getComponentesSP(new Date(alvo));
+    if (dentroDaJanela(hora, minuto, diaSemana, horaFechamento)) {
       return new Date(alvo);
     }
   }
@@ -104,7 +119,7 @@ export function agendarMaximizandoJanela(
   // Janela fecha fora do expediente. Se ainda estamos em expediente HOJE e a janela só
   // fecha depois, dispara perto do fim do expediente de hoje (ainda dentro da janela = grátis).
   const compAgora = getComponentesSP(agora);
-  if (!ehFimDeSemana(compAgora.diaSemana) && compAgora.hora >= HORA_ABERTURA && compAgora.hora < horaFechamento) {
+  if (dentroDaJanela(compAgora.hora, compAgora.minuto, compAgora.diaSemana, horaFechamento)) {
     const spNow = new Date(agora.getTime() + SP_OFFSET_MS);
     spNow.setUTCHours(horaFechamento, 0, 0, 0);
     const fimExpedienteHoje = spNow.getTime() - SP_OFFSET_MS - margemMs;
