@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { rotaStale, rotaLock, rotaNovasMsgs } from "../../src/graphs/main-agent/graph.ts";
+import { rotaStale, rotaLock, rotaNovasMsgs, rotaColeta } from "../../src/graphs/main-agent/graph.ts";
 import type { MainAgentStateType } from "../../src/graphs/main-agent/state.ts";
 
 function makeState(overrides: Partial<MainAgentStateType>): MainAgentStateType {
@@ -48,6 +48,24 @@ describe("rotaStale", () => {
 
   test("stale=false → tentar_lock", () => {
     expect(rotaStale(makeState({ stale: false }))).toBe("tentar_lock");
+  });
+});
+
+describe("rotaColeta", () => {
+  test("fila vazia → liberar_lock (aborta: mensagem já tratada por execução concorrente)", () => {
+    expect(rotaColeta(makeState({ mensagensAgregadas: "" }))).toBe("liberar_lock");
+  });
+
+  test("fila só com espaços → liberar_lock", () => {
+    expect(rotaColeta(makeState({ mensagensAgregadas: "   \n " }))).toBe("liberar_lock");
+  });
+
+  test("fila com conteúdo → executar_agente", () => {
+    expect(rotaColeta(makeState({ mensagensAgregadas: "quero começar" }))).toBe("executar_agente");
+  });
+
+  test("erroFatal → liberar_lock mesmo com conteúdo", () => {
+    expect(rotaColeta(makeState({ mensagensAgregadas: "oi", erroFatal: true }))).toBe("liberar_lock");
   });
 });
 
