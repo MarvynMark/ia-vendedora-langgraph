@@ -7,7 +7,7 @@ function sp(date: Date) {
   return { hora: d.getUTCHours(), dia: d.getUTCDay(), min: d.getUTCMinutes() };
 }
 
-describe("proximoHorarioComercial (fuso SP, janela 08h20-18h)", () => {
+describe("proximoHorarioComercial (fuso SP, janela 08h20-20h)", () => {
   test("alvo às 01:00 SP (madrugada) vira 08:20 SP, NUNCA 01:00", () => {
     // 2026-07-15 04:00 UTC = 01:00 SP
     const agora = new Date(Date.UTC(2026, 6, 15, 4, 0, 0));
@@ -23,8 +23,8 @@ describe("proximoHorarioComercial (fuso SP, janela 08h20-18h)", () => {
     expect(c.min).toBe(20);
   });
 
-  test("alvo após 18h SP vira 08:20 de um dia útil", () => {
-    // 2026-07-15 23:00 UTC = 20:00 SP
+  test("alvo às 20h SP (fechamento) vira 08:20 de um dia útil", () => {
+    // 2026-07-15 23:00 UTC = 20:00 SP (limite exclusivo da janela → cai pro próximo dia)
     const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 15, 23, 0, 0)), 0));
     expect(c.hora).toBe(8);
     expect(c.min).toBe(20);
@@ -41,13 +41,13 @@ describe("proximoHorarioComercial (fuso SP, janela 08h20-18h)", () => {
     expect(c.dia).toBeLessThanOrEqual(5);
   });
 
-  test("INVARIANTE: qualquer instante da semana → sempre dia útil, 08h20-18h", () => {
+  test("INVARIANTE: qualquer instante da semana → sempre dia útil, 08h20-20h", () => {
     const base = new Date(Date.UTC(2026, 6, 13, 0, 0, 0));
     for (let h = 0; h < 168; h++) {
       const c = sp(proximoHorarioComercial(new Date(base.getTime() + h * 3_600_000), 0));
       // nunca antes de 08:20
       expect(c.hora * 60 + c.min).toBeGreaterThanOrEqual(8 * 60 + 20);
-      expect(c.hora).toBeLessThan(18);
+      expect(c.hora).toBeLessThan(20);
       expect(c.dia).toBeGreaterThanOrEqual(1);
       expect(c.dia).toBeLessThanOrEqual(5);
     }
@@ -57,10 +57,10 @@ describe("proximoHorarioComercial (fuso SP, janela 08h20-18h)", () => {
     // acha uma quarta ao meio-dia SP: 2026-07-15 15:00 UTC = 12:00 SP
     const agora = new Date(Date.UTC(2026, 6, 15, 15, 0, 0));
     const r = proximoHorarioComercial(agora, 0);
-    // se 15/07 for dia útil, retorna igual; valida ao menos que caiu em 08:20-18h dia útil
+    // se 15/07 for dia útil, retorna igual; valida ao menos que caiu em 08:20-20h dia útil
     const c = sp(r);
     expect(c.hora * 60 + c.min).toBeGreaterThanOrEqual(8 * 60 + 20);
-    expect(c.hora).toBeLessThan(18);
+    expect(c.hora).toBeLessThan(20);
   });
 });
 
@@ -79,7 +79,7 @@ describe("agendarMaximizandoJanela (espremer follow-up na janela grátis de 24h)
     expect(r.getTime()).toBe(fechamento - 30 * 60 * 1000);
     const c = sp(r);
     expect(c.hora).toBeGreaterThanOrEqual(9);
-    expect(c.hora).toBeLessThan(18);
+    expect(c.hora).toBeLessThan(20);
   });
 
   test("sem janela (msRestantes <= 0) → agenda normal (cai no template pago)", () => {
@@ -97,11 +97,11 @@ describe("agendarMaximizandoJanela (espremer follow-up na janela grátis de 24h)
     expect(r.getTime()).toBe(proximoHorarioComercial(agora, 24 * H).getTime());
   });
 
-  test("janela fecha à noite (fora do expediente) mas ainda há expediente hoje → dispara hoje antes das 18h", () => {
-    // fecha em 10h → 22:00 SP; ainda dá pra mandar grátis hoje antes das 18h
+  test("janela fecha à noite (fora do expediente) mas ainda há expediente hoje → dispara hoje antes das 20h", () => {
+    // fecha em 10h → 22:00 SP; ainda dá pra mandar grátis hoje antes das 20h (fechamento - 30min = 19:30)
     const r = agendarMaximizandoJanela(agora, 24 * H, 10 * H);
     const c = sp(r);
-    expect(c.hora).toBe(17);
+    expect(c.hora).toBe(19);
     expect(c.min).toBe(30);
     expect(r.getTime()).toBeLessThan(agora.getTime() + 10 * H);
   });

@@ -10,7 +10,7 @@ import { logger } from "./logger.ts";
 const STEPS_RASTREADOS = [
   { id: 1,  name: "Novo Lead",            delayMs: 5  * 60 * 1000,            tipoFollowup: "template_inicial"  as const },
   { id: 7,  name: "Primeira mensagem",    delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "template_abertura" as const },
-  { id: 10, name: "Conexao",              delayMs: 3  * 60 * 60 * 1000,       tipoFollowup: "followup"          as const },
+  { id: 10, name: "Conexao",              delayMs: 1  * 60 * 60 * 1000,       tipoFollowup: "followup"          as const },
   { id: 8,  name: "Aguardando Pagamento", delayMs: 30 * 60 * 1000,            tipoFollowup: "lembrete"          as const },
   { id: 12, name: "Nutrir",               delayMs: 3  * 24 * 60 * 60 * 1000,  tipoFollowup: "nutrir"            as const },
 ];

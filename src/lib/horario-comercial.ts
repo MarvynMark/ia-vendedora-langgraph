@@ -2,12 +2,14 @@
 // Convenção: horário SP = horário UTC + SP_OFFSET_MS (offset negativo).
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 
-// Janela de envio de follow-ups: 08h20 às 18h (horário de São Paulo), seg-sex.
+// Janela de envio de follow-ups: 08h20 às 20h (horário de São Paulo), seg-sex.
 // A abertura às 08:20 é o horário em que o Pedro (comercial) já consegue acompanhar,
-// então o primeiro follow-up da manhã sai a partir daí.
+// então o primeiro follow-up da manhã sai a partir daí. O fechamento às 20h permite
+// recuperar no mesmo dia quem some no fim da tarde (a janela grátis de 24h do WhatsApp
+// segue aberta à noite), em vez de jogar o toque só pra manhã seguinte.
 const HORA_ABERTURA = 8;
 const MINUTO_ABERTURA = 20;
-const HORA_FECHAMENTO = 18;
+const HORA_FECHAMENTO = 20;
 const HORA_REABERTURA = 8; // hora para reagendar quando cai fora do intervalo permitido
 const MINUTO_REABERTURA = 20;
 

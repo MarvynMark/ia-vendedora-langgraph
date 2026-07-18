@@ -390,7 +390,7 @@ const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as con
 // Fora da janela (lead frio, quase sempre): reforço → urgência em ~2 dias, encerramento no Dia 3 seguinte.
 const DELAYS_FORA_JANELA_MS = [2 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
 // Follow-ups sempre dentro do horário comercial (9h-18h SP), inclusive dentro da janela de 24h.
-const HORA_MAX_FOLLOWUP_JANELA = 18;
+const HORA_MAX_FOLLOWUP_JANELA = 20;
 
 function lerContadorTemplates(description: string): number {
   const match = description.match(/followup-templates:\s*(\d+)/i);
