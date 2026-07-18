@@ -1,5 +1,23 @@
 import { pool } from "./pool.ts";
 
+// Dedup persistente e atômico por id_mensagem. Retorna true se é a PRIMEIRA vez que essa
+// mensagem é vista (deve processar), false se já foi reivindicada antes (duplicata → ignorar).
+// Cross-process e sobrevive a restart, ao contrário do Set em memória do webhook.
+export async function reivindicarMensagem(idMensagem: string): Promise<boolean> {
+  const result = await pool.query(
+    `INSERT INTO mensagens_processadas (id_mensagem) VALUES ($1)
+     ON CONFLICT (id_mensagem) DO NOTHING
+     RETURNING id_mensagem`,
+    [idMensagem],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+// Remove registros antigos de dedup pra tabela não crescer indefinidamente.
+export async function limparMensagensProcessadas(): Promise<void> {
+  await pool.query(`DELETE FROM mensagens_processadas WHERE criado_em < NOW() - INTERVAL '2 days'`);
+}
+
 export async function enfileirarMensagem(
   idMensagem: string,
   telefone: string,

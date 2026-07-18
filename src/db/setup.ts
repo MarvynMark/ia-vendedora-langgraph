@@ -71,6 +71,14 @@ export async function criarTabelas() {
 
       CREATE INDEX IF NOT EXISTS idx_template_pendente_enviado ON leads_template_pendente(template_enviado, criado_em);
 
+      -- Dedup persistente de mensagens já processadas (idempotência cross-process/restart).
+      -- Substitui o Set em memória do webhook, que não cobria entrega duplicada entre
+      -- processos nem sobrevivia a restart (causa do envio duplicado da resposta, conv 458).
+      CREATE TABLE IF NOT EXISTS mensagens_processadas (
+        id_mensagem TEXT PRIMARY KEY,
+        criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS intro_pendente (
         id            SERIAL PRIMARY KEY,
         account_id    TEXT NOT NULL,

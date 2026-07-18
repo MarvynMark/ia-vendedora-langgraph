@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ChatwootWebhookPayload } from "../types/chatwoot.ts";
 import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
-import { limparFila } from "../db/fila.ts";
+import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
 import { limparHistorico } from "../db/memoria.ts";
@@ -24,16 +24,6 @@ import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 
 const GRUPO_ESPERA_KEYWORDS = ["grupo de espera", "grupo de espero", "acesso ao grupo", "entrar no grupo"];
-
-// Deduplicação: evita processar a mesma mensagem duas vezes (Chatwoot dispara message_created + message_incoming)
-const mensagensProcessadas = new Set<string>();
-function jaProcessou(idMensagem: string): boolean {
-  if (mensagensProcessadas.has(idMensagem)) return true;
-  mensagensProcessadas.add(idMensagem);
-  // Limpa após 5 minutos para não crescer indefinidamente
-  setTimeout(() => mensagensProcessadas.delete(idMensagem), 5 * 60 * 1000);
-  return false;
-}
 
 
 const webhookPayloadSchema = z.object({
@@ -85,9 +75,10 @@ export const webhookRouter = new Elysia()
       return { status: "ignored", reason: "not_message_created" };
     }
 
-    // Deduplicação pelo ID da mensagem
+    // Deduplicação pelo ID da mensagem — claim PERSISTENTE no banco (cross-process, sobrevive
+    // a restart). reivindicarMensagem retorna false se a mensagem já foi processada antes.
     const idMensagemRaw = String((body as Record<string, unknown>).id ?? "");
-    if (idMensagemRaw && jaProcessou(idMensagemRaw)) {
+    if (idMensagemRaw && !(await reivindicarMensagem(idMensagemRaw))) {
       logger.info("webhook", "Ignorado: mensagem duplicada id =", idMensagemRaw);
       return { status: "ignored", reason: "duplicate" };
     }
