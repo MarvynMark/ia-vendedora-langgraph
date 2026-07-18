@@ -21,6 +21,19 @@ export async function buscarHistorico(sessionId: string, limite: number = 50): P
   return result.rows.reverse();
 }
 
+// Retorna true se a IA mandou alguma mensagem (type='ai') nos últimos `minutos`. Usado pra
+// evitar re-disparar a intro quando a conversa está ATIVA agora, sem bloquear leads que voltam
+// depois de muito tempo (histórico antigo não conta como "conversa em andamento").
+export async function houveAiRecente(sessionId: string, minutos: number): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT 1 FROM n8n_historico_mensagens
+     WHERE session_id = $1 AND type = 'ai' AND created_at > NOW() - ($2 || ' minutes')::interval
+     LIMIT 1`,
+    [sessionId, minutos],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function salvarMensagem(
   sessionId: string,
   mensagem: MensagemHistorico,

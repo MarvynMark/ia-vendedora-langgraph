@@ -18,7 +18,7 @@ import {
   atualizarAtributosConversa,
   removerEtiquetas,
 } from "../services/chatwoot.ts";
-import { buscarHistorico } from "../db/memoria.ts";
+import { houveAiRecente } from "../db/memoria.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
@@ -168,10 +168,11 @@ export const webhookRouter = new Elysia()
 
         setTimeout(async () => {
           try {
-            // Verificar se a conversa já foi iniciada (evita intro duplicada se dois timers dispararem)
-            const historicoExistente = await buscarHistorico(introTelefone, 3);
-            if (historicoExistente.some(m => m.type === "ai")) {
-              logger.info("webhook", "Intro automática ignorada: conversa já iniciada", { telefone: introTelefone });
+            // Evita intro duplicada quando a conversa está ATIVA agora (dois timers ou o agente
+            // acabou de responder). Só pula se a IA falou nos últimos 5 min — histórico ANTIGO não
+            // bloqueia: lead que some por semanas e volta pedindo o grupo deve ser re-engajado.
+            if (await houveAiRecente(introTelefone, 5)) {
+              logger.info("webhook", "Intro automática ignorada: conversa ativa (IA falou nos últimos 5min)", { telefone: introTelefone });
               return;
             }
 
@@ -192,7 +193,7 @@ export const webhookRouter = new Elysia()
               idInbox: introIdInbox,
               telefone: introTelefone,
               nome: introNome,
-              mensagem: "[SISTEMA: Lead preencheu o formulário de aplicação. Apresente-se em 1ª pessoa como o Perito Walker, diga que acabou de receber o formulário e inicie a conversa pela Mensagem 1 do roteiro.]",
+              mensagem: "[SISTEMA: O lead pediu o grupo de espera e você já mandou o link. Agora INICIE a conversa de vendas. Se você NUNCA falou com esse lead antes (sem histórico seu na conversa), apresente-se em 1ª pessoa como o Perito Walker, diga que recebeu o formulário e comece pela Mensagem 1 do roteiro. Se JÁ houver histórico seu com ele (lead que está voltando), NÃO se reapresente: dê as boas-vindas de volta de forma natural e retome de onde pararam.]",
               mensagemDeAudio: false,
               timestamp: new Date().toISOString(),
               tipoArquivo: null,
