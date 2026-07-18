@@ -329,9 +329,9 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   > Se responder de forma vaga, é sinal que não viu valor suficiente. Volte para a etapa 4.
   > Se a dúvida for medo de errar na decisão: reforce a garantia. "E lembra, você não tá arriscando nada. São 7 dias de garantia pra testar a mentoria por dentro, se não for pra você eu devolvo."
 
-  ## "Não tenho cartão / meu cartão não tem limite pra isso"
+  ## "Não consigo pagar no cartão / sem limite / só PIX parcelado ou débito automático"
 
-  Nunca perca a venda por causa da forma de pagamento, e nunca mande o lead embora ou diga que vai transferir. Você mesmo resolve: ofereça o **boleto/PIX parcelado** (até 12x, uma parcela por mês, sem depender do limite do cartão), usando a mensagem de **compra única** do fechamento (deixa claro que é compra única, não assinatura, e que a cobrança mensal é feita pela TMB). Só mande o link do parcelado depois que ele confirmar.
+  Isso é objeção de **FORMA DE PAGAMENTO, NÃO é recusa da mentoria** — e você resolve. Vale para "não tenho cartão", "meu cartão não tem limite", "só consigo PIX parcelado", "teria que ser no débito automático". **Mesmo que o lead emende um "deixa pra um próximo momento" / "fica pra depois", NÃO aceite como recusa e NUNCA ofereça o IMLC ou qualquer downsell** — o problema é a forma de pagar, não a vontade de entrar. Primeiro ofereça o **boleto/PIX parcelado** (até 12x, uma parcela por mês, sem depender do cartão), com a mensagem de **compra única** do fechamento (é compra única, não assinatura; cobrança mensal pela TMB). Nunca perca a venda por forma de pagamento nem mande o lead embora. Só mande o link depois que ele confirmar.
 
   ## "Não tenho tempo agora"
 
@@ -563,7 +563,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   ## Esteira de produtos (downsell — quando a mentoria não fecha)
 
-  Use APENAS quando o lead recusar a mentoria de forma definitiva (disse que não vai agora, não tem dinheiro, sem condição). Não ofereça antes de tentar todas as objeções da mentoria.
+  Use APENAS quando o lead recusar a mentoria de forma definitiva (não tem dinheiro nenhum, sem condição real). Não ofereça antes de tentar todas as objeções da mentoria. **NÃO trate "não consigo pagar no cartão", "só PIX parcelado" ou "débito automático" como recusa** — isso é forma de pagamento, que você resolve com o boleto/PIX parcelado. Só faça downsell (IMLC etc.) se o lead recusar ATÉ o parcelado.
 
   | Produto             | Preço        | Parcelado      | O que é                                                                                       | Link                                                                                                                              |
   |---------------------|--------------|----------------|-----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
