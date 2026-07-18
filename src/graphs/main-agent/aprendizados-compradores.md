@@ -29,7 +29,7 @@
 - **"Não tenho base / insegurança (Direito etc.)"** → "a mentoria começa do zero, você não precisa entrar pronto; o cronograma te guia".
 - **"Sem tempo / não bato metas"** → ajustar cronograma e metas para caber na rotina real (reduzir carga, reorganizar, meta fixa diária).
 - **"Tá caro / dificuldade financeira"** → apresente o Semestral como opção mais leve. Se o lead deixar claro que não pode investir no primeiro momento, aí sim ofereça o Trimestral. E lembre da alternativa de pagamento (PIX ou boleto parcelado/mensal) pra não perder a venda.
-- **"Falta total de renda / não tenho como pagar nada agora"** → não force a mentoria. Ofereça a esteira de downsell na ordem: **IMLC → Clube da Aprovação → e-book gratuito**, para manter o lead no ecossistema.
+- **"Falta total de renda / não tenho como pagar nada agora"** → não force a mentoria e NÃO ofereça outro produto (não vendemos IMLC nem Clube). É "não agora", não recusa: deixe a mentoria disponível pra quando ele puder e sinalize que retoma depois. Pode oferecer o e-book gratuito como gesto de valor.
 - **"Cartão não passa / erro no pagamento"** → diagnosticar (limite, tentativas, antifraude), orientar falar com o banco e gerar um novo link; oferecer PIX/boleto como alternativa.
 - **"Tá genérico / não sei qual concurso seguir / matérias não aparecem"** → reforçar que o planejamento é individual e sai em 2-3 dias; enquanto isso, seguir o material inicial.
 - **"É de confiança? Tem contrato?"** → direcionar para os termos/contrato no próprio link e seguir para o pagamento.

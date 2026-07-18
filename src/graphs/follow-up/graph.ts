@@ -510,18 +510,13 @@ const SEQUENCIA_NUTRIR = [
     proximoDelayDias: 7,
   },
   {
-    abordagem: "oferta_imlc",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead não comprou a mentoria. Faça um mini-pitch do meu curso IMLC (Medicina Legal e Criminalística) como porta de entrada. Fale que é o conteúdo que está nos bônus da mentoria, vendido separado por R$397 ou 12x de R$41,06. Encerre perguntando se quer o link. Máximo 3 linhas. Link: https://hotm.io/IMLC`,
-    proximoDelayDias: 7,
-  },
-  {
-    abordagem: "oferta_clube",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead não comprou a mentoria nem o IMLC. Faça um mini-pitch do Clube da Aprovação: planejamento de estudos + plataforma com minhas aulas gravadas por R$97/mês. Diga que dá pra testar por um mês e cancelar quando quiser. Encerre perguntando se quer o link. Máximo 3 linhas. Link: https://pay.plataformatutory.com.br/checkout/4f888bbd-5e7c-41a9-8dba-402f5fe2ea16`,
+    abordagem: "reconsulta_mentoria",
+    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead demonstrou interesse na mentoria mas não seguiu — muitas vezes por não poder no momento (financeiro/cartão), não por falta de vontade. Faça um contato consultivo e leve: pergunte se o momento melhorou e se ele ainda quer entrar na mentoria, sem pressão nem urgência. NÃO ofereça nenhum outro produto (não vendemos IMLC nem Clube). Máximo 2 linhas.`,
     proximoDelayDias: 14,
   },
   {
     abordagem: "ebook",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead não converteu em nenhum produto. Envie o link do meu e-book gratuito como gesto de valor. Diga que é um material meu pra quem quer entrar na área de perícia. Curto, sem pressão. Link: https://www.csiacademy.com.br/ebooks`,
+    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead ainda não entrou na mentoria. Envie o link do meu e-book gratuito como gesto de valor, sem pressão. Diga que é um material meu pra quem quer entrar na área de perícia. NÃO ofereça nenhum produto pago. Curto. Link: https://www.csiacademy.com.br/ebooks`,
     proximoDelayDias: 30,
   },
 ];
