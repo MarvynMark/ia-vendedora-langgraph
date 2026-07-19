@@ -46,7 +46,7 @@ export const env = {
   LANGFUSE_PUBLIC_KEY: process.env["LANGFUSE_PUBLIC_KEY"] ?? "",
   LANGFUSE_BASEURL: process.env["LANGFUSE_BASEURL"] ?? "https://cloud.langfuse.com",
 
-  MONITOR_TERMOS: process.env["MONITOR_TERMOS"] ?? "perito criminal",
+  MONITOR_TERMOS: process.env["MONITOR_TERMOS"] ?? "perito criminal,perito oficial,polícia científica,polícia técnico-científica,papiloscopista,médico legista,perito médico legista,criminalística,medicina legal",
   MONITOR_INTERVALO_MS: Number(process.env["MONITOR_INTERVALO_MS"] ?? "300000"), // 5 minutos
   MONITOR_ATIVO: process.env["MONITOR_ATIVO"] !== "false", // ligado por default
 

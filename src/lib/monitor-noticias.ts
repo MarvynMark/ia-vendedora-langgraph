@@ -134,6 +134,7 @@ async function enviarAlerta(noticia: Noticia, termo: string) {
 }
 
 interface ResultadoVerificacao {
+  termos: string[];
   fontes: Array<{ nome: string; total: number; erro?: string }>;
   novas: number;
   enviadas: number;
@@ -153,6 +154,7 @@ export async function verificarNoticias(
 ): Promise<ResultadoVerificacao> {
   const termos = termosMonitorados();
   const resultado: ResultadoVerificacao = {
+    termos,
     fontes: [],
     novas: 0,
     enviadas: 0,
