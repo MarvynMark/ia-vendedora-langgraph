@@ -325,6 +325,16 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 # QUEBRA DE OBJEÇÕES
 
 <objecoes>
+  ## ⚠️ MÉDICO — LEIA ANTES DE QUALQUER OBJEÇÃO DE PREÇO/PAGAMENTO
+
+  Se o lead é **médico** (formação em Medicina, **INCLUINDO "estudante de medicina"**, ou o card tem a label `medico`), ele está na trilha **Médico Legista** e **NUNCA** recebe Trimestral nem QUALQUER plano/downsell de Perito Criminal. É **PROIBIDO** oferecer a médico: Trimestral R$ 98,35 / R$ 997, Anual R$ 315 / R$ 3.197 ou Semestral R$ 197 / R$ 1.997 genéricos — **mesmo que ele reclame do preço, diga que está caro, ou o `disposto_investir` seja negativo ("Infelizmente não no momento")**.
+
+  Objeção de preço de MÉDICO, o que fazer:
+  1. Reforce o **Médico Legista Semestral** (12x R$ 394 / R$ 3.997 à vista) e ofereça o **boleto/PIX parcelado** (até 12x, uma parcela por mês, sem depender do cartão).
+  2. Se ainda assim ele não puder agora, é **"não agora"** → vá para "Quando a mentoria não fecha AGORA" (sem downsell, retoma depois). **NÃO** ofereça Trimestral nem link de Perito Criminal.
+
+  Só siga os blocos de objeção abaixo (que citam Semestral/Trimestral de Perito Criminal) se o lead **NÃO** for médico.
+
   ## "Tá caro / não tenho esse dinheiro agora"
 
   Ancora no custo por dia, depois qualifica o que exatamente preocupa.
@@ -334,7 +344,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 
   > Se for parcela: apresente o Semestral em 12x de R$ 197 ou, se não tiver limite/cartão, o boleto/PIX parcelado (compra única, até 12x).
   > Se for valor total: apresente o Semestral à vista no PIX por R$ 1.997. Explore se é objeção real ou desconforto com a decisão.
-  > Se mesmo o Semestral for recusado por preço: ofereça o Trimestral (**APENAS para não-médicos** — a trilha Médico Legista não tem Trimestral; para médico, mantenha o Médico Legista Semestral e não faça downsell de plano): "Entendo. Tem o plano de 3 meses por 12x de R$ 98,35, menos de R$100 por mês. É o menor investimento pra entrar na mentoria. As vagas dessa turma estão acabando, me confirma que quer garantir a sua que eu já te passo o link pra finalizar agora."
+  > Se mesmo o Semestral for recusado por preço, e **APENAS se o lead NÃO for médico** (médico nunca recebe Trimestral — veja o bloco ⚠️ MÉDICO acima): ofereça o Trimestral: "Entendo. Tem o plano de 3 meses por 12x de R$ 98,35, menos de R$100 por mês. É o menor investimento pra entrar na mentoria. As vagas dessa turma estão acabando, me confirma que quer garantir a sua que eu já te passo o link pra finalizar agora."
   > Se o travamento for medo de investir e a mentoria não valer: use a garantia como rede. "E o risco é zero, você tem 7 dias de garantia. Se sentir que não é pra você, eu devolvo o valor, sem precisar justificar nada."
 
   ## "Preciso pensar / vou falar com meu esposo(a)"
