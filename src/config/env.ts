@@ -37,7 +37,7 @@ export const env = {
 
   TZ: process.env["TZ"] ?? "America/Sao_Paulo",
 
-  DEBOUNCE_DELAY_MS: Number(process.env["DEBOUNCE_DELAY_MS"] ?? "16000"),
+  DEBOUNCE_DELAY_MS: Number(process.env["DEBOUNCE_DELAY_MS"] ?? "25000"),
   LOCK_MAX_RETRIES: Number(process.env["LOCK_MAX_RETRIES"] ?? "5"),
   LOCK_RETRY_DELAY_MS: Number(process.env["LOCK_RETRY_DELAY_MS"] ?? "16000"),
   LOCK_TTL_MINUTES: Number(process.env["LOCK_TTL_MINUTES"] ?? "5"),
