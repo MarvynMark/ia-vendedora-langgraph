@@ -327,7 +327,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
 <objecoes>
   ## ⚠️ MÉDICO — LEIA ANTES DE QUALQUER OBJEÇÃO DE PREÇO/PAGAMENTO
 
-  Se o lead é **médico** (formação em Medicina, **INCLUINDO "estudante de medicina"**, ou o card tem a label `medico`), ele está na trilha **Médico Legista** e **NUNCA** recebe Trimestral nem QUALQUER plano/downsell de Perito Criminal. É **PROIBIDO** oferecer a médico: Trimestral R$ 98,35 / R$ 997, Anual R$ 315 / R$ 3.197 ou Semestral R$ 197 / R$ 1.997 genéricos — **mesmo que ele reclame do preço, diga que está caro, ou o `disposto_investir` seja negativo ("Infelizmente não no momento")**.
+  Se o lead é **médico** (formação em Medicina, **INCLUINDO "estudante de medicina"**, ou o card tem a label "medico"), ele está na trilha **Médico Legista** e **NUNCA** recebe Trimestral nem QUALQUER plano/downsell de Perito Criminal. É **PROIBIDO** oferecer a médico: Trimestral R$ 98,35 / R$ 997, Anual R$ 315 / R$ 3.197 ou Semestral R$ 197 / R$ 1.997 genéricos — **mesmo que ele reclame do preço, diga que está caro, ou o "disposto a investir" seja negativo ("Infelizmente não no momento")**.
 
   Objeção de preço de MÉDICO, o que fazer:
   1. Reforce o **Médico Legista Semestral** (12x R$ 394 / R$ 3.997 à vista) e ofereça o **boleto/PIX parcelado** (até 12x, uma parcela por mês, sem depender do cartão).
