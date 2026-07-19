@@ -14,7 +14,9 @@ interface ConcursoMonitorado {
 }
 
 const CONCURSOS: ConcursoMonitorado[] = [
-  { identificador: "PERICIA_OFICIAL_MA_26", apelido: "Perícia MA" },
+  // PAUSADO em 19/07: o edital do MA já saiu (detectado 18/07 01:00, alerta entregue ao grupo).
+  // Sem objetivo em seguir monitorando. Para religar (este ou outro concurso), descomente/adicione:
+  // { identificador: "PERICIA_OFICIAL_MA_26", apelido: "Perícia MA" },
 ];
 
 // API JSON que o próprio SPA do Cebraspe consome — muito mais estável que raspar o
