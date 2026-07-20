@@ -158,10 +158,16 @@ export async function processarPagamentoAprovado(dados: PagamentoAprovadoDados) 
   }
   try {
     await processarPagamentoAprovadoInterno(dados);
-  } finally {
-    await liberarLock(chaveIdempotencia).catch((e) =>
-      logger.warn("pagamento", "Falha ao liberar lock de idempotência", { chave: chaveIdempotencia, erro: String(e) }),
+    // SUCESSO: NÃO libera o lock — deixa a TTL (LOCK_TTL_MINUTES, 5min) expirar sozinha. Assim,
+    // retries do MESMO pagamento dentro da janela são bloqueados na entrada (o provedor reenvia
+    // o webhook em segundos/minutos: caso do Diogo, retry 28s depois → boas-vindas em dobro).
+    // Retries após a TTL caem no backstop do marcador "boas-vindas: enviado" no card.
+  } catch (e) {
+    // FALHA: libera o lock pra permitir que um retry reprocesse um pagamento não concluído.
+    await liberarLock(chaveIdempotencia).catch((err) =>
+      logger.warn("pagamento", "Falha ao liberar lock de idempotência", { chave: chaveIdempotencia, erro: String(err) }),
     );
+    throw e;
   }
 }
 
