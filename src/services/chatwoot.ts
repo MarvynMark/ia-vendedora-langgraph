@@ -243,6 +243,26 @@ export async function atualizarContato(
   return res.json();
 }
 
+// Atualiza campos gerais do contato (name/phone/email/custom_attributes). Diferente de
+// atualizarContato (que só mexe em custom_attributes), o objeto vai cru no PATCH — usado pelo fluxo
+// de formulário para corrigir o nome de um contato pré-existente que ficou com o telefone como nome.
+export async function atualizarContatoDados(
+  accountId: string | number,
+  contactId: string | number,
+  dados: { name?: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> },
+) {
+  const res = await fetchComTimeout(
+    `${urlConta(accountId)}/contacts/${contactId}`,
+    { method: "PATCH", headers: headers(), body: JSON.stringify(dados) },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] atualizarContatoDados falhou (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
 export async function buscarConversa(
   accountId: string | number,
   conversationId: string | number,

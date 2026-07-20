@@ -4,7 +4,7 @@ import { pool } from "../db/pool.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
-import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas, atualizarContato } from "../services/chatwoot.ts";
+import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas, atualizarContatoDados } from "../services/chatwoot.ts";
 
 const KANBAN_BOARD_ID = 1;
 const KANBAN_STEP_NOVO_LEAD = 1;
@@ -51,6 +51,15 @@ export function montarDescricaoTarefa(d: Record<string, string>): string {
     "🔁 - Follow-ups: 0",
     "👤 - Descrição: inicio",
   ].join("\n");
+}
+
+// True se o nome atual do contato é um "placeholder" que deve ser sobrescrito pelo nome do
+// formulário: vazio, ou composto SÓ de dígitos e pontuação de telefone (+ ( ) - espaço). É o caso
+// do contato criado pelo Chatwoot a partir do WhatsApp sem nome de perfil (fica o telefone como
+// nome). Um nome com qualquer letra NÃO é placeholder — não sobrescrevemos nomes reais.
+export function nomeEhPlaceholderContato(nomeAtual: string | null | undefined): boolean {
+  const n = (nomeAtual ?? "").trim();
+  return !n || /^[\d\s+()\-]+$/.test(n);
 }
 
 // Schema aceita qualquer objeto com strings — o parse faz o mapeamento
@@ -138,11 +147,12 @@ async function lancarNoChatwoot(d: Record<string, string>) {
 
   // Verifica se contato já existe pelo telefone ou email
   let contatoId: number | null = null;
+  let contatoExistente: Awaited<ReturnType<typeof buscarContatoPorQuery>> = null;
   const queryBusca = phoneE164 ?? d.email ?? d.nome_completo;
   if (queryBusca) {
-    const existente = await buscarContatoPorQuery(accountId, queryBusca);
-    if (existente) {
-      contatoId = existente.id;
+    contatoExistente = await buscarContatoPorQuery(accountId, queryBusca);
+    if (contatoExistente) {
+      contatoId = contatoExistente.id;
       logger.info("aplicacao", "Contato já existe no Chatwoot:", contatoId);
     }
   }
@@ -171,10 +181,17 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     contatoId = novoContato.id;
     logger.info("aplicacao", "Contato criado no Chatwoot:", contatoId);
   } else {
-    // atualizarContato já embrulha em { custom_attributes: ... } — passar os atributos CRUS
-    // (embrulhar aqui de novo geraria custom_attributes.custom_attributes, aninhamento duplo).
-    await atualizarContato(accountId, contatoId, atributosFormulario);
-    logger.info("aplicacao", "Atributos do contato atualizados:", contatoId);
+    // Contato pré-existente (criado antes, ex.: pelo Chatwoot a partir do WhatsApp). Atualiza os
+    // atributos do formulário e, se o nome ficou como placeholder (o telefone / só dígitos / vazio),
+    // corrige com o nome_completo do formulário. Sem isso, o contato fica com o telefone como nome
+    // (bug da conv 4442 — contato "5521992887269" em vez de "Monique G H Ferraz").
+    const dados: { name?: string; custom_attributes: Record<string, unknown> } = { custom_attributes: atributosFormulario };
+    if (nomeEhPlaceholderContato(contatoExistente?.name) && d.nome_completo) {
+      dados.name = d.nome_completo;
+      logger.info("aplicacao", `Corrigindo nome placeholder do contato ${contatoId}: "${contatoExistente?.name}" -> "${d.nome_completo}"`);
+    }
+    await atualizarContatoDados(accountId, contatoId, dados);
+    logger.info("aplicacao", `Contato atualizado (atributos${dados.name ? " + nome" : ""}):`, contatoId);
   }
 
   // Cria conversa na inbox comercial

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { montarDescricaoTarefa } from "../../src/routes/aplicacao-mentoria.ts";
+import { montarDescricaoTarefa, nomeEhPlaceholderContato } from "../../src/routes/aplicacao-mentoria.ts";
 
 // Regressão do card com "Concurso: não informado" (conversa 3995): a descrição lia
 // d.qual_concurso (nome do atributo do Chatwoot), mas o formulário parseado usa a chave
@@ -26,5 +26,25 @@ describe("montarDescricaoTarefa", () => {
     expect(linhas).toHaveLength(3);
     expect(linhas[1]).toBe("🔁 - Follow-ups: 0");
     expect(linhas[2]).toBe("👤 - Descrição: inicio");
+  });
+});
+
+// Regressão da conv 4442: contato pré-existente ficou com o telefone como nome porque o branch de
+// atualização não corrigia o nome. Só sobrescrevemos quando o nome atual é placeholder.
+describe("nomeEhPlaceholderContato", () => {
+  test("é placeholder: telefone, só dígitos, vazio", () => {
+    expect(nomeEhPlaceholderContato("5521992887269")).toBe(true);
+    expect(nomeEhPlaceholderContato("+55 21 99288-7269")).toBe(true);
+    expect(nomeEhPlaceholderContato("(21) 99288-7269")).toBe(true);
+    expect(nomeEhPlaceholderContato("")).toBe(true);
+    expect(nomeEhPlaceholderContato("   ")).toBe(true);
+    expect(nomeEhPlaceholderContato(null)).toBe(true);
+    expect(nomeEhPlaceholderContato(undefined)).toBe(true);
+  });
+
+  test("NÃO é placeholder: nome real (tem letra) não é sobrescrito", () => {
+    expect(nomeEhPlaceholderContato("Monique G H Ferraz")).toBe(false);
+    expect(nomeEhPlaceholderContato("Ana")).toBe(false);
+    expect(nomeEhPlaceholderContato("José 2")).toBe(false);
   });
 });
