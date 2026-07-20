@@ -371,11 +371,21 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
   const formatado = await formatarTextoFn(state.outputAgente);
-  // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu
-  // do texto já enviado como apresentação de áudio/vídeo (mensagem_antes).
-  const frases = dividirMensagem(formatado)
-    .flatMap((bloco) => dividirEmFrases(bloco))
-    .filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f));
+  // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu do
+  // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
+  // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
+  const frasesBrutas = dividirMensagem(formatado).flatMap((bloco) => dividirEmFrases(bloco));
+  let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f));
+  // Salvaguarda: se o filtro esvaziou a mensagem só por causa do fecho passivo (a IA respondeu
+  // apenas com um "estou aqui para ajudar"), não ficar em silêncio — relaxa APENAS esse filtro e
+  // envia a última frase. Se sobrou só duplicata de mídia / nome de tool, aí sim fica em silêncio.
+  if (frases.length === 0 && frasesBrutas.length > 0) {
+    const semFechoPassivo = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoEhNomeDeTool(f));
+    if (semFechoPassivo.length > 0) {
+      logger.warn("main-agent", "Só fecho passivo sobrou após o filtro — enviando a última frase pra não ficar em silêncio");
+      frases = [semFechoPassivo[semFechoPassivo.length - 1]!];
+    }
+  }
   for (const frase of frases) {
     // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem, simulando digitação
     await pausaComDigitando(state.idConta, state.idConversa, calcularDelayDigitando(frase));

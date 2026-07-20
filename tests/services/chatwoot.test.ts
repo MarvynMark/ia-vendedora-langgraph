@@ -434,5 +434,23 @@ describe("chatwoot service", () => {
       expect(blocoTemFraseProibida("Qual plano se encaixa melhor pra você?")).toBe(false);
       expect(blocoTemFraseProibida("Tenha uma excelente tarde também!")).toBe(false);
     });
+
+    test("filtra os fechos passivos que vazaram na 4409 (fase de pagamento)", () => {
+      expect(blocoTemFraseProibida("Se precisar de mais alguma coisa ou tiver dúvidas sobre o pagamento, estou aqui para ajudar!")).toBe(true);
+      expect(blocoTemFraseProibida("Se tiver mais alguma dúvida ou precisar de ajuda com o pagamento, me avisa")).toBe(true);
+      expect(blocoTemFraseProibida("Estou aqui para ajudar no que for preciso!")).toBe(true);
+      expect(blocoTemFraseProibida("Se precisar de mais alguma coisa, é só me avisar!")).toBe(true);
+      expect(blocoTemFraseProibida("Qualquer coisa, me chama")).toBe(true);
+      expect(blocoTemFraseProibida("Conte comigo!")).toBe(true);
+    });
+
+    test("NÃO filtra CTAs ativos (ação concreta) nem respostas legítimas com 'se precisar'", () => {
+      // CTAs ativos: pedem uma ação ligada ao próximo passo, sem abertura passiva
+      expect(blocoTemFraseProibida("Me avisa quando finalizar!")).toBe(false);
+      expect(blocoTemFraseProibida("Assim que finalizar, me avisa pra eu liberar tudo pra você")).toBe(false);
+      expect(blocoTemFraseProibida("Me avisa quando cair o pagamento que eu já monto seu plano")).toBe(false);
+      // "se precisar" numa resposta de conteúdo (sem verbo de oferta) não deve casar
+      expect(blocoTemFraseProibida("Se precisar parcelar em mais vezes, dá pra fazer no link")).toBe(false);
+    });
   });
 });

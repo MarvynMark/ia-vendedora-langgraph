@@ -376,8 +376,9 @@ export function blocoEhNomeDeTool(bloco: string): boolean {
 }
 
 // Retorna true se o bloco contém uma frase de despedida/robótica explicitamente BANIDA pelo
-// roteiro ("boa sorte", "à disposição", "fica à vontade"). O prompt já as proíbe, mas o LLM às
-// vezes as usa no fim da conversa. Rede de segurança determinística que remove o bloco.
+// roteiro ("boa sorte", "à disposição", "fica à vontade", "estou aqui para ajudar", "se precisar
+// … me avisa", "qualquer coisa me chama"). O prompt já as proíbe, mas o LLM às vezes as usa no fim
+// da conversa (sobretudo na fase de pagamento). Rede de segurança determinística que remove o bloco.
 export function blocoTemFraseProibida(bloco: string): boolean {
   const b = normalizarTextoMidia(bloco);
   if (!b) return false;
@@ -387,6 +388,16 @@ export function blocoTemFraseProibida(bloco: string): boolean {
     // caractere \w) e evita falso-positivo com "a disposição das questões"
     /\b(estou|fico|fica|ficamos|estamos|sigo|seguimos)\s+[àa]\s+disposi[çc][ãa]o\b/,
     /\bfi(ca|que) [àa] vontade\b/, // "fica à vontade", "fique à vontade"
+    // "estou aqui/por aqui (para ajudar…)" — sinal de disponibilidade passiva
+    /\bestou (aqui|por aqui)\b/,
+    /\bconte comigo\b/,
+    // Família "se precisar/qualquer dúvida … me avisa / é só me avisar / estou aqui". Exige a
+    // ABERTURA passiva + um VERBO DE OFERTA na mesma frase (as frases já vêm divididas). Assim NÃO
+    // pega CTAs ativos como "me avisa quando finalizar" (sem abertura passiva) nem respostas
+    // legítimas como "se precisar parcelar em mais vezes, dá pra fazer no link" (sem verbo de oferta).
+    // Sem \b ao redor do ".*": em JS, "é"/"ú" não são \w, então \b antes de "é só" / depois de
+    // "dúvida" falharia. A exigência de abertura passiva + verbo de oferta já evita falso-positivo.
+    /\b(se precisar|se tiver (mais )?(alguma )?d[úu]vida|qualquer (coisa|d[úu]vida)).*(me avis|me cham|[ée] s[óo] (me )?(avis|cham|fal)|estou (aqui|por aqui)|conte comigo)/,
   ];
   return proibidas.some((re) => re.test(b));
 }
