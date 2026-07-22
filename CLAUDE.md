@@ -67,6 +67,33 @@ Follow-up types are classified by Kanban step:
 - **State**: LangGraph `Annotation.Root` with `MessagesAnnotation` for type-safe graph state
 - **TypeScript**: Strict mode, `noUncheckedIndexedAccess`, `noEmit`, `verbatimModuleSyntax`
 
+## Observability (Langfuse) — use this before diagnosing agent behavior
+
+Every graph execution is traced to a self-hosted Langfuse (`https://langfuse.softaxon.tech`),
+with `sessionId` = the lead's phone number. Traces contain the exact prompt sent, the raw model
+response, every tool call with its arguments, per-node timings, tokens and cost.
+
+**Whenever a question is about what the AI actually did — a bad reply, a tool that didn't fire,
+slowness, cost, a prompt change that may have regressed — query Langfuse first instead of
+guessing from the source code.** Chatwoot shows what the lead received; Langfuse shows what the
+agent reasoned. Use both together: Chatwoot MCP for funnel/Kanban state, Langfuse for the reasoning.
+
+```bash
+bun run lf resumo [dias]        # cost, tokens and volume per day
+bun run lf sessoes [n]          # most recent leads handled
+bun run lf conversa <telefone>  # a lead's full reasoning history (lead → tools → AI)
+bun run lf trace <id>           # waterfall: exactly where time and money went
+bun run lf lentos [n] [dias]    # slowest traces
+bun run lf caros [n] [dias]     # most expensive traces
+bun run lf erros [n]            # observations with ERROR/WARNING level
+```
+
+Typical loop: `lentos`/`caros` or `conversa <telefone>` to find a suspect trace → `trace <id>`
+to see which node is responsible. Source: `src/scripts/langfuse.ts`, handler in `src/lib/langfuse.ts`.
+
+After changing prompts, tools or graph nodes, compare `bun run lf resumo` before/after — a
+regression usually shows up as a jump in cost, latency or tool-call count before it shows up in sales.
+
 ## External Services
 
 OpenAI (GPT agent + Whisper transcription), Chatwoot (CRM/messaging with fazer.ai Kanban), ElevenLabs (TTS), Digital Manager Guru (payment webhooks). All configured via environment variables (see `.env.example`).
