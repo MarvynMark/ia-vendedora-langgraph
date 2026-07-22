@@ -65,3 +65,30 @@ export async function buscarDadosFormulario(telefone: string): Promise<string> {
     return "";
   }
 }
+
+// Versão estruturada e enxuta pra personalizar follow-ups (concurso/dificuldade). O agente
+// principal usa a string completa (buscarDadosFormulario); a camada de follow-up só precisa
+// destes campos pra injetar nos textos. Mesmo match por últimos 8 dígitos do WhatsApp.
+export async function buscarCamposFormulario(
+  telefone: string,
+): Promise<{ concurso: string | null; dificuldade: string | null } | null> {
+  if (!telefone) return null;
+  const ultimos8 = telefone.replace(/\D/g, "").slice(-8);
+  if (ultimos8.length < 8) return null;
+  try {
+    const result = await pool.query<{ concurso_desejado: string | null; maior_dificuldade: string | null }>(
+      `SELECT concurso_desejado, maior_dificuldade
+       FROM leads_formulario_mentoria
+       WHERE RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) = $1
+       ORDER BY criado_em DESC
+       LIMIT 1`,
+      [ultimos8],
+    );
+    const d = result.rows[0];
+    if (!d) return null;
+    return { concurso: d.concurso_desejado, dificuldade: d.maior_dificuldade };
+  } catch (e) {
+    logger.warn("db-formulario", "Erro ao buscar campos do formulário:", e);
+    return null;
+  }
+}

@@ -36,3 +36,36 @@ export function substituirNome(texto: string, nomeCru: string | null | undefined
     .replace(/\[Nome\]\s*,?\s*/g, "")   // "[Nome], " no início     → ""
     .replace(/\[Nome\]/g, "");          // qualquer resto
 }
+
+/**
+ * Personaliza um texto de follow-up com nome + campos do formulário (concurso/dificuldade),
+ * degradando limpo quando um campo falta.
+ *
+ * Convenção dos textos:
+ * - `[Nome]` → primeiro nome (via substituirNome).
+ * - `{{ ...trecho com [concurso]/[dificuldade]... }}` = SEGMENTO OPCIONAL: é mantido (com os
+ *   placeholders preenchidos) só se TODOS os campos citados nele tiverem valor; senão o segmento
+ *   inteiro some. Assim "a rotina de quem quer{{ a aprovação em [concurso]}} é corrida" vira
+ *   "...quem quer a aprovação em PCDF é corrida" OU, sem concurso, "...quem quer é corrida".
+ *   (Delimitador `{{ }}` — não colide com o `]` dos placeholders `[campo]`.)
+ */
+export function substituirCampos(
+  texto: string,
+  campos: { nome?: string | null; concurso?: string | null; dificuldade?: string | null },
+): string {
+  const valores: Record<string, string> = {};
+  const concurso = (campos.concurso ?? "").trim();
+  const dificuldade = (campos.dificuldade ?? "").trim();
+  if (concurso) valores["concurso"] = concurso;
+  if (dificuldade) valores["dificuldade"] = dificuldade.charAt(0).toLowerCase() + dificuldade.slice(1);
+
+  let out = texto.replace(/\{\{([\s\S]+?)\}\}/g, (_m, seg: string) => {
+    const usados = [...seg.matchAll(/\[(concurso|dificuldade)\]/g)].map((x) => x[1]!);
+    if (usados.some((k) => !valores[k])) return "";                                  // falta valor → remove o segmento
+    return seg.replace(/\[(concurso|dificuldade)\]/g, (_mm, k: string) => valores[k]!);
+  });
+
+  out = substituirNome(out, campos.nome);
+  // Limpa resíduos da remoção (espaço duplo, espaço antes de pontuação)
+  return out.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+([,.!?])/g, "$1").trim();
+}

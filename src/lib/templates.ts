@@ -11,13 +11,16 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Sequência de recuperação: Primeira mensagem (lead não respondeu a abertura) ---
   // variável {{1}} = primeiro nome. Cada mensagem traz um ângulo NOVO (reforço → prova social
   // → urgência), em vez de só perguntar "cadê você?". Template (janela fechada) ou msg normal (aberta).
+  // Personalização: [Nome] = primeiro nome; {{ ...[concurso]... }} = segmento opcional que só
+  // aparece se o concurso do lead for conhecido (via substituirCampos). NA JANELA FECHADA (template
+  // Meta) a personalização de concurso NÃO chega ao lead (a Meta usa o template aprovado com só {{1}}).
   fup1_reforco:
-    "Oi [Nome], imagino que a rotina tá corrida.\n\nMas separei um tempo pra ver seu caso e não quero que você perca essa chance. Me dá um oi rapidinho?",
+    "Oi [Nome], imagino que a rotina tá corrida{{, ainda mais pra quem quer a aprovação em [concurso]}}.\n\nMas separei um tempo pra ver seu caso e não quero que você perca essa chance. Me dá um oi rapidinho?",
   // Prova social em TEXTO (sem cabeçalho de imagem — evita o erro Meta #132000 do Chatwoot 4.15.1).
   fup2_prova_social:
     "Ei [Nome], essa semana mais alunos meus passaram na frente estudando com direção, não sozinhos.\n\nSeu perfil tem tudo pra entrar nesse caminho. Quer que eu te mostre como?",
   fup3_urgencia:
-    "Olha [Nome], tô fechando minha agenda de análises e não quero deixar seu caso de fora.\n\nSe ainda quer a aprovação como Perito, me manda um \"sim\" que eu priorizo seu direcionamento hoje.",
+    "Olha [Nome], tô fechando minha agenda de análises e não quero deixar seu caso de fora.\n\nSe ainda quer a aprovação{{ em [concurso]}}, me manda um \"sim\" que eu priorizo seu direcionamento hoje.",
 
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
@@ -27,7 +30,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência de recuperação: Conexão (janela aberta) ---
   // Leads que já conversaram mas pararam de responder
-  conexao_followup_1: "Oi [Nome], ficou alguma dúvida sobre o que conversamos? Pode falar sem compromisso",
+  conexao_followup_1: "Oi [Nome], ficou alguma dúvida sobre o que conversamos{{ da sua preparação pra [concurso]}}? Pode falar sem compromisso",
   conexao_followup_2:
     "Ei [Nome], quem entra na mentoria para de estudar no escuro: tem direção, material e acompanhamento meu. Foi o que virou o jogo pros meus aprovados. Faz sentido pra você?",
   conexao_followup_3: "Oi [Nome], ainda dá tempo de você entrar nessa turma. Quer que eu te explique o próximo passo?",

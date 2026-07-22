@@ -5,7 +5,8 @@ import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
-import { primeiroNomeSaudacao, substituirNome } from "../../lib/nome.ts";
+import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../lib/nome.ts";
+import { buscarCamposFormulario } from "../../db/formulario.ts";
 import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
@@ -166,7 +167,10 @@ async function agenteFollowup(state: FollowUpStateType) {
   }
 
   const nomeMsg = sequencia[contador]!;
-  const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
+  // Personaliza com concurso/dificuldade do formulário (só chega ao lead na janela aberta —
+  // fora dela usa o template Meta puro; ver textoEnviar abaixo).
+  const campos = await buscarCamposFormulario(state.telefone);
+  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   const templateFallback = fallbacks[contador] ?? "encerramento_02";
   const textoEnviar = dentroJanela ? conteudo : (CONTEUDO_TEMPLATES[templateFallback] ?? "");
 
@@ -391,7 +395,10 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${SEQUENCIA_RECUPERACAO_PM.length}) — janela: ${dentroJanela}`);
 
   // Dentro da janela: mensagem normal (não cobra template). Fora: template aprovado.
-  const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
+  // Personaliza com concurso do formulário — só chega ao lead na janela aberta (fora, a Meta usa
+  // o template com só {{1}}); substituirCampos garante que nenhum [[...]] cru vaze no conteúdo.
+  const campos = await buscarCamposFormulario(state.telefone);
+  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   try {
     if (dentroJanela && conteudo) {
       logger.info("follow-up", `Janela 24h ativa — mensagem normal: ${nomeMsg}`);
