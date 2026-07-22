@@ -3,9 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, enviarArquivo, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
-import { fetchComTimeout } from "../../lib/fetch-with-timeout.ts";
-import { VIDEO_BOAS_VINDAS_URL } from "../../tools/enviar-video.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { primeiroNomeSaudacao, substituirNome } from "../../lib/nome.ts";
 import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
@@ -283,97 +281,40 @@ async function agenteLembrete(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
-async function enviarVideoPlataforma(accountId: number, conversationId: number): Promise<void> {
-  try {
-    logger.info("follow-up", "Baixando vídeo para boas-vindas...");
-    const res = await fetchComTimeout(VIDEO_BOAS_VINDAS_URL, { method: "GET", timeout: 60_000 });
-    if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
+// Páginas de onboarding "Primeiros passos". Substituem a antiga sequência de 6 mensagens:
+// vídeo de apresentação, acesso à plataforma, Laudo Inicial, grupos oficiais e suporte
+// estão todos dentro da página, com checklist de progresso.
+const LINK_PRIMEIROS_PASSOS_PERITO = "https://lp.mentoriavestigium.com.br/primeiros-passos-perito";
+const LINK_PRIMEIROS_PASSOS_MEDICO = "https://lp.mentoriavestigium.com.br/primeiros-passos-medico";
 
-    const resContentType = res.headers.get("content-type") ?? "";
-    if (resContentType.includes("text/html")) {
-      throw new Error("URL retornou HTML — verifique se o link do Drive é público");
-    }
-
-    const buffer = await res.arrayBuffer();
-    await enviarArquivo(accountId, conversationId, new Uint8Array(buffer), "apresentacao-plataforma.mp4", "video/mp4");
-    logger.info("follow-up", "Vídeo enviado com sucesso na sequência de boas-vindas");
-  } catch (e) {
-    logger.error("follow-up", "Erro ao enviar vídeo nas boas-vindas:", e);
-  }
+// A trilha do aluno vem do plano que o webhook de pagamento grava no card
+// ("💳 - Plano: Mentoria Vestigium - Médico Legista - 12 meses"). Só a linha do plano é
+// analisada: o resto da description carrega marcadores de follow-up que poderiam dar
+// falso positivo. Sem plano identificável, cai na página de perito (maioria dos alunos).
+export function linkPrimeirosPassos(description: string): string {
+  const linhaPlano = description.match(/Plano:\s*(.+)/i)?.[1] ?? "";
+  return /m[ée]dic|legista/i.test(linhaPlano)
+    ? LINK_PRIMEIROS_PASSOS_MEDICO
+    : LINK_PRIMEIROS_PASSOS_PERITO;
 }
 
 async function agenteBoasVindas(state: FollowUpStateType) {
-  logger.info("follow-up", "iniciando sequência de boas-vindas...");
+  logger.info("follow-up", "enviando boas-vindas...");
 
   // Só o primeiro nome deixa a saudação mais natural (evita "Renan Martins Paludo").
   // Alinhado aos demais agentes do grafo, que já usam o primeiro nome.
   const primeiroNome = primeiroNomeSaudacao(state.title, "aluno(a)");
-  const accountId = state.accountId;
-  const conversationId = state.conversationId;
+  const link = linkPrimeirosPassos(state.description ?? "");
 
-  // Etapa 1 — Imediato
-  const msg1 = `🚀 ${primeiroNome}, parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já foi liberada e agora começa o seu processo rumo à aprovação.`;
+  const msg = `🚀 ${primeiroNome}, parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 ${link}\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.`;
+
   try {
-    await enviarMensagem(accountId, conversationId, msg1);
-    logger.info("follow-up", "boas-vindas etapa 1 enviada");
+    await enviarMensagem(state.accountId, state.conversationId, msg);
+    logger.info("follow-up", "boas-vindas enviada", { link });
   } catch (e) {
-    logger.error("follow-up", "Erro ao enviar etapa 1 das boas-vindas:", e);
+    logger.error("follow-up", "Erro ao enviar boas-vindas:", e);
   }
 
-  // Etapas 2–6 em background com delays
-  void (async () => {
-    // Etapa 2 — +30s: texto + vídeo
-    await new Promise(r => setTimeout(r, 30_000));
-    try {
-      const msg2 = `Gravei um vídeo rápido te mostrando como acessar a plataforma e por onde começar. Assiste agora pra já entrar com clareza 🚀`;
-      await enviarMensagem(accountId, conversationId, msg2);
-      await enviarVideoPlataforma(accountId, conversationId);
-    } catch (e) {
-      logger.error("follow-up", "Erro ao enviar etapa 2 das boas-vindas:", e);
-    }
-
-    // Etapa 3 — +1 min
-    await new Promise(r => setTimeout(r, 30_000));
-    try {
-      const msg3 = `Agora cria seu acesso à plataforma:\nhttps://aluno.mentoriavestigium.com.br/dash\n\nClica em "Criar conta gratuitamente", usa o e-mail da compra e define sua senha. Seu acesso já está liberado ✅`;
-      await enviarMensagem(accountId, conversationId, msg3);
-      logger.info("follow-up", "boas-vindas etapa 3 enviada");
-    } catch (e) {
-      logger.error("follow-up", "Erro ao enviar etapa 3 das boas-vindas:", e);
-    }
-
-    // Etapa 4 — +2 min
-    await new Promise(r => setTimeout(r, 60_000));
-    try {
-      const msg4 = `Preciso que você preencha o Laudo Inicial — é essencial pra montar seu plano de estudos dentro da mentoria:\nhttps://forms.gle/KwtrpzKPyuy6sFyT6`;
-      await enviarMensagem(accountId, conversationId, msg4);
-      logger.info("follow-up", "boas-vindas etapa 4 enviada");
-    } catch (e) {
-      logger.error("follow-up", "Erro ao enviar etapa 4 das boas-vindas:", e);
-    }
-
-    // Etapa 5 — +3 min
-    await new Promise(r => setTimeout(r, 60_000));
-    try {
-      const msg5 = `Entra aqui no grupo oficial da mentoria pra receber todos os avisos importantes:\n👉 https://chat.whatsapp.com/HS9NlWNw1RuInyZbPDr1FC`;
-      await enviarMensagem(accountId, conversationId, msg5);
-      logger.info("follow-up", "boas-vindas etapa 5 enviada");
-    } catch (e) {
-      logger.error("follow-up", "Erro ao enviar etapa 5 das boas-vindas:", e);
-    }
-
-    // Etapa 6 — +4 min
-    await new Promise(r => setTimeout(r, 60_000));
-    try {
-      const msg6 = `Esse aqui é o grupo de disciplina — recomendo entrar também:\n👉 https://t.me/+MqIIJEYWzucxZTlh\n\nJá salva nosso número de suporte:\n(62) 9 8167-2618`;
-      await enviarMensagem(accountId, conversationId, msg6);
-      logger.info("follow-up", "boas-vindas etapa 6 enviada");
-    } catch (e) {
-      logger.error("follow-up", "Erro ao enviar etapa 6 das boas-vindas:", e);
-    }
-  })();
-
-  // Retorna imediatamente — as etapas 2–6 rodam em background
   return { respostaAgente: "" };
 }
 

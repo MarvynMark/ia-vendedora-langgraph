@@ -8,8 +8,8 @@ import { logger } from "../lib/logger.ts";
 // Vídeo de apresentação da plataforma por dentro — enviado durante a VENDA (Etapa 5B, após imagem de entregáveis)
 export const VIDEO_PLATAFORMA_URL = "https://s3.stkd.site/arquivosclientes/Vestigium%2Fplataforma-entregaveis-walker-falando.mp4";
 
-// Vídeo de boas-vindas — enviado APENAS para alunos que acabaram de pagar (sequência de onboarding)
-export const VIDEO_BOAS_VINDAS_URL = "https://minio.stkd.site/api/v1/buckets/arquivosclientes/objects/download?preview=true&prefix=Vestigium%2Fboas-vindas.mp4";
+// O vídeo de boas-vindas não é mais enviado por aqui: ele vive dentro da página
+// "Primeiros passos" (src/graphs/follow-up/graph.ts), que é o único link do onboarding.
 
 const conversasComVideoEnviado = new Set<string>();
 
