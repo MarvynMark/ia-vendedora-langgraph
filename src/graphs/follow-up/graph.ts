@@ -467,6 +467,11 @@ const SEQUENCIA_NUTRIR = [
     prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead ainda não entrou na mentoria. Envie o link do meu e-book gratuito como gesto de valor, sem pressão. Diga que é um material meu pra quem quer entrar na área de perícia. NÃO ofereça nenhum produto pago. Curto. Link: https://www.csiacademy.com.br/ebooks`,
     proximoDelayDias: 30,
   },
+  {
+    abordagem: "reabertura",
+    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead demonstrou interesse há um tempo mas não entrou na mentoria. Avise, de forma leve e humana, que você está abrindo uma turma nova, e pergunte se agora faz mais sentido pra ele começar. Sem pressão, SEM inventar escassez com números, e NÃO ofereça nenhum outro produto. Máximo 2 linhas.`,
+    proximoDelayDias: 60,
+  },
 ];
 
 async function agenteNutrir(state: FollowUpStateType) {

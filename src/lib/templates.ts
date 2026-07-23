@@ -20,22 +20,22 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   fup2_prova_social:
     "Ei [Nome], essa semana mais alunos meus passaram na frente estudando com direção, não sozinhos.\n\nSeu perfil tem tudo pra entrar nesse caminho. Quer que eu te mostre como?",
   fup3_urgencia:
-    "Olha [Nome], tô fechando minha agenda de análises e não quero deixar seu caso de fora.\n\nSe ainda quer a aprovação{{ em [concurso]}}, me manda um \"sim\" que eu priorizo seu direcionamento hoje.",
+    "Oi [Nome], uma pergunta rápida: você já sabe montar um cronograma de estudos pro seu concurso{{ de [concurso]}}? É onde a maioria se perde. Quer que eu te mostre por onde começar?",
 
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
   olhinho_followup: "👀",
   encerramento_02:
-    "Como você não respondeu, vou encerrar seu atendimento por aqui para organizar as prioridades.\nSe decidir começar sua preparação de forma estratégica, me chama aqui, ok?",
+    "Antes de eu encerrar seu atendimento por aqui: ficou com alguma dúvida que eu possa esclarecer? Se ainda fizer sentido pra você começar, é só me dar um sinal.",
 
   // --- Sequência de recuperação: Conexão (janela aberta) ---
   // Leads que já conversaram mas pararam de responder
-  conexao_followup_1: "Oi [Nome], ficou alguma dúvida sobre o que conversamos{{ da sua preparação pra [concurso]}}? Pode falar sem compromisso",
+  conexao_followup_1: "Oi [Nome], lembrei de você{{ e da sua preparação pra [concurso]}}. Ficou alguma dúvida do que a gente conversou, ou foi mais questão de tempo?",
   conexao_followup_2:
-    "Ei [Nome], quem entra na mentoria para de estudar no escuro: tem direção, material e acompanhamento meu. Foi o que virou o jogo pros meus aprovados. Faz sentido pra você?",
+    "Oi [Nome], deixa eu te perguntar direto: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
   conexao_followup_3: "Oi [Nome], ainda dá tempo de você entrar nessa turma. Quer que eu te explique o próximo passo?",
   conexao_encerramento:
-    "Oi [Nome], vou deixar o espaço livre por aqui. Se decidir avançar com a mentoria, é só me chamar. Sucesso nos estudos!",
+    "Oi [Nome], antes de eu deixar o espaço livre por aqui: ficou alguma dúvida que eu possa esclarecer? Se ainda fizer sentido pra você, é só me dar um sinal.",
 
   // --- Sequência de recuperação: Conexão (janela fechada — Meta templates) ---
   conexao_duvida: "Ficou alguma dúvida sobre o que conversamos? Pode me chamar aqui sem compromisso",
@@ -47,13 +47,13 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   pos_preco_followup_2:
     "Ei [Nome], caso o valor tenha pesado, dá pra fazer o semestral em 12x de R$ 197 também — qual parcela ficaria melhor pra você?",
   pos_preco_followup_3:
-    "Oi [Nome], ficou alguma dúvida sobre o valor ou como a mentoria funciona por dentro? Me fala que eu te ajudo a ver o que faz mais sentido pro seu momento, sem compromisso.",
+    "Oi [Nome], e lembra: o risco é zero. Você tem 7 dias de garantia pra testar a mentoria por dentro, e se sentir que não é pra você, eu devolvo o valor, sem precisar justificar nada. Faz mais sentido assim?",
   // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
   // não substitui a variável — igual aos demais fallbacks (conexao_duvida, lembrete_acesso...).
   pos_preco_urgencia:
     "Oi, vou seguir com os outros atendimentos, mas consigo segurar sua condição até amanhã. Ainda quer garantir sua vaga?",
   pos_preco_encerramento:
-    "Oi [Nome], vou deixar o espaço livre. Se quiser retomar quando fizer sentido, é só me chamar",
+    "Oi [Nome], antes de encerrar: foi o valor que pesou ou ficou alguma dúvida? Se ainda fizer sentido, me dá um sinal que a gente vê a melhor forma pra você.",
 
   // --- Sequência pós-preço: Conexão (janela fechada — Meta templates) ---
   pos_preco_duvida: "Ficou alguma dúvida sobre o investimento? Me conta aqui que a gente resolve",
@@ -62,12 +62,12 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Sequência de lembrete: Aguardando Pagamento (janela aberta) ---
   lembrete_1: "Oi [Nome], o link ainda tá ativo. Ficou com alguma dúvida antes de confirmar?",
   lembrete_2:
-    "Ei [Nome], quando confirmar o pagamento já te envio todos os acessos na hora pra você começar ainda hoje",
+    "Oi [Nome], vi que você ainda não finalizou. Travou em alguma coisa na hora de finalizar? Me fala que eu te ajudo.",
   lembrete_3: "Oi [Nome], posso deixar tudo pronto pra você começar hoje. Confirma que eu já libero seus acessos?",
   lembrete_urgencia:
     "Oi [Nome], vou liberar sua vaga amanhã se não tiver retorno. Ainda consigo segurar até lá — quer confirmar?",
   lembrete_encerramento:
-    "Oi [Nome], vou liberar sua vaga por ora. Se quiser retomar, é só me chamar — o link pode ser reativado",
+    "Oi [Nome], vou liberar sua vaga por ora, mas o link pode ser reativado a qualquer momento. Travou alguma coisa no pagamento? Me fala que eu resolvo com você.",
 
   // --- Sequência de lembrete: Aguardando Pagamento (janela fechada — Meta templates) ---
   lembrete_acesso:
