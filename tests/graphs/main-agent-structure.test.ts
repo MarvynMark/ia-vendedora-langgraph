@@ -71,4 +71,21 @@ describe("main agent prompt", () => {
     expect(prompt.length).toBeGreaterThan(30000);
     expect(prompt.length).toBeLessThan(60000);
   });
+
+  // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
+  // recebeu o Trimestral. Agora a detecção é determinística (label + formação tolerante a typo).
+  const MARCA_MEDICO = "Detectado de forma determinística";
+  const baseCtx = { tarefa: {}, etapasDescricao: "", dataHoraAtual: "", nomeLead: "Leandra" };
+
+  test("detecta médico por typo na formação (Mediciba) e pela label", () => {
+    expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Mediciba | Concurso: MA", etiquetas: ["nao"] })).toContain(MARCA_MEDICO);
+    expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Medicina" })).toContain(MARCA_MEDICO);
+    expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Concurso: MA", etiquetas: ["medico"] })).toContain(MARCA_MEDICO);
+  });
+
+  test("NÃO marca médico para biomedicina/veterinária/outras formações", () => {
+    expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Biomedicina" })).not.toContain(MARCA_MEDICO);
+    expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Medicina Veterinária" })).not.toContain(MARCA_MEDICO);
+    expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Engenharia Civil" })).not.toContain(MARCA_MEDICO);
+  });
 });

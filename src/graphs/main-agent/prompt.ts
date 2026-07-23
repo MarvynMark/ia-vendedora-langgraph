@@ -18,6 +18,7 @@ interface ContextoPrompt {
   dadosFormulario: string;
   atributosContato?: Record<string, unknown>;
   nomeLead?: string;
+  etiquetas?: string[];
 }
 
 export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
@@ -33,6 +34,16 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   const dadosFormulario = ctx.dadosFormulario || "(não disponível)";
   const concursoSalvo = (ctx.atributosContato?.concurso_interesse as string | undefined) ?? "";
   const primeiroNome = (ctx.nomeLead ?? "").split(" ")[0] || "";
+
+  // Detecção DETERMINÍSTICA de médico → trilha Médico Legista. Autoritativo pela label "medico"
+  // (que o cadastro seta com a mesma lógica tolerante a typo). Fallback: formação contém "medic"
+  // (pega erros de digitação como "Mediciba", conv 4549), exceto biomedicina/veterinária. Sem isso,
+  // o gate dependia do LLM reconhecer "Medicina" na string e um typo o fazia vender Trimestral.
+  const formacaoNorm = (/(?:^|\|)\s*Forma[çc][ãa]o:\s*([^|]+)/i.exec(dadosFormulario)?.[1] ?? "")
+    .toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const ehMedico =
+    (ctx.etiquetas ?? []).includes("medico") ||
+    (/medic/.test(formacaoNorm) && !/biomedic/.test(formacaoNorm) && !/veterin/.test(formacaoNorm));
 
   return `# PAPEL
 
@@ -67,7 +78,9 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 
 # DADOS DO LEAD
 
-<dados-lead>
+<dados-lead>${ehMedico ? `
+  **⚠️ ESTE LEAD É MÉDICO — trilha Médico Legista OBRIGATÓRIA.** Detectado de forma determinística (label "medico" e/ou formação com "medic", inclusive typos como "Mediciba"). SÓ ofereça planos **Médico Legista**. É PROIBIDO oferecer Trimestral, Anual ou Semestral genéricos de Perito Criminal, MESMO com "disposto a investir" negativo ou reclamação de preço. Ignore o roteamento por disposição financeira para este lead.
+` : ""}
   **Nome do lead**: ${primeiroNome || "(não disponível)"}
   > Sempre que o roteiro contiver [Nome], substitua pelo nome acima. Nunca envie "[Nome]" literalmente.
 
@@ -238,7 +251,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e incluir a linha "status: proposta_apresentada" na descrição da task (mantendo o restante da descrição existente).**
 
   **GATE DE ROTEAMENTO — decida qual bloco usar ANTES de escrever qualquer preço, nesta ordem:**
-  1. A **Formação** do formulário é Medicina? → use a trilha **Médico Legista** (bloco logo abaixo) e pare aqui.
+  1. Apareceu o alerta **⚠️ ESTE LEAD É MÉDICO** nos DADOS DO LEAD (ou a formação é Medicina / o card tem a label "medico")? → use a trilha **Médico Legista** (bloco logo abaixo) e pare aqui. **Vale mesmo com erro de digitação na formação** (ex.: "Mediciba").
   2. O campo **Disposto a investir** do formulário é negativo ("Infelizmente não no momento", "não", "não tenho", "não consigo", "talvez")? → use o **PITCH TRIMESTRAL** (bloco abaixo). **REGRA DURA**: mesmo que o lead esteja quente, tenha respondido "pronto para garantir: Sim" ou demonstrado muito interesse, ele continua sendo um lead sem orçamento agora — NUNCA apresente Anual nem Semestral como primeira oferta pra ele. Interesse e capacidade de pagar são coisas diferentes; o roteamento é definido pelo campo do formulário, não pelo clima da conversa.
   3. Só se **Disposto a investir** for "Sim" → use o pitch de plano recomendado (Anual OU Semestral conforme o edital do concurso — um plano por vez, não os dois de uma vez).
 
