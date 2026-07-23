@@ -69,7 +69,9 @@ describe("main agent prompt", () => {
       dataHoraAtual: "",
     });
     expect(prompt.length).toBeGreaterThan(30000);
-    expect(prompt.length).toBeLessThan(60000);
+    // Teto atualizado: o prompt cresceu com Anual Completo, ganchos do formulário e regras de médico
+    // (~72k). Mantém um limite de sanidade contra crescimento descontrolado.
+    expect(prompt.length).toBeLessThan(90000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
