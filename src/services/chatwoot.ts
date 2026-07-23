@@ -514,7 +514,9 @@ export async function enviarTemplate(
   // Idioma e cabeçalho de mídia vêm do mapa TEMPLATE_META (default: pt_BR, sem mídia).
   const meta = TEMPLATE_META[templateName];
   const language = meta?.language ?? "pt_BR";
-  const bodyParams = processedParams ?? {};
+  // Se o template não tem variável (bodyVars 0), NÃO envia processed_params — evita a Meta
+  // rejeitar "param a mais" (ex.: template reaprovado sem {{1}} recebendo {{1}} do caller).
+  const bodyParams = meta?.bodyVars === 0 ? {} : (processedParams ?? {});
   // Sem mídia: params do corpo na raiz ({ "1": "João" }). Com cabeçalho de mídia, o Chatwoot
   // exige o formato estruturado { body: {...}, header: { media_url, media_type } }.
   const processedParamsFinal = meta?.mediaUrl

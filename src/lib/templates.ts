@@ -86,15 +86,31 @@ export interface TemplateMeta {
   /** URL PÚBLICA da imagem do cabeçalho (só para templates com header de mídia). */
   mediaUrl?: string;
   mediaType?: "image" | "video" | "document";
+  /** Nº de variáveis {{n}} no CORPO do template aprovado na Meta. Se 0, o enviarTemplate
+   *  NÃO manda processed_params (evita erro quando o template não tem variável — ex.: um
+   *  template reaprovado sem {{1}} recebendo {{1}} do caller). */
+  bodyVars?: number;
 }
 
 export const TEMPLATE_META: Record<string, TemplateMeta> = {
-  // Abertura criada em Portuguese (BR)
-  abertura02: { language: "pt_BR" },
-  // Sequência de recuperação criada em English (o texto do corpo é português mesmo)
-  fup1_reforco: { language: "en" },
-  // fup2 agora é TEXT-ONLY (sem cabeçalho de imagem) — recriar na Meta sem header de mídia
-  // para evitar o erro #132000 do Chatwoot 4.15.1.
-  fup2_prova_social: { language: "en" },
-  fup3_urgencia: { language: "en" },
+  // Abertura criada em Portuguese (BR), com {{1}} = primeiro nome.
+  abertura02: { language: "pt_BR", bodyVars: 1 },
+  // Sequência de recuperação criada em English (o texto do corpo é português mesmo).
+  fup1_reforco: { language: "en", bodyVars: 1 },
+  fup2_prova_social: { language: "en", bodyVars: 1 },
+  // fup3 reaprovado com a copy nova (cronograma) — SEM {{1}}. bodyVars 0 dropa o param.
+  fup3_urgencia: { language: "en", bodyVars: 0 },
+
+  // Templates de recuperação NOVOS aprovados na Meta (usados no envio fora da janela).
+  conexao_1: { language: "pt_BR", bodyVars: 1 },
+  conexao_2: { language: "pt_BR", bodyVars: 0 },
+  lembrete_2: { language: "pt_BR", bodyVars: 1 },
+
+  // Fallbacks SEM variável — o caller pode passar {{1}}, mas bodyVars 0 faz o enviarTemplate dropar.
+  conexao_duvida: { language: "pt_BR", bodyVars: 0 },
+  lembrete_acesso: { language: "pt_BR", bodyVars: 0 },
+  lembrete_urgencia_meta: { language: "pt_BR", bodyVars: 0 },
+  pos_preco_duvida: { language: "pt_BR", bodyVars: 0 },
+  pos_preco_urgencia: { language: "pt_BR", bodyVars: 0 },
+  encerramento_02: { language: "pt_BR", bodyVars: 0 },
 };

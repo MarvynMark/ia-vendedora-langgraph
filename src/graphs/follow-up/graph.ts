@@ -102,7 +102,7 @@ const SEQUENCIA_RECUPERACAO_CONEXAO = [
 const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
 
 // Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
-const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_duvida", "conexao_duvida"] as const;
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] as const;
 
 // Sequência pós-preço: acionada quando lead viu o pitch e sumiu (description contém "status: proposta_apresentada")
 const SEQUENCIA_POS_PRECO = [
@@ -189,7 +189,7 @@ async function agenteFollowup(state: FollowUpStateType) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar);
+      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar, { "1": primeiroNome });
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
@@ -214,7 +214,7 @@ const SEQUENCIA_LEMBRETE = ["lembrete_1", "lembrete_2", "lembrete_3", "lembrete_
 // "espremido" pra dentro da janela (24h+clamp), t3→t4 Dia 2 (pago), t4→encerramento Dia 3.
 const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fallback pago (fora da janela 24h), por posição do contador — reforço de acesso / urgência.
-const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "lembrete_acesso", "lembrete_acesso", "lembrete_urgencia_meta"] as const;
+const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "lembrete_2", "lembrete_acesso", "lembrete_urgencia_meta"] as const;
 
 async function agenteLembrete(state: FollowUpStateType) {
   logger.info("follow-up", "executando lembrete pré-configurado...");
@@ -265,7 +265,7 @@ async function agenteLembrete(state: FollowUpStateType) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar);
+      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar, { "1": primeiroNome });
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
