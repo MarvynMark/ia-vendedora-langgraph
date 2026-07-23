@@ -90,4 +90,12 @@ describe("main agent prompt", () => {
     expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Medicina Veterinária" })).not.toContain(MARCA_MEDICO);
     expect(gerarPromptAgentePrincipal({ ...baseCtx, dadosFormulario: "Formação: Engenharia Civil" })).not.toContain(MARCA_MEDICO);
   });
+
+  // Regressão conv 4565: agente disse que o Anual "puro" tinha aulas gravadas/PDF (fez a mentoria
+  // parecer cursinho). O prompt precisa proibir isso e rotear material completo pro Anual Completo.
+  test("proíbe fazer a mentoria parecer cursinho completo (material só no Anual Completo)", () => {
+    const p = gerarPromptAgentePrincipal({ tarefa: {}, etapasDescricao: "", dataHoraAtual: "" });
+    expect(p).toContain("PROIBIDO dizer que o Anual");
+    expect(p).toContain("não é um cursinho");
+  });
 });
