@@ -4,6 +4,7 @@ import type { ChatwootFollowUpPayload } from "../types/chatwoot.ts";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { atualizarKanbanTask } from "../services/chatwoot.ts";
 import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
+import { primeiroNomeSaudacao } from "../lib/nome.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 
@@ -178,6 +179,12 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
     return { status: "ignored", reason: "lead_convertido_step_desatualizado" };
   }
 
+  // O nome usado na saudação: prefere o nome REAL do contato (WhatsApp) ao título da tarefa
+  // do Kanban, que para leads criados sem nome vira o genérico "Conversa" → "Oi Conversa, ...".
+  // Só cai no task.title se o contato não tiver um primeiro nome válido.
+  const nomeContato = conversa.contact?.name ?? "";
+  const nomeSaudacao = primeiroNomeSaudacao(nomeContato) ? nomeContato : task.title;
+
   logger.info("follow-up", `Processando overdue para: ${telefone} — step: ${task.board_step.name} — tipo: ${tipoFollowup}`);
 
   const processamento = (async () => {
@@ -190,7 +197,7 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
         boardId: payload.board_id,
         taskId: task.id,
         board_step: task.board_step,
-        title: task.title,
+        title: nomeSaudacao,
         description: task.description ?? "",
         dueDate: task.due_date ?? "",
         telefone,

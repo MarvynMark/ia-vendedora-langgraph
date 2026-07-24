@@ -2,6 +2,7 @@ import { env } from "../config/env.ts";
 import { listarKanbanTasks, atualizarKanbanTask, buscarConversa } from "../services/chatwoot.ts";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { proximoHorarioComercial } from "./horario-comercial.ts";
+import { primeiroNomeSaudacao } from "./nome.ts";
 import { logger } from "./logger.ts";
 
 // Etapas rastreadas: Novo Lead (1), Primeira mensagem (7), Conexao (10), Aguardando Pagamento (8), Nutrir (12)
@@ -87,15 +88,20 @@ export async function verificarFollowupsPendentes() {
         // fazia o fetch falhar → telefone vazio → card pulado sem avançar due_date → follow-up preso.
         const convApiId = conversa.display_id ?? conversa.id;
         let telefone = "";
+        let nomeContato = "";
         try {
           const conversaCompleta = await buscarConversa(accountId, convApiId) as {
-            meta?: { sender?: { phone_number?: string } };
-            contact?: { phone_number?: string; additional_attributes?: { social_profiles?: { instagram?: string } } };
+            meta?: { sender?: { phone_number?: string; name?: string } };
+            contact?: { name?: string; phone_number?: string; additional_attributes?: { social_profiles?: { instagram?: string } } };
           };
           telefone =
             conversaCompleta.meta?.sender?.phone_number ??
             conversaCompleta.contact?.phone_number ??
             conversaCompleta.contact?.additional_attributes?.social_profiles?.instagram ??
+            "";
+          nomeContato =
+            conversaCompleta.meta?.sender?.name ??
+            conversaCompleta.contact?.name ??
             "";
         } catch (e) {
           logger.warn("followup-timer", `Erro ao buscar conversa ${conversa.id} para telefone:`, e);
@@ -129,7 +135,9 @@ export async function verificarFollowupsPendentes() {
               boardId,
               taskId: task.id,
               board_step: stepInfo,
-              title: task.title,
+              // Prefere o nome real do contato ao título da tarefa (que vira "Conversa" para
+              // leads sem nome). Só cai no task.title se o contato não tiver primeiro nome válido.
+              title: primeiroNomeSaudacao(nomeContato) ? nomeContato : task.title,
               description: task.description ?? "",
               dueDate: task.due_date ?? "",
               telefone,

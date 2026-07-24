@@ -8,6 +8,11 @@
 // Token que é basicamente um telefone: só dígitos e símbolos de telefone (+, -, (), ., espaço).
 const SO_NUMERO_RE = /^[\d+()\-.\s]+$/;
 
+// Placeholders genéricos que o Chatwoot/Kanban usa quando o contato não tem nome real
+// (ex.: título de tarefa "Conversa", contato "Contato"). Não são nomes de pessoa — se
+// usados na saudação viram o esquisito "Oi Conversa, ...". Tratados como inválidos.
+const PLACEHOLDERS_GENERICOS = new Set(["conversa", "contato", "cliente", "lead", "aluno", "aluna"]);
+
 /**
  * Retorna o primeiro nome do lead para saudação, ou `fallback` quando o "nome" é inválido
  * (vazio ou parece um telefone/wa_id). Ex.: "Maria Silva" → "Maria"; "5518997537716" → fallback.
@@ -19,6 +24,7 @@ export function primeiroNomeSaudacao(nomeCru: string | null | undefined, fallbac
   if (!primeiro) return fallback;
   if (SO_NUMERO_RE.test(primeiro)) return fallback;                 // "+5518...", "18 99753-7716"
   if ((primeiro.match(/\d/g) ?? []).length >= 4) return fallback;   // muitos dígitos = wa_id/telefone
+  if (PLACEHOLDERS_GENERICOS.has(primeiro.toLowerCase())) return fallback; // "Conversa", "Contato"...
   return primeiro;
 }
 
