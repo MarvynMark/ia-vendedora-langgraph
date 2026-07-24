@@ -105,6 +105,8 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   conexao_1: { language: "pt_BR", bodyVars: 1 },
   conexao_2: { language: "pt_BR", bodyVars: 0 },
   lembrete_2: { language: "pt_BR", bodyVars: 1 },
+  // Encerramento consultivo aprovado com {{1}} = primeiro nome.
+  encerramento: { language: "pt_BR", bodyVars: 1 },
 
   // Fallbacks SEM variável — o caller pode passar {{1}}, mas bodyVars 0 faz o enviarTemplate dropar.
   conexao_duvida: { language: "pt_BR", bodyVars: 0 },

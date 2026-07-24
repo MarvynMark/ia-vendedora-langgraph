@@ -157,7 +157,7 @@ async function agenteFollowup(state: FollowUpStateType) {
           await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
         }
       } else {
-        await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", CONTEUDO_TEMPLATES["encerramento_02"]);
+        await enviarTemplate(state.accountId, state.conversationId, "encerramento", conteudoEnc, { "1": primeiroNome });
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento:", e);
@@ -235,7 +235,7 @@ async function agenteLembrete(state: FollowUpStateType) {
           await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
         }
       } else {
-        await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", CONTEUDO_TEMPLATES["encerramento_02"]);
+        await enviarTemplate(state.accountId, state.conversationId, "encerramento", conteudoEnc, { "1": primeiroNome });
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento lembrete:", e);
@@ -382,7 +382,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
           await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
         }
       } else {
-        await enviarTemplate(state.accountId, state.conversationId, "encerramento_02", conteudoEnc);
+        await enviarTemplate(state.accountId, state.conversationId, "encerramento", conteudoEnc ?? "", { "1": primeiroNome });
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento Primeira mensagem:", e);
