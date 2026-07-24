@@ -172,7 +172,11 @@ async function agenteFollowup(state: FollowUpStateType) {
   const campos = await buscarCamposFormulario(state.telefone);
   const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   const templateFallback = fallbacks[contador] ?? "encerramento_02";
-  const textoEnviar = dentroJanela ? conteudo : (CONTEUDO_TEMPLATES[templateFallback] ?? "");
+  // Fora da janela o lead recebe o template Meta (só {{1}}=nome). O texto REGISTRADO no Chatwoot
+  // precisa refletir isso: substitui o nome e remove os segmentos {{ }} de concurso que o template
+  // Meta não envia. Sem isso o registro mostrava "[Nome]" cru (ou vazio, quando a chave não existia).
+  const textoFallback = CONTEUDO_TEMPLATES[templateFallback] ?? CONTEUDO_TEMPLATES[nomeMsg] ?? "";
+  const textoEnviar = dentroJanela ? conteudo : substituirCampos(textoFallback, { nome: state.title });
 
   // Trava anti-duplicata: não reenvia se for idêntico ao último que o agente mandou.
   const ultimaAgente = await ultimaMensagemAgente(state.accountId, state.conversationId);
@@ -247,7 +251,10 @@ async function agenteLembrete(state: FollowUpStateType) {
   const nomeMsg = SEQUENCIA_LEMBRETE[contador]!;
   const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
   const templateFallback = TEMPLATE_FALLBACK_LEMBRETE[contador] ?? "encerramento_02";
-  const textoEnviar = dentroJanela ? conteudo : (CONTEUDO_TEMPLATES[templateFallback] ?? "");
+  // Fora da janela o registro no Chatwoot deve refletir o template Meta ({{1}}=nome), não o
+  // "[Nome]" cru — substitui o nome (e remove segmentos {{ }} caso existam).
+  const textoFallback = CONTEUDO_TEMPLATES[templateFallback] ?? CONTEUDO_TEMPLATES[nomeMsg] ?? "";
+  const textoEnviar = dentroJanela ? conteudo : substituirCampos(textoFallback, { nome: state.title });
 
   // Trava anti-duplicata: se o texto for idêntico ao último que o agente mandou, não reenvia
   // (evita repetir o mesmo template de fallback em toques consecutivos). Contador avança normal.
