@@ -9,42 +9,49 @@ import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, ad
 const KANBAN_BOARD_ID = 1;
 const KANBAN_STEP_NOVO_LEAD = 1;
 
-// Mapeamento: chave do formulário → coluna da tabela
-const CAMPO_MAP: Record<string, string> = {
-  "Qual é o seu nome completo?": "nome_completo",
-  "Qual é o seu WhatsApp?": "whatsapp",
-  "Qual é o seu e-mail?": "email",
-  "Qual é a sua idade?": "idade",
-  "Qual é a sua área de graduação/curso de formação superior?": "area_graduacao",
-  "Qual é o concurso de Perito Criminal você deseja prestar?": "concurso_desejado",
-  "Você já foi aluno do Perito Walker?": "ja_foi_aluno",
-  "Você estuda para concursos há muito tempo? Qual é o seu nível de concurseiro?": "nivel_concurseiro",
-  "Qual é sua maior dificuldade frente aos estudos para concurso para Perito Criminal?": "maior_dificuldade",
-  "O que te fez dar o primeiro passo em busca de uma mentoria?": "motivo_mentoria",
-  "O que você espera que essa mentoria te traga em relação aos seus estudos?": "expectativa_mentoria",
-  "Você tem um plano B caso a aprovação não venha logo de imediato?": "plano_b",
-  "O que você acredita que faltou para você ser aprovado em um concurso até agora?": "o_que_faltou",
-  "O você acha que seria diferente na sua preparação caso tenha o perito Walker como mentor?": "diferenca_com_mentor",
-  "Você está disposto e teria condições de investir cerca de R$ 197 por mês (12x de 197) para ser acompanhado pelo Perito Walker?": "disposto_investir",
-  "Por fim: se sua aplicação for aprovada, você estaria pronto para garantir sua vaga hoje?": "pronto_para_garantir",
+// Mapeamento pergunta → coluna por PADRÃO (não por texto exato). O formulário é reformulado com
+// frequência; casar por texto exato quebrava silenciosamente (coluna virava null → quebrou a
+// detecção de médico, conv 4549). Cada título é testado contra os padrões na ORDEM (primeiro casa,
+// primeiro leva) — por isso "dificuldade" vem antes de "concurso" (a pergunta de dificuldade também
+// contém "concurso"). Cobre os forms Perito (atual) e Médico ("Você é?" para graduação).
+// Obs: o ideal futuro é o n8n repassar o `question_id` (estável) e mapear por ID — imune a texto.
+const CAMPO_PADROES: Array<{ re: RegExp; coluna: string }> = [
+  { re: /nome completo/i, coluna: "nome_completo" },
+  { re: /whatsapp/i, coluna: "whatsapp" },
+  { re: /e-?mail/i, coluna: "email" },
+  { re: /idade/i, coluna: "idade" },
+  { re: /dificuldade/i, coluna: "maior_dificuldade" },
+  { re: /concurso.*(deseja|prestar)/i, coluna: "concurso_desejado" },
+  { re: /gradua|forma[çc][ãa]o|^\s*voc[êe]\s+[ée]\s*\??\s*$/i, coluna: "area_graduacao" },
+  { re: /primeiro passo|o que te fez/i, coluna: "motivo_mentoria" },
+  { re: /o que voc[êe] espera/i, coluna: "expectativa_mentoria" },
+  { re: /o que.*faltou/i, coluna: "o_que_faltou" },
+  { re: /seria diferente/i, coluna: "diferenca_com_mentor" },
+  { re: /plano b\b/i, coluna: "plano_b" },
+  { re: /n[íi]vel/i, coluna: "nivel_concurseiro" },
+  { re: /j[áa] foi aluno/i, coluna: "ja_foi_aluno" },
+  { re: /pronto para (garantir|come[çc]ar)|garantir sua vaga/i, coluna: "pronto_para_garantir" },
+  // "disposto a investir" foi REMOVIDO do formulário (fluxo único) — de propósito não tem padrão.
+];
 
-  // --- Variantes do formulário MÉDICO LEGISTA (perguntas com texto diferente do Perito Criminal).
-  // Sem estas, todo lead de Médico Legista perdia concurso/formação/dificuldade/disposição (ficavam
-  // null): concurso e trilha errados, sem label "medico". (Ex.: contato Omilto, conv 4394.)
-  "Você é?": "area_graduacao",
-  "Qual é o concurso de Perito Médico Legista você deseja prestar?": "concurso_desejado",
-  "Qual é sua maior dificuldade frente aos estudos para concurso?": "maior_dificuldade",
-  "Você está disposto e teria condições de investir cerca de R$ 400 por mês (pagamento em 12x de 400) para ser acompanhado pelo Perito Walker e pela Dra. Natália na Mentoria?": "disposto_investir",
-};
+const COLUNAS_VALIDAS = new Set(CAMPO_PADROES.map(p => p.coluna));
 
-const COLUNAS_VALIDAS = new Set(Object.values(CAMPO_MAP));
+// Retorna a coluna do primeiro padrão que casa com o título da pergunta, ou null.
+function colunaDaPergunta(titulo: string): string | null {
+  for (const { re, coluna } of CAMPO_PADROES) {
+    if (re.test(titulo)) return coluna;
+  }
+  return null;
+}
 
 // Monta a descrição de 3 linhas do card do Kanban a partir do formulário parseado.
-// `d` tem as chaves de CAMPO_MAP (ex.: concurso_desejado) — NÃO as dos atributos do Chatwoot
+// `d` tem as colunas de CAMPO_PADROES (ex.: concurso_desejado) — NÃO as dos atributos do Chatwoot
 // (qual_concurso), que só são criadas depois em atributosFormulario.
 export function montarDescricaoTarefa(d: Record<string, string>): string {
-  const dispostoInvestir = (d.disposto_investir ?? "").toLowerCase();
-  const emojiAtendimento = (dispostoInvestir.includes("sim") || dispostoInvestir.includes("quero")) ? "🟢" : "🟣";
+  // Sinal visual de lead quente: agora baseado em "pronto para garantir" (o "disposto a investir"
+  // foi removido do formulário). 🟢 se respondeu afirmativo, 🟣 caso contrário.
+  const pronto = (d.pronto_para_garantir ?? "").toLowerCase();
+  const emojiAtendimento = (pronto.includes("sim") || pronto.includes("certeza")) ? "🟢" : "🟣";
   const concursoDescricao = d.concurso_desejado ?? "não informado";
   return [
     `${emojiAtendimento} - Concurso: ${concursoDescricao}`,
@@ -65,18 +72,18 @@ export function nomeEhPlaceholderContato(nomeAtual: string | null | undefined): 
 // Schema aceita qualquer objeto com strings — o parse faz o mapeamento
 const formularioSchema = z.record(z.string(), z.string());
 
-function parsearFormulario(raw: Record<string, string>): Record<string, string> {
+export function parsearFormulario(raw: Record<string, string>): Record<string, string> {
   const resultado: Record<string, string> = {};
   const naoMapeadas: string[] = [];
   for (const [pergunta, resposta] of Object.entries(raw)) {
-    const coluna = CAMPO_MAP[pergunta];
-    if (coluna) {
+    const coluna = colunaDaPergunta(pergunta);
+    if (coluna && !(coluna in resultado)) {
       resultado[coluna] = resposta;
-    } else {
+    } else if (!coluna) {
       naoMapeadas.push(pergunta);
     }
   }
-  // Visibilidade: perguntas do payload que NÃO bateram com nenhuma chave do CAMPO_MAP são
+  // Visibilidade: perguntas do payload que NÃO bateram com nenhum padrão de CAMPO_PADROES são
   // descartadas silenciosamente. Se o texto de uma pergunta mudar no formulário, isso avisa
   // (senão o campo viraria null pra todos sem ninguém perceber).
   if (naoMapeadas.length) {
@@ -165,7 +172,6 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     ...(d.expectativa_mentoria ? { espera_da_mentoria: d.expectativa_mentoria } : {}),
     ...(d.nivel_concurseiro   ? { nivel_concurseiro: d.nivel_concurseiro } : {}),
     ...(d.motivo_mentoria     ? { motivo_mentoria: d.motivo_mentoria } : {}),
-    ...(d.disposto_investir   ? { disposto_investir: d.disposto_investir } : {}),
     ...(d.pronto_para_garantir ? { pronto_para_garantir: d.pronto_para_garantir } : {}),
     ...(d.ja_foi_aluno        ? { ja_foi_aluno: d.ja_foi_aluno } : {}),
   };
@@ -223,18 +229,14 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   if (ehMedico) etiquetas.push("medico");
 
   // agente-on é adicionado SEMPRE — a IA atende TODOS os leads novos, inclusive quando o
-  // formulário vem incompleto (sem a resposta de "disposto a investir"). Antes o agente-on só
-  // era aplicado nos branches sim/não, então aplicação incompleta (disposto_investir vazio)
-  // ficava SEM automação (bug do contato Omilto, conv 4394).
+  // formulário vem incompleto. É o único gatilho de automação agora (as labels sim/nao, que
+  // dependiam do "disposto a investir", foram aposentadas).
   etiquetas.push("agente-on");
 
-  // sim / nao: qualificação adicional pela disposição para investir (não gateia a automação)
-  const disposto = (d.disposto_investir ?? "").toLowerCase();
-  if (disposto.includes("sim") || disposto.includes("quero")) {
-    etiquetas.push("sim");
-  } else if (disposto.includes("nao") || disposto.includes("não") || disposto.includes("talvez")) {
-    etiquetas.push("nao");
-  }
+  // (Labels "sim"/"nao" APOSENTADAS: derivavam da pergunta "disposto a investir", removida do
+  // formulário — agora é um fluxo único para todos, com a qualificação feita pela própria IA.
+  // Quem dependia delas foi repontado para "agente-on": gatilho da intro pós-grupo-espera
+  // e filtro de ativação no webhook.)
 
   await adicionarEtiquetas(accountId, conversa.id, etiquetas);
   logger.info("aplicacao", "Etiquetas adicionadas:", etiquetas);

@@ -143,12 +143,13 @@ export const webhookRouter = new Elysia()
         `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
       );
 
-      // Para leads de formulário (sim OU nao): agendar intro da IA (dispara ~2min depois pelo cron).
-      // A IA atende ambos os grupos — a intro inicia o roteiro do Walker. PERSISTIDA no banco
-      // (não é mais setTimeout em memória, que morria em deploy/crash e deixava o lead só com o
-      // link do grupo, sem apresentação — bug da conv 4413).
-      if (labels.includes("nao") || labels.includes("sim")) {
-        logger.info("webhook", "Lead de formulário detectado (sim/nao): agendando intro (+2min, persistida)");
+      // Para leads de formulário: agendar intro da IA (dispara ~2min depois pelo cron). A IA
+      // inicia o roteiro do Walker. Agora todo lead de formulário recebe "agente-on" (as labels
+      // sim/nao foram aposentadas com a remoção do "disposto a investir"), então o gatilho passa a
+      // ser esse. PERSISTIDA no banco (não é mais setTimeout em memória, que morria em
+      // deploy/crash e deixava o lead só com o link do grupo, sem apresentação — bug da conv 4413).
+      if (labels.includes("agente-on")) {
+        logger.info("webhook", "Lead de formulário detectado (agente-on): agendando intro (+2min, persistida)");
         await agendarIntroPendente({
           idConta,
           idConversa,
