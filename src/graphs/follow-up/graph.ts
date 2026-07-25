@@ -60,7 +60,7 @@ async function encerrarParaNutrir(state: FollowUpStateType): Promise<void> {
   logger.info("follow-up", `Encerrado → Nutrir (step ${destino}), contador zerado, próximo nurturing em 7d`);
 }
 
-async function classificar(state: FollowUpStateType) {
+export async function classificar(state: FollowUpStateType) {
   // Se tipoFollowup já foi definido pelo chamador (verificar-followups.ts), usa direto
   if (state.tipoFollowup && state.tipoFollowup !== "ignorar") {
     logger.info("follow-up", "tipoFollowup pré-definido:", state.tipoFollowup);
@@ -75,7 +75,16 @@ async function classificar(state: FollowUpStateType) {
   if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
   } else if (stepName === "aguardando pagamento") {
-    tipoFollowup = "lembrete";
+    // "Aguardando Pagamento" tem duas subpopulações distinguidas pelo status na descrição:
+    // - proposta_apresentada SEM link enviado = viu o preço e sumiu → sequência PÓS-PREÇO
+    //   (agenteFollowup detecta proposta_apresentada e usa SEQUENCIA_POS_PRECO). Antes esses
+    //   leads caíam no lembrete, que fala "o link ainda tá ativo" — link que nunca foi enviado.
+    // - link enviado = comprometeu-se, falta pagar → lembrete de pagamento.
+    const desc = state.description ?? "";
+    const temLink = /link\s*enviado/i.test(desc);
+    // Mesmo padrão que o agenteFollowup usa pra ativar a SEQUENCIA_POS_PRECO (isPosPreco).
+    const propostaApresentada = /status:\s*proposta_apresentada/i.test(desc);
+    tipoFollowup = (propostaApresentada && !temLink) ? "followup" : "lembrete";
   } else if (stepName === "ganho") {
     tipoFollowup = "boas_vindas";
   } else if (stepName === "primeira mensagem") {

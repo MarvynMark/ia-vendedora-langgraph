@@ -43,9 +43,9 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência pós-preço: Conexão (janela aberta) ---
   // Acionada quando lead viu o pitch de preço e sumiu (description contém "status: proposta_apresentada")
-  pos_preco_followup_1: "Oi [Nome], ficou alguma dúvida sobre o investimento?",
+  pos_preco_followup_1: "Oi [Nome], ficou alguma dúvida sobre o investimento ou sobre como a mentoria funciona? Me pergunta aqui que eu te respondo.",
   pos_preco_followup_2:
-    "Ei [Nome], caso o valor tenha pesado, dá pra fazer o semestral em 12x de R$ 197 também — qual parcela ficaria melhor pra você?",
+    "Ei [Nome], se o valor pesou de cabeça, dá pra dividir em até 12x no boleto ou no PIX, uma parcela por mês, sem precisar de limite no cartão. Quer que eu te mostre como fica?",
   pos_preco_followup_3:
     "Oi [Nome], e lembra: o risco é zero. Você tem 7 dias de garantia pra testar a mentoria por dentro, e se sentir que não é pra você, eu devolvo o valor, sem precisar justificar nada. Faz mais sentido assim?",
   // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
