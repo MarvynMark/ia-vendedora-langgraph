@@ -48,6 +48,31 @@ describe("parsearFormulario (mapeamento por padrão)", () => {
     expect(d.maior_dificuldade).toBe("Rotina do plantão");
   });
 
+  // Regressão real (conv 4669, Luana): formulário reformulado ("graduação superior", "dificuldade
+  // ...de Perito", "pronto para começar"). No CAMPO_MAP antigo (texto exato) esses 3 viravam null;
+  // com os padrões têm que casar. Payload = objeto `answers` achatado que o n8n repassa.
+  test("payload real do form reformulado popula TODAS as 8 colunas (regressão conv 4669)", () => {
+    const d = parsearFormulario({
+      "Qual é o seu nome completo?": "Luana Pascoal",
+      "Qual é o seu WhatsApp?": "55 61993058056",
+      "Qual é o seu e-mail?": "luana.eluan@gmail.com",
+      "Qual é a sua graduação superior?": "engenharia civil",
+      "Qual é o concurso de Perito Criminal você deseja prestar?": "pcdf",
+      "Qual é sua maior dificuldade frente aos estudos para concurso de Perito Criminal?": "direcionamento no que deve ser estudado",
+      "O que te fez dar o primeiro passo em busca de uma mentoria?": "a matéria é muito extensa, quero direcionamento nos estudos de acordo com a banca.",
+      "Por fim: se seu formulário for aprovado, você estaria pronto para começar na mentoria hoje?": "Sim, com certeza!",
+    });
+    expect(d.area_graduacao).toBe("engenharia civil");       // antes: null
+    expect(d.maior_dificuldade).toBe("direcionamento no que deve ser estudado"); // antes: null
+    expect(d.pronto_para_garantir).toBe("Sim, com certeza!"); // antes: null → agora casa (🟢)
+    expect(d.concurso_desejado).toBe("pcdf");
+    expect(d.motivo_mentoria).toContain("a matéria é muito extensa");
+    expect(d.nome_completo).toBe("Luana Pascoal");
+    expect(Object.keys(d).sort()).toEqual(
+      ["area_graduacao", "concurso_desejado", "email", "maior_dificuldade", "motivo_mentoria", "nome_completo", "pronto_para_garantir", "whatsapp"].sort(),
+    );
+  });
+
   test("'disposto a investir' foi removido: se vier no payload, é ignorado (não vira coluna)", () => {
     const d = parsearFormulario({
       "Você está disposto e teria condições de investir cerca de R$ 197 por mês?": "Não",
