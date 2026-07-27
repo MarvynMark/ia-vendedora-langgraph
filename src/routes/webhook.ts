@@ -4,6 +4,7 @@ import type { ChatwootWebhookPayload } from "../types/chatwoot.ts";
 import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao } from "./webhook-filtros.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
 import { limparHistorico } from "../db/memoria.ts";
@@ -96,30 +97,18 @@ export const webhookRouter = new Elysia()
     }
     const payload = body as ChatwootWebhookPayload;
 
-    // Verificar se é mensagem incoming (Chatwoot sends 0 or "incoming")
-    const mt = parsed.data.message_type;
-    if (mt !== 0 && mt !== "incoming") {
-      logger.info("webhook", "Ignorado: message_type =", mt);
-      return { status: "ignored", reason: "not_incoming" };
-    }
-
-    // Reação (emoji) NÃO é mensagem: chega como incoming com is_reaction=true e content = o emoji.
-    // Tratá-la como mensagem faz a IA responder a um ❤️/🙏 como se fosse um "sim" — na conv 4677
-    // o lead reagiu ❤️ ao pitch e a IA mandou o link de pagamento. Ignorar sempre.
-    if (parsed.data.content_attributes?.is_reaction === true) {
-      logger.info("webhook", "Ignorado: reação (is_reaction), não é mensagem");
-      return { status: "ignored", reason: "reaction" };
-    }
-
-    // Ignorar mensagens enviadas pelo bot/agente:
-    // Chatwoot dispara message_created com message_type:0 para mensagens do bot também.
-    // O sender do contato tem id == contact_inbox.contact_id.
-    // O sender do agente/bot tem id diferente do contact_id.
-    const senderId = parsed.data.sender.id;
-    const contactId = payload.conversation?.contact_inbox?.contact_id;
-    if (contactId !== undefined && senderId !== contactId) {
-      logger.info("webhook", "Ignorado: sender não é o contato da conversa (mensagem do bot/agente)");
-      return { status: "ignored", reason: "agent_message" };
+    // Decisões de ignorar ANTES do grupo-espera: mensagem não-incoming, REAÇÃO (emoji — conv 4677:
+    // lead reagiu ❤️ e a IA tratou como "sim" e mandou o link) e mensagem do próprio bot/agente
+    // (sender != contato). Lógica pura em src/routes/webhook-filtros.ts (testada sem mocks).
+    const motivoPre = motivoIgnorarPreGrupo(
+      parsed.data.message_type,
+      parsed.data.content_attributes?.is_reaction,
+      parsed.data.sender.id,
+      payload.conversation?.contact_inbox?.contact_id,
+    );
+    if (motivoPre) {
+      logger.info("webhook", `Ignorado: ${motivoPre}`);
+      return { status: "ignored", reason: motivoPre };
     }
 
     const labels = parsed.data.conversation?.labels ?? [];
@@ -178,20 +167,12 @@ export const webhookRouter = new Elysia()
       return { status: "ok", action: "grupo_espera" };
     }
 
-    // Filtro de ativação: só processar conversas com "agente-on"
-    if (!labels.includes("agente-on")) {
-      logger.info("webhook", "Ignorado: label agente-on ausente");
-      return { status: "ignored", reason: "no_agente-on" };
-    }
-
-    // (Filtro de qualificação sim/nao REMOVIDO: a IA agora atende AMBOS os grupos.
-    // A ativação é controlada apenas pelo label "agente-on" acima — o humano assume
-    // uma conversa removendo esse label.)
-
-    // Modo teste: só processa conversas com "teste-agente"
-    if (env.MODO_TESTE && !labels.includes("teste-agente")) {
-      logger.info("webhook", "Modo teste ativo — ignorado: label teste-agente ausente");
-      return { status: "ignored", reason: "modo_teste" };
+    // Filtro de ativação: "agente-on" (o humano assume removendo o label) + modo teste.
+    // Lógica pura em src/routes/webhook-filtros.ts (testada sem mocks).
+    const motivoAtiv = motivoIgnorarAtivacao(labels, env.MODO_TESTE);
+    if (motivoAtiv) {
+      logger.info("webhook", `Ignorado (ativação): ${motivoAtiv}`);
+      return { status: "ignored", reason: motivoAtiv };
     }
 
     // Comando /reset
