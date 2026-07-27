@@ -28,6 +28,7 @@ import {
   blocoEhNomeDeTool,
   precisaFechoAtivoDeResgate,
   FECHO_ATIVO_RESGATE,
+  obterTextosMidia,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -483,6 +484,33 @@ describe("chatwoot service", () => {
     test("o texto de resgate é um CTA ativo (termina em pergunta, sem frase passiva)", () => {
       expect(FECHO_ATIVO_RESGATE.trim().endsWith("?") || /me confirma/i.test(FECHO_ATIVO_RESGATE)).toBe(true);
       expect(blocoTemFraseProibida(FECHO_ATIVO_RESGATE)).toBe(false);
+    });
+  });
+
+  // Registro de texto de mídia (mensagem_antes): guarda o ORIGINAL pra persistir no histórico,
+  // fechando a duplicação da conv 4700 (run concorrente repetia a etapa por não ver a mídia).
+  describe("registro de texto de mídia (obterTextosMidia)", () => {
+    test("guarda o texto ORIGINAL (com acento/pontuação) e retorna na ordem enviada", () => {
+      limparTextosMidia("simc1");
+      registrarTextoMidia("simc1", "Entendi. Vi que você é formado em Engenharia Química.");
+      registrarTextoMidia("simc1", "Dá uma olhadinha no vídeo.");
+      expect(obterTextosMidia("simc1")).toEqual([
+        "Entendi. Vi que você é formado em Engenharia Química.",
+        "Dá uma olhadinha no vídeo.",
+      ]);
+    });
+
+    test("limparTextosMidia zera também os originais", () => {
+      registrarTextoMidia("simc2", "Texto de mídia");
+      limparTextosMidia("simc2");
+      expect(obterTextosMidia("simc2")).toEqual([]);
+    });
+
+    test("blocoDuplicaMidia continua funcionando após guardar o original", () => {
+      limparTextosMidia("simc3");
+      registrarTextoMidia("simc3", "Vou te mostrar tudo que está incluso!");
+      // normalizarTextoMidia remove pontuação e baixa a caixa, mas NÃO remove acento.
+      expect(blocoDuplicaMidia("simc3", "vou te mostrar tudo que está incluso")).toBe(true);
     });
   });
 });

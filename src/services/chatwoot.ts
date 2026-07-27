@@ -317,6 +317,9 @@ export async function atualizarPresenca(
 // dos áudios). O LLM às vezes repete esse mesmo texto no output final, gerando duplicação.
 // Guardamos o que já foi enviado para filtrar blocos duplicados no envio de texto.
 const textosMidiaPorConversa = new Map<string, string[]>();
+// Paralelo: guarda o texto ORIGINAL (não normalizado) das apresentações de mídia deste turno,
+// para persistir no histórico depois (ver executarAgente / obterTextosMidia).
+const textosMidiaOriginaisPorConversa = new Map<string, string[]>();
 function normalizarTextoMidia(s: string): string {
   return (s ?? "").toLowerCase().replace(/[.,!?;:]/g, "").replace(/\s+/g, " ").trim();
 }
@@ -327,9 +330,23 @@ export function registrarTextoMidia(idConversa: string | number, texto: string):
   const arr = textosMidiaPorConversa.get(chave) ?? [];
   arr.push(t);
   textosMidiaPorConversa.set(chave, arr);
+  const orig = (texto ?? "").trim();
+  if (orig) {
+    const arrO = textosMidiaOriginaisPorConversa.get(chave) ?? [];
+    arrO.push(orig);
+    textosMidiaOriginaisPorConversa.set(chave, arrO);
+  }
 }
 export function limparTextosMidia(idConversa: string | number): void {
   textosMidiaPorConversa.delete(String(idConversa));
+  textosMidiaOriginaisPorConversa.delete(String(idConversa));
+}
+// Textos ORIGINAIS de apresentação de mídia (mensagem_antes) enviados neste turno. Usado para
+// persistir no histórico: as tools de mídia mandam esse texto pro WhatsApp mas não o salvavam no
+// n8n_historico; numa corrida de concorrência (2ª msg do lead gerando run paralela), a run
+// seguinte não via a etapa e a repetia (duplicação da conv 4700).
+export function obterTextosMidia(idConversa: string | number): string[] {
+  return textosMidiaOriginaisPorConversa.get(String(idConversa)) ?? [];
 }
 // Retorna true se o bloco de texto já foi enviado como apresentação de mídia nesta conversa
 // (está contido em algum mensagem_antes registrado) — ou seja, é uma duplicata a descartar.

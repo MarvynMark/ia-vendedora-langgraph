@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, precisaFechoAtivoDeResgate, FECHO_ATIVO_RESGATE } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, precisaFechoAtivoDeResgate, FECHO_ATIVO_RESGATE } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -314,6 +314,19 @@ async function executarAgente(state: MainAgentStateType) {
       }
     }
     await garantirMidiaEntregue(output, toolsChamadas, state.idConta, state.idConversa);
+
+    // Persiste no histórico os textos de apresentação de mídia (mensagem_antes) enviados neste
+    // turno. As tools de mídia mandam esse texto direto pro WhatsApp mas NÃO o salvavam no
+    // n8n_historico. Numa corrida de concorrência (2ª mensagem do lead gerando run paralela), a
+    // run seguinte carregava um histórico sem a etapa de mídia e a REPETIA (duplicação da conv
+    // 4700). Salvar aqui fecha o buraco — vale inclusive quando o turno é abortado depois por
+    // verificarNovasMsgs, pois a mídia JÁ foi enviada ao lead.
+    for (const textoMidia of obterTextosMidia(state.idConversa)) {
+      await salvarMensagem(state.telefone, {
+        type: "ai", content: textoMidia,
+        tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
+      });
+    }
 
     return { outputAgente: output };
   } catch (e) {
