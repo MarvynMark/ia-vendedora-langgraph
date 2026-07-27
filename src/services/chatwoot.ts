@@ -422,6 +422,22 @@ export function blocoTemFraseProibida(bloco: string): boolean {
   return proibidas.some((re) => re.test(b));
 }
 
+// Empurrão ativo de RESGATE: a trava (blocoTemFraseProibida) é subtrativa — remove o fecho passivo,
+// mas não coloca nada no lugar. Com lead quente pós-pitch (caso Clarice, conv 4677) o turno acabava
+// "chapado", sem CTA. Este helper detecta esse caso pra acrescentar um empurrão ativo.
+// Precisão alta: só dispara quando (a) houve fecho passivo removido neste turno E (b) o que sobrou
+// NÃO termina em pergunta (se já termina, o CTA existe e não precisa acrescentar).
+export const FECHO_ATIVO_RESGATE =
+  "Quer seguir e garantir sua vaga? Me confirma aqui que eu já te passo o próximo passo.";
+
+export function precisaFechoAtivoDeResgate(frasesBrutas: string[], frasesFiltradas: string[]): boolean {
+  if (frasesFiltradas.length === 0) return false; // silêncio total já é tratado por outra salvaguarda
+  const houveFechoPassivo = frasesBrutas.some((f) => blocoTemFraseProibida(f));
+  if (!houveFechoPassivo) return false;
+  const ultima = (frasesFiltradas[frasesFiltradas.length - 1] ?? "").trim();
+  return !/\?\s*$/.test(ultima);
+}
+
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.

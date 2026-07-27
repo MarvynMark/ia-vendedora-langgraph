@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, precisaFechoAtivoDeResgate, FECHO_ATIVO_RESGATE } from "../../services/chatwoot.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -386,6 +386,12 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
       logger.warn("main-agent", "Só fecho passivo sobrou após o filtro — enviando a última frase pra não ficar em silêncio");
       frases = [semFechoPassivo[semFechoPassivo.length - 1]!];
     }
+  }
+  // Resgate de CTA: se a trava removeu um fecho passivo e o turno ficou sem pergunta/CTA
+  // (lead quente terminando "chapado" — caso Clarice), acrescenta um empurrão ativo no fim.
+  if (precisaFechoAtivoDeResgate(frasesBrutas, frases)) {
+    logger.info("main-agent", "Fecho passivo removido e turno sem CTA — acrescentando empurrão ativo de resgate");
+    frases.push(FECHO_ATIVO_RESGATE);
   }
   for (const frase of frases) {
     // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem, simulando digitação
