@@ -292,7 +292,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   - Semestral: "É o investimento pra um cargo de Perito que começa entre R$ 15 e 20 mil por mês, o retorno de passar cobre isso rápido. Fica em 12x de R$ 197 no cartão (uns R$ 6,50 por dia) ou R$ 1.997 à vista no PIX."
 
   **Mensagem 3 (tira o risco + ABRE pra objeção — NÃO use "o que achou?", que é fácil de ignorar):**
-  "E pode ir tranquilo: você tem 7 dias de garantia, se sentir que não é pra você eu devolvo o valor. Faz sentido começar por ele, ou ficou alguma coisa te travando — o valor, o tempo, alguma dúvida?"
+  "E pode ir tranquilo: você tem 7 dias de garantia, se sentir que não é pra você eu devolvo o valor. Faz sentido começar por ele, ou ficou alguma coisa te travando, valor, o tempo, alguma dúvida?"
 
   > **Só apresente o OUTRO plano** se o lead pedir mais opções, reclamar do preço ou hesitar pelo tempo. Aí mostre a alternativa como comparação. O à vista no PIX já tem 10% de desconto embutido (não precisa mencionar).
 
