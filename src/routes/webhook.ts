@@ -29,6 +29,12 @@ const GRUPO_ESPERA_KEYWORDS = ["grupo de espera", "grupo de espero", "acesso ao 
 const webhookPayloadSchema = z.object({
   message_type: z.union([z.number(), z.string()]),
   content: z.string().nullable().optional(),
+  // Reações (emoji) vêm com is_reaction=true aqui. Precisamos ler pra ignorá-las (ver abaixo).
+  content_attributes: z
+    .object({ is_reaction: z.boolean().optional() })
+    .passthrough()
+    .nullable()
+    .optional(),
   conversation: z.object({
     id: z.number(),
     labels: z.array(z.string()),
@@ -95,6 +101,14 @@ export const webhookRouter = new Elysia()
     if (mt !== 0 && mt !== "incoming") {
       logger.info("webhook", "Ignorado: message_type =", mt);
       return { status: "ignored", reason: "not_incoming" };
+    }
+
+    // Reação (emoji) NÃO é mensagem: chega como incoming com is_reaction=true e content = o emoji.
+    // Tratá-la como mensagem faz a IA responder a um ❤️/🙏 como se fosse um "sim" — na conv 4677
+    // o lead reagiu ❤️ ao pitch e a IA mandou o link de pagamento. Ignorar sempre.
+    if (parsed.data.content_attributes?.is_reaction === true) {
+      logger.info("webhook", "Ignorado: reação (is_reaction), não é mensagem");
+      return { status: "ignored", reason: "reaction" };
     }
 
     // Ignorar mensagens enviadas pelo bot/agente:
