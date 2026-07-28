@@ -320,6 +320,13 @@ const textosMidiaPorConversa = new Map<string, string[]>();
 // Paralelo: guarda o texto ORIGINAL (não normalizado) das apresentações de mídia deste turno,
 // para persistir no histórico depois (ver executarAgente / obterTextosMidia).
 const textosMidiaOriginaisPorConversa = new Map<string, string[]>();
+// Registro PERSISTENTE entre runs (não é zerado por limparTextosMidia a cada turno). Fecha a
+// corrida do #3: numa run concorrente (2ª msg do lead), a tool de mídia é deduped e NÃO registra
+// o mensagem_antes de novo, e o limparTextosMidia do início da run zerou o registro do turno —
+// então a cópia do texto na resposta da run concorrente não era filtrada e vazava duplicada.
+// Como as apresentações de mídia são frases únicas (uma vez por conversa), manter persistente
+// não causa falso-positivo em turnos legítimos posteriores.
+const textosMidiaPersistentePorConversa = new Map<string, string[]>();
 function normalizarTextoMidia(s: string): string {
   return (s ?? "").toLowerCase().replace(/[.,!?;:]/g, "").replace(/\s+/g, " ").trim();
 }
@@ -330,6 +337,9 @@ export function registrarTextoMidia(idConversa: string | number, texto: string):
   const arr = textosMidiaPorConversa.get(chave) ?? [];
   arr.push(t);
   textosMidiaPorConversa.set(chave, arr);
+  const arrP = textosMidiaPersistentePorConversa.get(chave) ?? [];
+  arrP.push(t);
+  textosMidiaPersistentePorConversa.set(chave, arrP);
   const orig = (texto ?? "").trim();
   if (orig) {
     const arrO = textosMidiaOriginaisPorConversa.get(chave) ?? [];
@@ -351,8 +361,11 @@ export function obterTextosMidia(idConversa: string | number): string[] {
 // Retorna true se o bloco de texto já foi enviado como apresentação de mídia nesta conversa
 // (está contido em algum mensagem_antes registrado) — ou seja, é uma duplicata a descartar.
 export function blocoDuplicaMidia(idConversa: string | number, bloco: string): boolean {
-  const arr = textosMidiaPorConversa.get(String(idConversa));
-  if (!arr || arr.length === 0) return false;
+  const chave = String(idConversa);
+  // Considera o registro do turno E o persistente (cross-run) — o persistente cobre a corrida
+  // em que a run concorrente não re-registrou o mensagem_antes (#3).
+  const arr = [...(textosMidiaPorConversa.get(chave) ?? []), ...(textosMidiaPersistentePorConversa.get(chave) ?? [])];
+  if (arr.length === 0) return false;
   const b = normalizarTextoMidia(bloco);
   if (b.length < 5) return false;
   return arr.some(t => t.includes(b));

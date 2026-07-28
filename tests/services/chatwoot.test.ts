@@ -512,5 +512,14 @@ describe("chatwoot service", () => {
       // normalizarTextoMidia remove pontuação e baixa a caixa, mas NÃO remove acento.
       expect(blocoDuplicaMidia("simc3", "vou te mostrar tudo que está incluso")).toBe(true);
     });
+
+    // Fix do #3: numa run concorrente, o limparTextosMidia do início zera o registro do turno e a
+    // tool (deduped) não re-registra — o registro PERSISTENTE segura pra ainda filtrar a cópia.
+    test("blocoDuplicaMidia pega a apresentação MESMO após limparTextosMidia (dedup cross-run)", () => {
+      limparTextosMidia("simc4");
+      registrarTextoMidia("simc4", "Entendi. Vi que você é formado em Engenharia Química.");
+      limparTextosMidia("simc4"); // simula o começo da run concorrente
+      expect(blocoDuplicaMidia("simc4", "vi que você é formado em Engenharia Química")).toBe(true);
+    });
   });
 });
