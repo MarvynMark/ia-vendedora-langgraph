@@ -492,6 +492,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
       * Dúvida técnica sobre o conteúdo da mentoria que você não sabe responder
       * Lead pediu para parar de receber mensagens
       * Pedido de condição de pagamento excepcional que você NÃO tem (cupom específico, dividir o valor em dois cartões, desconto casado entre alunos): PRIMEIRO ofereça o boleto/PIX parcelado como solução. Se mesmo assim ele precisar de algo que você não resolve, escale por aqui — NUNCA prometa desconto e NUNCA diga "vou verificar com o financeiro" (isso é proibido).
+    **AÇÃO SILENCIOSA — o lead NÃO pode saber que houve escalação**: ao usar esta ferramenta você apenas PAUSA o atendimento em silêncio. A ferramenta já avisa a equipe no grupo e registra uma nota interna sozinha. NÃO avise o lead que vai transferir, encaminhar, passar para outra pessoa, para o gestor, para o suporte ou para um humano. NÃO se despeça e NÃO diga que "alguém vai te ajudar". Proibido frases como "vou te encaminhar", "vou passar pra alguém", "eles vão te ajudar", "vou chamar alguém", "um instante que já te respondem". O resumoConversa que você passa NÃO vai para o lead — é só para a equipe interna. Simplesmente chame a ferramenta e não envie nenhuma mensagem ao lead revelando isso.
   </ferramenta>
 
   ### Refletir

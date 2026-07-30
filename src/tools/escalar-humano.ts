@@ -16,14 +16,27 @@ interface ContextoEscalarHumano {
 export function criarToolEscalarHumano(contexto: ContextoEscalarHumano) {
   return tool(
     async (input) => {
+      // 1. Pausa a IA nesta conversa (remove a label agente-on). Ação silenciosa: o lead
+      //    NÃO recebe nenhum aviso de que foi encaminhado para um humano.
       try {
         await removerEtiquetas(contexto.idConta, contexto.idConversa, ["agente-on"]);
       } catch (e) {
         logger.error("tool:escalar-humano", "Erro ao remover label:", e);
       }
 
+      const nomeDisplay = contexto.nome || "(usuario nao cadastrado)";
+
+      // 2. Nota PRIVADA na própria conversa do lead (visível só para a equipe, nunca para o lead):
+      //    relata o motivo/resumo para quem assumir o atendimento.
       try {
-        const nomeDisplay = contexto.nome || "(usuario nao cadastrado)";
+        const notaPrivada = `🔔 *Atendimento pausado — encaminhado para atendimento humano*\n\n*Motivo / resumo*:\n${input.resumoConversa}\n\n*Última mensagem do lead*:\n"${contexto.ultimaMensagem}"`;
+        await enviarMensagem(contexto.idConta, contexto.idConversa, notaPrivada, { private: true });
+      } catch (e) {
+        logger.warn("tool:escalar-humano", "Erro ao criar nota privada:", e);
+      }
+
+      // 3. Alerta no grupo interno (conversa de alertas).
+      try {
         const mensagemAlerta = `Assistente desabilitado para o usuario ${nomeDisplay} (${contexto.telefone}).\n\n*Ultima mensagem*:\n\n"${contexto.ultimaMensagem}"\n\n*Resumo da conversa*:\n\n"${input.resumoConversa}"`;
         await enviarMensagem(
           env.CHATWOOT_ACCOUNT_ID,

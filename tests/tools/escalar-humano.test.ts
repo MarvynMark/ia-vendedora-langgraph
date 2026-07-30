@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 describe("criarToolEscalarHumano", () => {
-  test("adiciona etiqueta agente-on na conversa", async () => {
+  test("remove a etiqueta agente-on da conversa (pausa a IA)", async () => {
     const tool = criarToolEscalarHumano(contexto);
     await tool.invoke({ resumoConversa: "paciente quer agendar urgência" });
     const labelCall = mockFetch.mock.calls.find(c => {
@@ -30,7 +30,24 @@ describe("criarToolEscalarHumano", () => {
     });
     expect(labelCall).toBeDefined();
     const body = JSON.parse((labelCall as [string, RequestInit])[1]!.body as string);
-    expect(body.labels).toContain("agente-on");
+    // Pausa = remover a label; ela NÃO pode aparecer na lista final enviada.
+    expect(body.labels).not.toContain("agente-on");
+  });
+
+  test("cria nota PRIVADA na conversa do lead com o resumo", async () => {
+    const tool = criarToolEscalarHumano(contexto);
+    await tool.invoke({ resumoConversa: "paciente quer agendar urgência" });
+    const notaCall = mockFetch.mock.calls.find(c => {
+      const [url, opts] = c as [string, RequestInit];
+      if (!url.includes("/conversations/100/messages") || opts?.method !== "POST") return false;
+      const body = JSON.parse(opts.body as string);
+      return body.private === true;
+    });
+    expect(notaCall).toBeDefined();
+    const body = JSON.parse((notaCall as [string, RequestInit])[1]!.body as string);
+    expect(body.private).toBe(true);
+    expect(body.content).toContain("paciente quer agendar urgência");
+    expect(body.content).toContain("quero falar com alguém"); // última mensagem do lead
   });
 
   test("envia alerta para conversa de alerta", async () => {
@@ -51,6 +68,6 @@ describe("criarToolEscalarHumano", () => {
     const tool = criarToolEscalarHumano(contexto);
     const result = await tool.invoke({ resumoConversa: "resumo" });
     const parsed = JSON.parse(result);
-    expect(parsed.resultado).toContain("escalado");
+    expect(parsed.resultado).toBe("ok");
   });
 });
