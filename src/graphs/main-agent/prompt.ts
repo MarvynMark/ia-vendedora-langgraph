@@ -45,6 +45,15 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
     (ctx.etiquetas ?? []).includes("medico") ||
     (/medic/.test(formacaoNorm) && !/biomedic/.test(formacaoNorm) && !/veterin/.test(formacaoNorm));
 
+  // Valores DINÂMICOS do lead (mudam por lead) — montados aqui e inseridos no FIM do prompt.
+  // Motivo: manter as ~18k tokens de regras como um PREFIXO ESTÁVEL, que a OpenAI cacheia entre
+  // leads/chamadas (o cache exige prefixo idêntico ≥1024 tk; com estes valores no topo, cacheava 0).
+  const blocoDadosLead = `${ehMedico ? `  **⚠️ ESTE LEAD É MÉDICO — trilha Médico Legista OBRIGATÓRIA.** Detectado de forma determinística (label "medico" e/ou formação com "medic", inclusive typos como "Mediciba"). SÓ ofereça planos **Médico Legista**. É PROIBIDO oferecer Trimestral, Anual ou Semestral genéricos de Perito Criminal, MESMO com reclamação de preço.\n` : ""}  **Nome do lead**: ${primeiroNome || "(não disponível)"}
+
+  Dados preenchidos pelo lead no formulário de aplicação (formato: Campo: Valor | Campo: Valor):
+
+  ${dadosFormulario || "(não disponível - lead orgânico, sem formulário prévio)"}${concursoSalvo ? `\n\n  **Concurso identificado em conversa anterior**: ${concursoSalvo}` : ""}`;
+
   return `# PAPEL
 
 <papel>
@@ -76,18 +85,11 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   * **Velocidade**: Quando o problema do lead está claro, avance. Não fique explorando o mesmo ponto com perguntas diferentes. Máximo 2 perguntas de qualificação antes de ir para a solução
 </personalidade>
 
-# DADOS DO LEAD
+# COMO USAR OS DADOS DO LEAD
 
-<dados-lead>${ehMedico ? `
-  **⚠️ ESTE LEAD É MÉDICO — trilha Médico Legista OBRIGATÓRIA.** Detectado de forma determinística (label "medico" e/ou formação com "medic", inclusive typos como "Mediciba"). SÓ ofereça planos **Médico Legista**. É PROIBIDO oferecer Trimestral, Anual ou Semestral genéricos de Perito Criminal, MESMO com reclamação de preço.
-` : ""}
-  **Nome do lead**: ${primeiroNome || "(não disponível)"}
-  > Sempre que o roteiro contiver [Nome], substitua pelo nome acima. Nunca envie "[Nome]" literalmente.
+<como-usar-dados>
+  ⚠️ Os DADOS DESTE LEAD (nome, respostas do formulário, concurso e o alerta de médico quando houver) estão no **FINAL deste prompt**, na seção "# DADOS DO LEAD" — sempre consulte de lá. Onde o roteiro tiver [Nome], substitua pelo nome que está lá; nunca envie "[Nome]" literal.
 
-  Dados preenchidos pelo lead no formulário de aplicação (formato: Campo: Valor | Campo: Valor):
-
-  ${dadosFormulario || "(não disponível - lead orgânico, sem formulário prévio)"}
-${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concursoSalvo}` : ""}
   **Campos disponíveis e como usá-los no roteiro:**
   - **Concurso** → qual concurso ele quer prestar. Use na abertura e em toda reação ao concurso. NUNCA pergunte de novo.
   - **Formação** → área de graduação. Use para personalizar a conexão com as matérias do concurso.
@@ -113,7 +115,7 @@ ${concursoSalvo ? `\n  **Concurso identificado em conversa anterior**: ${concurs
   - **Nível de concurseiro** → ajuste a profundidade: iniciante = mais didático e acolhedor; veterano = mais direto e técnico.
 
   **TRATAMENTO PARA MÉDICOS**: Se a formação do lead for Medicina, use "Dr. [Nome]" (homem) ou "Dra. [Nome]" (mulher) ao se referir a ele. Para o gênero, use seu conhecimento do nome (você sabe que "Marjory", "Beatriz", "Raquel", "Ester" são femininos e "Wesley", "Yuri" são masculinos, mesmo não terminando em "a"). **Se tiver QUALQUER dúvida sobre o gênero do nome, use só o primeiro nome sem "Dr./Dra."** — nunca arrisque, porque chamar uma mulher de "Dr." (ou um homem de "Dra.") é constrangedor e queima a confiança.
-</dados-lead>
+</como-usar-dados>
 
 # FLUXO DA CONVERSA
 
@@ -760,5 +762,11 @@ ${APRENDIZADOS_COMPRADORES}
 <informacoes-sistema>
   **Data e Hora Atual**: ${dataHoraAtual}
 </informacoes-sistema>
+
+# DADOS DO LEAD
+
+<dados-lead>
+${blocoDadosLead}
+</dados-lead>
 `;
 }
