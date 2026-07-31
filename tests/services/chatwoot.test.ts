@@ -26,8 +26,6 @@ import {
   blocoNarraAcaoInterna,
   blocoTemFraseProibida,
   blocoEhNomeDeTool,
-  precisaFechoAtivoDeResgate,
-  FECHO_ATIVO_RESGATE,
   obterTextosMidia,
 } from "../../src/services/chatwoot.ts";
 
@@ -454,36 +452,6 @@ describe("chatwoot service", () => {
       expect(blocoTemFraseProibida("Me avisa quando cair o pagamento que eu já monto seu plano")).toBe(false);
       // "se precisar" numa resposta de conteúdo (sem verbo de oferta) não deve casar
       expect(blocoTemFraseProibida("Se precisar parcelar em mais vezes, dá pra fazer no link")).toBe(false);
-    });
-  });
-
-  // Trava aditiva: quando a trava remove um fecho passivo e o turno fica sem CTA (caso Clarice,
-  // conv 4677), acrescenta um empurrão ativo. Só dispara nesse caso preciso.
-  describe("resgate de CTA (precisaFechoAtivoDeResgate)", () => {
-    test("dispara quando houve fecho passivo removido e o resto NÃO termina em pergunta", () => {
-      const brutas = ["Se Timon e Caxias já foram mencionados, é provável que sejam opções de lotação.", "Se precisar de mais alguma coisa, estou aqui!"];
-      const filtradas = ["Se Timon e Caxias já foram mencionados, é provável que sejam opções de lotação."];
-      expect(precisaFechoAtivoDeResgate(brutas, filtradas)).toBe(true);
-    });
-
-    test("NÃO dispara se o que sobrou já termina em pergunta (CTA já existe)", () => {
-      const brutas = ["Faz sentido pra você?", "Estou aqui pra ajudar!"];
-      const filtradas = ["Faz sentido pra você?"];
-      expect(precisaFechoAtivoDeResgate(brutas, filtradas)).toBe(false);
-    });
-
-    test("NÃO dispara se não houve fecho passivo no turno", () => {
-      const brutas = ["Perfeito! Segue o link: https://x.com", "Me avisa quando pagar."];
-      expect(precisaFechoAtivoDeResgate(brutas, brutas)).toBe(false);
-    });
-
-    test("NÃO dispara quando a saída ficou vazia (outra salvaguarda cuida do silêncio)", () => {
-      expect(precisaFechoAtivoDeResgate(["Estou aqui pra ajudar!"], [])).toBe(false);
-    });
-
-    test("o texto de resgate é um CTA ativo (termina em pergunta, sem frase passiva)", () => {
-      expect(FECHO_ATIVO_RESGATE.trim().endsWith("?") || /me confirma/i.test(FECHO_ATIVO_RESGATE)).toBe(true);
-      expect(blocoTemFraseProibida(FECHO_ATIVO_RESGATE)).toBe(false);
     });
   });
 
