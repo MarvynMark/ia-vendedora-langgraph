@@ -86,7 +86,7 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
   } else if (newStepName.includes("conexão") || newStepName.includes("conexao")) {
     proximaData = proximoHorarioComercial(new Date(), 1 * 60 * 60 * 1000); // 1h (lead morno, parou de responder — recupera no mesmo dia enquanto quente)
   } else if (newStepName.includes("aguardando pagamento")) {
-    proximaData = proximoHorarioComercial(new Date(), 30 * 60 * 1000); // 30 min (lead quente, link na mão)
+    proximaData = proximoHorarioComercial(new Date(), 20 * 60 * 1000); // 20 min (cutucada rápida, sem interromper o checkout)
   } else {
     proximaData = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000); // amanhã
   }

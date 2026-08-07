@@ -71,13 +71,13 @@ export async function buscarDadosFormulario(telefone: string): Promise<string> {
 // destes campos pra injetar nos textos. Mesmo match por últimos 8 dígitos do WhatsApp.
 export async function buscarCamposFormulario(
   telefone: string,
-): Promise<{ concurso: string | null; dificuldade: string | null } | null> {
+): Promise<{ concurso: string | null; dificuldade: string | null; formacao: string | null } | null> {
   if (!telefone) return null;
   const ultimos8 = telefone.replace(/\D/g, "").slice(-8);
   if (ultimos8.length < 8) return null;
   try {
-    const result = await pool.query<{ concurso_desejado: string | null; maior_dificuldade: string | null }>(
-      `SELECT concurso_desejado, maior_dificuldade
+    const result = await pool.query<{ concurso_desejado: string | null; maior_dificuldade: string | null; area_graduacao: string | null }>(
+      `SELECT concurso_desejado, maior_dificuldade, area_graduacao
        FROM leads_formulario_mentoria
        WHERE RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) = $1
        ORDER BY criado_em DESC
@@ -86,7 +86,7 @@ export async function buscarCamposFormulario(
     );
     const d = result.rows[0];
     if (!d) return null;
-    return { concurso: d.concurso_desejado, dificuldade: d.maior_dificuldade };
+    return { concurso: d.concurso_desejado, dificuldade: d.maior_dificuldade, formacao: d.area_graduacao };
   } catch (e) {
     logger.warn("db-formulario", "Erro ao buscar campos do formulário:", e);
     return null;

@@ -99,6 +99,14 @@ export async function classificar(state: FollowUpStateType) {
   return { tipoFollowup };
 }
 
+// Detecta médico pela formação do formulário (mesma lógica do prompt principal): "medic" na
+// formação, exceto biomedicina/veterinária. Médico segue a trilha Médico Legista, que NÃO tem
+// downsell — por isso não recebe o toque da "versão enxuta" (Semestral de Perito).
+function ehMedicoPorFormacao(formacao: string | null | undefined): boolean {
+  const f = (formacao ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return /medic/.test(f) && !/biomedic/.test(f) && !/veterin/.test(f);
+}
+
 // Sequência de recuperação para leads em Conexão (já conversaram mas pararam de responder)
 const SEQUENCIA_RECUPERACAO_CONEXAO = [
   "conexao_followup_1",
@@ -113,17 +121,18 @@ const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 6
 // Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
 const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] as const;
 
-// Sequência pós-preço: acionada quando lead viu o pitch e sumiu (description contém "status: proposta_apresentada")
+// Sequência pós-preço (viu o pitch e sumiu — description tem "status: proposta_apresentada"):
+// cutucada de reforço → (se sumir) versão enxuta 6 meses → parcelado → garantia.
 const SEQUENCIA_POS_PRECO = [
-  "pos_preco_followup_1",
+  "pos_preco_reforco",
+  "recuperacao_versao_enxuta",
   "pos_preco_followup_2",
   "pos_preco_followup_3",
-  "pos_preco_urgencia",
 ] as const;
 
-// Pós-preço: t1→t2 3h (dentro), t2→t3 espremido (24h+clamp), t3→t4 Dia 2 (pago), t4→enc Dia 3.
+// Pós-preço: t1→t2 3h (mesmo dia, na janela), t2→t3 e t3→t4 dia seguinte, t4→enc dia seguinte.
 const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_duvida", "pos_preco_duvida", "pos_preco_duvida", "pos_preco_urgencia"] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_versao_enxuta", "pos_preco_duvida", "pos_preco_urgencia"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -147,11 +156,21 @@ async function agenteFollowup(state: FollowUpStateType) {
   const primeiroNome = primeiroNomeSaudacao(state.title);
   const isPosPreco = /status:\s*proposta_apresentada/i.test(state.description ?? "");
 
-  // Seleciona sequência, fallbacks e delays conforme contexto
-  const sequencia = isPosPreco ? SEQUENCIA_POS_PRECO : SEQUENCIA_RECUPERACAO_CONEXAO;
-  const fallbacks = isPosPreco ? TEMPLATE_FALLBACK_POS_PRECO : TEMPLATE_FALLBACK_CONEXAO;
+  // Dados do formulário (concurso/formação) + detecção de médico (trilha Médico Legista, sem downsell).
+  const campos = await buscarCamposFormulario(state.telefone);
+  const ehMedico = ehMedicoPorFormacao(campos?.formacao);
+
+  // Seleciona sequência, fallbacks e delays conforme contexto (cópia mutável p/ guarda de médico).
+  const sequencia: string[] = [...(isPosPreco ? SEQUENCIA_POS_PRECO : SEQUENCIA_RECUPERACAO_CONEXAO)];
+  const fallbacks: string[] = [...(isPosPreco ? TEMPLATE_FALLBACK_POS_PRECO : TEMPLATE_FALLBACK_CONEXAO)];
   const delays = isPosPreco ? DELAYS_POS_PRECO_MS : DELAYS_CONEXAO_MS;
   const nomeEncerramento = isPosPreco ? "pos_preco_encerramento" : "conexao_encerramento";
+
+  // Guarda de médico: não oferecer o downsell "versão enxuta" (Semestral de Perito) — troca por um toque de dúvida.
+  if (ehMedico) {
+    const iEnxuta = sequencia.indexOf("recuperacao_versao_enxuta");
+    if (iEnxuta >= 0) { sequencia[iEnxuta] = "pos_preco_followup_1"; fallbacks[iEnxuta] = "pos_preco_duvida"; }
+  }
 
   logger.info("follow-up", `Modo: ${isPosPreco ? "pós-preço" : "conexão"}, contador: ${contador}`);
 
@@ -177,8 +196,7 @@ async function agenteFollowup(state: FollowUpStateType) {
 
   const nomeMsg = sequencia[contador]!;
   // Personaliza com concurso/dificuldade do formulário (só chega ao lead na janela aberta —
-  // fora dela usa o template Meta puro; ver textoEnviar abaixo).
-  const campos = await buscarCamposFormulario(state.telefone);
+  // fora dela usa o template Meta puro; ver textoEnviar abaixo). campos já buscado acima.
   const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   const templateFallback = fallbacks[contador] ?? "encerramento_02";
   // Fora da janela o lead recebe o template Meta (só {{1}}=nome). O texto REGISTRADO no Chatwoot
@@ -222,12 +240,12 @@ async function agenteFollowup(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
-const SEQUENCIA_LEMBRETE = ["lembrete_1", "lembrete_2", "lembrete_3", "lembrete_urgencia"] as const;
-// Toque 1 dispara no delay INICIAL da etapa (30min). Depois: t1→t2 3h (dentro), t2→t3
-// "espremido" pra dentro da janela (24h+clamp), t3→t4 Dia 2 (pago), t4→encerramento Dia 3.
-const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-// Fallback pago (fora da janela 24h), por posição do contador — reforço de acesso / urgência.
-const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "lembrete_2", "lembrete_acesso", "lembrete_urgencia_meta"] as const;
+// Sequência lembrete (link enviado): cutucada (o link tá ativo) → (se sumir) versão enxuta → travou em quê.
+const SEQUENCIA_LEMBRETE = ["lembrete_1", "recuperacao_versao_enxuta", "lembrete_2"] as const;
+// Toque 1 dispara no delay INICIAL da etapa (20min). Depois: t1→t2 3h (mesmo dia), t2→t3 dia seguinte.
+const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Fallback pago (fora da janela 24h), por posição do contador.
+const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "recuperacao_versao_enxuta", "lembrete_2"] as const;
 
 async function agenteLembrete(state: FollowUpStateType) {
   logger.info("follow-up", "executando lembrete pré-configurado...");
@@ -257,9 +275,17 @@ async function agenteLembrete(state: FollowUpStateType) {
     return { respostaAgente: "" };
   }
 
-  const nomeMsg = SEQUENCIA_LEMBRETE[contador]!;
-  const conteudo = substituirNome(CONTEUDO_TEMPLATES[nomeMsg] ?? "", state.title);
-  const templateFallback = TEMPLATE_FALLBACK_LEMBRETE[contador] ?? "encerramento_02";
+  // Dados do formulário + guarda de médico: troca o downsell "versão enxuta" por um lembrete neutro.
+  const campos = await buscarCamposFormulario(state.telefone);
+  const seqLembrete: string[] = [...SEQUENCIA_LEMBRETE];
+  const fallbackLembrete: string[] = [...TEMPLATE_FALLBACK_LEMBRETE];
+  if (ehMedicoPorFormacao(campos?.formacao)) {
+    const iEnxuta = seqLembrete.indexOf("recuperacao_versao_enxuta");
+    if (iEnxuta >= 0) { seqLembrete[iEnxuta] = "lembrete_3"; fallbackLembrete[iEnxuta] = "lembrete_acesso"; }
+  }
+  const nomeMsg = seqLembrete[contador]!;
+  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
+  const templateFallback = fallbackLembrete[contador] ?? "encerramento_02";
   // Fora da janela o registro no Chatwoot deve refletir o template Meta ({{1}}=nome), não o
   // "[Nome]" cru — substitui o nome (e remove segmentos {{ }} caso existam).
   const textoFallback = CONTEUDO_TEMPLATES[templateFallback] ?? CONTEUDO_TEMPLATES[nomeMsg] ?? "";

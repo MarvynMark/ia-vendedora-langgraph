@@ -33,7 +33,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   conexao_followup_1: "Oi [Nome], lembrei de você{{ e da sua preparação pra [concurso]}}. Ficou alguma dúvida do que a gente conversou, ou foi mais questão de tempo?",
   conexao_followup_2:
     "Oi [Nome], deixa eu te perguntar direto: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
-  conexao_followup_3: "Oi [Nome], ainda dá tempo de você entrar nessa turma. Quer que eu te explique o próximo passo?",
+  conexao_followup_3: "Oi [Nome], se ainda fizer sentido pra você, consigo te mostrar o próximo passo de forma bem tranquila. Quer?",
   conexao_encerramento:
     "Oi [Nome], antes de eu deixar o espaço livre por aqui: ficou alguma dúvida que eu possa esclarecer? Se ainda fizer sentido pra você, é só me dar um sinal.",
 
@@ -43,6 +43,8 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência pós-preço: Conexão (janela aberta) ---
   // Acionada quando lead viu o pitch de preço e sumiu (description contém "status: proposta_apresentada")
+  // Toque 1: cutucada leve reforçando a proposta enviada (sem downsell, sem escassez).
+  pos_preco_reforco: "Oi [Nome], só voltei aqui rapidinho. Lembra que na mentoria você não estuda no escuro: eu te digo exatamente o que priorizar{{ pro [concurso]}} e acompanho de perto. Ficou alguma dúvida sobre a proposta que te mandei?",
   pos_preco_followup_1: "Oi [Nome], ficou alguma dúvida sobre o investimento ou sobre como a mentoria funciona? Me pergunta aqui que eu te respondo.",
   pos_preco_followup_2:
     "Ei [Nome], se o valor pesou de cabeça, dá pra dividir em até 12x no boleto ou no PIX, uma parcela por mês, sem precisar de limite no cartão. Quer que eu te mostre como fica?",
@@ -51,7 +53,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
   // não substitui a variável — igual aos demais fallbacks (conexao_duvida, lembrete_acesso...).
   pos_preco_urgencia:
-    "Oi, vou seguir com os outros atendimentos, mas consigo segurar sua condição até amanhã. Ainda quer garantir sua vaga?",
+    "Oi, não quero te apressar. Só me diz o que ficou pesando, o valor ou alguma dúvida, que eu vejo a melhor forma de encaixar pro teu momento.",
   pos_preco_encerramento:
     "Oi [Nome], antes de encerrar: foi o valor que pesou ou ficou alguma dúvida? Se ainda fizer sentido, me dá um sinal que a gente vê a melhor forma pra você.",
 
@@ -59,21 +61,25 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   pos_preco_duvida: "Ficou alguma dúvida sobre o investimento? Me conta aqui que a gente resolve",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
 
+  // --- Recuperação: versão enxuta (downsell 6 meses / Semestral) ---
+  // Toque 2 (se o lead não respondeu à cutucada). NÃO enviar para médicos (guarda no graph.ts).
+  recuperacao_versao_enxuta: "[Nome], e se desse pra começar por um caminho mais leve? Tenho o plano de 6 meses, mesmo acompanhamento meu, num valor bem menor. Quer ver como fica{{ pro [concurso]}}?",
+
   // --- Sequência de lembrete: Aguardando Pagamento (janela aberta) ---
   lembrete_1: "Oi [Nome], o link ainda tá ativo. Ficou com alguma dúvida antes de confirmar?",
   lembrete_2:
     "Oi [Nome], vi que você ainda não finalizou. Travou em alguma coisa na hora de finalizar? Me fala que eu te ajudo.",
-  lembrete_3: "Oi [Nome], posso deixar tudo pronto pra você começar hoje. Confirma que eu já libero seus acessos?",
+  lembrete_3: "Oi [Nome], deixo tudo pronto pra você começar quando quiser. Ficou alguma dúvida antes de finalizar?",
   lembrete_urgencia:
-    "Oi [Nome], vou liberar sua vaga amanhã se não tiver retorno. Ainda consigo segurar até lá — quer confirmar?",
+    "Oi [Nome], sei que a correria toma conta. Se ainda quiser garantir seu acesso, é só me chamar que eu te ajudo a finalizar sem complicação. O que ficou pendente?",
   lembrete_encerramento:
-    "Oi [Nome], vou liberar sua vaga por ora, mas o link pode ser reativado a qualquer momento. Travou alguma coisa no pagamento? Me fala que eu resolvo com você.",
+    "Oi [Nome], vou te dar um tempo pra pensar sem pressão. Se travou algo no pagamento ou ficou alguma dúvida, me fala que eu resolvo com você.",
 
   // --- Sequência de lembrete: Aguardando Pagamento (janela fechada — Meta templates) ---
   lembrete_acesso:
     "Quando você confirmar o pagamento, te envio todos os acessos na hora pra começar ainda hoje",
   lembrete_urgencia_meta:
-    "Vou liberar sua vaga amanhã se não tiver retorno. Ainda consigo segurar até lá — quer confirmar?",
+    "Oi, sei que a correria toma conta. Se ainda quiser garantir seu acesso, é só me chamar que eu te ajudo a finalizar sem complicação. O que ficou pendente?",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
 };
 
@@ -105,6 +111,9 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   conexao_1: { language: "pt_BR", bodyVars: 1 },
   conexao_2: { language: "pt_BR", bodyVars: 0 },
   lembrete_2: { language: "pt_BR", bodyVars: 1 },
+  // Cutucada de reforço + versão enxuta (downsell 6 meses) — aprovar na Meta (pt_BR, {{1}}=nome).
+  pos_preco_reforco: { language: "pt_BR", bodyVars: 1 },
+  recuperacao_versao_enxuta: { language: "pt_BR", bodyVars: 1 },
   // Encerramento consultivo aprovado com {{1}} = primeiro nome.
   encerramento: { language: "pt_BR", bodyVars: 1 },
 
