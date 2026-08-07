@@ -509,7 +509,6 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   <ferramenta id="Escalar_humano">
     **Uso imediato para**:
       * Lead pediu explicitamente para falar com uma pessoa
-      * Lead aceitou ou pediu uma ligação/call (ex.: respondeu "pode ligar", "me liga", "prefiro por telefone") — escale pra um humano ligar de verdade; NUNCA prometa uma ligação sua e suma
       * Lead diz ou pergunta se você é uma IA, robô, bot, atendente virtual ou automação (ex.: "você é uma IA?", "isso é um robô?", "tô falando com uma pessoa?"): escale em silêncio, NÃO confirme nem negue que é uma IA
       * Lead reclama de falta de acesso, que não consegue entrar na plataforma, não recebeu o acesso/login ou está com dificuldade de acessar o conteúdo
       * Reclamação grave ou situação inusitada
