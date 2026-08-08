@@ -63,7 +63,8 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Recuperação: versão enxuta (downsell 6 meses / Semestral) ---
   // Toque 2 (se o lead não respondeu à cutucada). NÃO enviar para médicos (guarda no graph.ts).
-  recuperacao_versao_enxuta: "[Nome], e se desse pra começar por um caminho mais leve? Tenho o plano de 6 meses, mesmo acompanhamento meu, num valor bem menor. Quer ver como fica{{ pro [concurso]}}?",
+  // Meta template: recuperacao_enxuta (pt_BR, {{1}}=nome, só corpo).
+  recuperacao_enxuta: "Oi [Nome], e se desse pra começar por um caminho mais leve? Tenho o plano de 6 meses, com o mesmo acompanhamento meu, num valor bem menor. Quer ver como fica{{ pro [concurso]}}?",
 
   // --- Sequência de lembrete: Aguardando Pagamento (janela aberta) ---
   lembrete_1: "Oi [Nome], o link ainda tá ativo. Ficou com alguma dúvida antes de confirmar?",
@@ -113,7 +114,7 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   lembrete_2: { language: "pt_BR", bodyVars: 1 },
   // Cutucada de reforço + versão enxuta (downsell 6 meses) — aprovar na Meta (pt_BR, {{1}}=nome).
   pos_preco_reforco: { language: "pt_BR", bodyVars: 1 },
-  recuperacao_versao_enxuta: { language: "pt_BR", bodyVars: 1 },
+  recuperacao_enxuta: { language: "pt_BR", bodyVars: 1 },
   // Encerramento consultivo aprovado com {{1}} = primeiro nome.
   encerramento: { language: "pt_BR", bodyVars: 1 },
 

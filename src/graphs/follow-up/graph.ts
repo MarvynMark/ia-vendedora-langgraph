@@ -125,14 +125,14 @@ const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] a
 // cutucada de reforço → (se sumir) versão enxuta 6 meses → parcelado → garantia.
 const SEQUENCIA_POS_PRECO = [
   "pos_preco_reforco",
-  "recuperacao_versao_enxuta",
+  "recuperacao_enxuta",
   "pos_preco_followup_2",
   "pos_preco_followup_3",
 ] as const;
 
 // Pós-preço: t1→t2 3h (mesmo dia, na janela), t2→t3 e t3→t4 dia seguinte, t4→enc dia seguinte.
 const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_versao_enxuta", "pos_preco_duvida", "pos_preco_urgencia"] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_urgencia"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -168,7 +168,7 @@ async function agenteFollowup(state: FollowUpStateType) {
 
   // Guarda de médico: não oferecer o downsell "versão enxuta" (Semestral de Perito) — troca por um toque de dúvida.
   if (ehMedico) {
-    const iEnxuta = sequencia.indexOf("recuperacao_versao_enxuta");
+    const iEnxuta = sequencia.indexOf("recuperacao_enxuta");
     if (iEnxuta >= 0) { sequencia[iEnxuta] = "pos_preco_followup_1"; fallbacks[iEnxuta] = "pos_preco_duvida"; }
   }
 
@@ -241,11 +241,11 @@ async function agenteFollowup(state: FollowUpStateType) {
 }
 
 // Sequência lembrete (link enviado): cutucada (o link tá ativo) → (se sumir) versão enxuta → travou em quê.
-const SEQUENCIA_LEMBRETE = ["lembrete_1", "recuperacao_versao_enxuta", "lembrete_2"] as const;
+const SEQUENCIA_LEMBRETE = ["lembrete_1", "recuperacao_enxuta", "lembrete_2"] as const;
 // Toque 1 dispara no delay INICIAL da etapa (20min). Depois: t1→t2 3h (mesmo dia), t2→t3 dia seguinte.
 const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fallback pago (fora da janela 24h), por posição do contador.
-const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "recuperacao_versao_enxuta", "lembrete_2"] as const;
+const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "recuperacao_enxuta", "lembrete_2"] as const;
 
 async function agenteLembrete(state: FollowUpStateType) {
   logger.info("follow-up", "executando lembrete pré-configurado...");
@@ -280,7 +280,7 @@ async function agenteLembrete(state: FollowUpStateType) {
   const seqLembrete: string[] = [...SEQUENCIA_LEMBRETE];
   const fallbackLembrete: string[] = [...TEMPLATE_FALLBACK_LEMBRETE];
   if (ehMedicoPorFormacao(campos?.formacao)) {
-    const iEnxuta = seqLembrete.indexOf("recuperacao_versao_enxuta");
+    const iEnxuta = seqLembrete.indexOf("recuperacao_enxuta");
     if (iEnxuta >= 0) { seqLembrete[iEnxuta] = "lembrete_3"; fallbackLembrete[iEnxuta] = "lembrete_acesso"; }
   }
   const nomeMsg = seqLembrete[contador]!;
