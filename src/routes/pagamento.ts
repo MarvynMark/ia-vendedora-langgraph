@@ -18,6 +18,7 @@ import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
+import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
 
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -33,6 +34,8 @@ const dmGuruPayloadSchema = z.object({
     email: z.string().optional(),
     phone_local_code: z.string().optional(),
     phone_number: z.string().optional(),
+    // CPF do comprador — a DMG envia só dígitos ("07512345622"), sem pontuação
+    doc: z.string().optional(),
   }).optional(),
   product: z.object({
     name: z.string().optional(),
@@ -123,8 +126,10 @@ export const pagamentoRouter = new Elysia()
       nome: contato.name,
       email: contato.email,
       telefone: telefoneE164,
+      cpf: contato.doc,
       nomeProduto,
       nomeOferta,
+      origem: "dmguru",
     });
 
     void processamento;
@@ -135,8 +140,12 @@ export interface PagamentoAprovadoDados {
   nome?: string;
   email?: string;
   telefone?: string;
+  /** CPF do comprador, cru ou já pontuado — cada plataforma envia num formato. */
+  cpf?: string;
   nomeProduto: string;
   nomeOferta: string;
+  /** Plataforma de origem da venda. Ausente = DMGuru. */
+  origem?: "dmguru" | "tmb";
 }
 
 // Lógica de processamento agnóstica de plataforma de pagamento (DMGuru, TMB, ...):
@@ -322,11 +331,14 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
   // Ordem importa: enviar primeiro (Baileys enfileira a msg), depois reabrir
   // (Baileys entrega as msgs pendentes ao reabrir). Inverter a ordem causa falha.
   try {
-    const telefoneFormatado = dados.telefone
-      ? dados.telefone.replace(/^\+55/, "").replace(/(\d{2})(\d{4,5})(\d{4})/, "($1) $2-$3")
-      : "(não informado)";
-    const nomeProdutoNotificacao = dados.nomeOferta || dados.nomeProduto || "Mentoria Vestigium";
-    const mensagemGrupo = `✅✅ NOVO ALUNO MENTORIA: ${dados.nome ?? contato.name}\nEmail: ${dados.email ?? "(não informado)"}\nTelefone: ${telefoneFormatado}\n${nomeProdutoNotificacao}`;
+    const mensagemGrupo = montarMensagemNovoAluno({
+      nome: dados.nome ?? contato.name,
+      email: dados.email,
+      telefone: dados.telefone,
+      cpf: dados.cpf,
+      plano: dados.nomeOferta || dados.nomeProduto || "Mentoria Vestigium",
+      origem: dados.origem,
+    });
     await enviarMensagem(
       accountId,
       env.CHATWOOT_ALERT_CONVERSATION_ID,

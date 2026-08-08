@@ -15,6 +15,8 @@ const tmbVendasPayloadSchema = z.object({
   // "Cancelado" = cliente cancelou após pagar a entrada.
   status_pedido: z.string().optional(),
   cliente: z.string().optional(),
+  // CPF do comprador — a TMB envia já pontuado ("069.242.814-00")
+  documento: z.union([z.string(), z.number()]).optional(),
   email: z.string().optional(),
   // Telefone já vem em formato E.164 (ex.: "+5562999999999").
   telefone_ativo: z.string().optional(),
@@ -97,8 +99,10 @@ export const pagamentoTmbRouter = new Elysia()
       nome: dados.cliente,
       email: dados.email,
       telefone,
+      cpf: dados.documento !== undefined ? String(dados.documento) : undefined,
       nomeProduto,
       nomeOferta,
+      origem: "tmb",
     });
 
     return { status: "accepted" };

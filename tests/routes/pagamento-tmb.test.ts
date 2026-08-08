@@ -79,9 +79,18 @@ describe("webhook /webhook/pagamento-tmb", () => {
       nome: "Fulano de Tal",
       email: "fulano@gmail.com",
       telefone: "+5562999996666", // telefone_ativo tem prioridade sobre telefones
+      cpf: "069.242.814-00",
       nomeProduto: "Mentoria Vestigium - Perito Criminal",
       nomeOferta: "RC - R$ 1.997,00",
+      origem: "tmb", // marca a venda como boleto TMB no alerta do grupo
     });
+  });
+
+  test("não inventa CPF quando a TMB omite o campo 'documento'", async () => {
+    const { documento, ...semDocumento } = payloadEfetivado;
+    await pagamentoTmbRouter.handle(makeRequest(semDocumento));
+    const args = processarMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(args.cpf).toBeUndefined();
   });
 
   test("usa 'telefones' quando 'telefone_ativo' está ausente", async () => {
