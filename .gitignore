@@ -42,3 +42,4 @@ src/assets/
 *.local.md
 .mcp.json
 .claude/settings.local.json
+output/
