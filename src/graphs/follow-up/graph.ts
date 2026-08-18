@@ -17,6 +17,22 @@ import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
 import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
 
+// Envia um template Meta (fora da janela de 24h) E persiste no histórico, para que o registro
+// da conversa reflita o que o lead recebeu. Sem isso, todo envio de template ficava invisível
+// para análise E para o próprio agente (que relia o histórico e não sabia o que já mandou).
+// O ramo "dentro da janela" (enviarMensagem) já salvava; os ramos de template não.
+export async function enviarTemplateComHistorico(
+  state: FollowUpStateType,
+  templateName: string,
+  texto: string,
+  primeiroNome: string,
+): Promise<void> {
+  await enviarTemplate(state.accountId, state.conversationId, templateName, texto, { "1": primeiroNome });
+  if (state.telefone && texto.trim() !== "") {
+    await salvarMensagem(state.telefone, { type: "ai", content: texto, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+  }
+}
+
 // --- Nós do grafo ---
 
 async function buscarFunil(state: FollowUpStateType) {
@@ -75,16 +91,15 @@ export async function classificar(state: FollowUpStateType) {
   if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
   } else if (stepName === "aguardando pagamento") {
-    // "Aguardando Pagamento" tem duas subpopulações distinguidas pelo status na descrição:
-    // - proposta_apresentada SEM link enviado = viu o preço e sumiu → sequência PÓS-PREÇO
-    //   (agenteFollowup detecta proposta_apresentada e usa SEQUENCIA_POS_PRECO). Antes esses
-    //   leads caíam no lembrete, que fala "o link ainda tá ativo" — link que nunca foi enviado.
-    // - link enviado = comprometeu-se, falta pagar → lembrete de pagamento.
-    const desc = state.description ?? "";
-    const temLink = /link\s*enviado/i.test(desc);
-    // Mesmo padrão que o agenteFollowup usa pra ativar a SEQUENCIA_POS_PRECO (isPosPreco).
-    const propostaApresentada = /status:\s*proposta_apresentada/i.test(desc);
-    tipoFollowup = (propostaApresentada && !temLink) ? "followup" : "lembrete";
+    // "Aguardando Pagamento" tem duas subpopulações, distinguidas por "link enviado" na descrição:
+    // - COM "link enviado" = comprometeu-se, falta pagar → lembrete ("o link ainda tá ativo").
+    // - SEM "link enviado" = viu o preço e sumiu (link nunca foi mandado) → sequência PÓS-PREÇO.
+    // O DEFAULT é PÓS-PREÇO. Antes o default era lembrete (e ainda pior: no cron o tipo vinha
+    // pré-definido como "lembrete", ver verificar-followups.ts), então leads sem link recebiam
+    // "o link ainda tá ativo" sobre um link que nunca existiu — o "link fantasma" do diagnóstico,
+    // e a SEQUENCIA_POS_PRECO nunca disparava.
+    const temLink = /link\s*enviado/i.test(state.description ?? "");
+    tipoFollowup = temLink ? "lembrete" : "followup";
   } else if (stepName === "ganho") {
     tipoFollowup = "boas_vindas";
   } else if (stepName === "primeira mensagem") {
@@ -121,18 +136,26 @@ const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 6
 // Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
 const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] as const;
 
-// Sequência pós-preço (viu o pitch e sumiu — description tem "status: proposta_apresentada"):
-// cutucada de reforço → (se sumir) versão enxuta 6 meses → parcelado → garantia.
+// Sequência pós-preço (viu o pitch e sumiu — está em "Aguardando Pagamento" sem "link enviado"):
+// cutucada de reforço → versão enxuta 6 meses → parcelado → garantia → prova social (D+7) →
+// última chamada consultiva (D+14). Cadência mais longa e espaçada porque o pós-preço é o
+// maior vazamento do funil e a recuperação antes morria em 24-48h (diagnóstico).
 const SEQUENCIA_POS_PRECO = [
   "pos_preco_reforco",
   "recuperacao_enxuta",
   "pos_preco_followup_2",
   "pos_preco_followup_3",
+  "pos_preco_prova_social",
+  "pos_preco_ultima_chamada",
 ] as const;
 
-// Pós-preço: t1→t2 3h (mesmo dia, na janela), t2→t3 e t3→t4 dia seguinte, t4→enc dia seguinte.
-const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_urgencia"] as const;
+// Pós-preço: t1(entrada)→t2 3h (mesmo dia, na janela), t2→t3 e t3→t4 dia seguinte, t4→t5 ~D+7
+// (prova social), t5→t6 ~D+14 (última chamada), t6→encerramento +3d. Espaçado, sem 2 toques/dia.
+const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 5 * 24 * 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
+// Fallbacks pagos (fora da janela 24h), por posição. Reusam templates Meta já aprovados
+// (pos_preco_duvida/urgencia) — os toques novos (prova social/última chamada) só existem em texto
+// livre dentro da janela; fora dela caem no fallback aprovado correspondente.
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_urgencia", "pos_preco_duvida", "pos_preco_urgencia"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -154,7 +177,14 @@ async function agenteFollowup(state: FollowUpStateType) {
   const dentroJanela = msRestantes > 0;
   const contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = primeiroNomeSaudacao(state.title);
-  const isPosPreco = /status:\s*proposta_apresentada/i.test(state.description ?? "");
+  // Pós-preço = está em "Aguardando Pagamento" (viu o pitch) e ainda NÃO recebeu link.
+  // Antes dependia só de "status: proposta_apresentada" (que o agente nem sempre grava), por
+  // isso a SEQUENCIA_POS_PRECO quase nunca disparava. Agora espelha classificar(): basta estar
+  // em Aguardando Pagamento sem "link enviado". Leads em Conexão (outro step) continuam na
+  // SEQUENCIA_RECUPERACAO_CONEXAO normalmente (isPosPreco = false).
+  const stepNameFollowup = state.board_step?.name?.toLowerCase() ?? "";
+  const temLinkEnviado = /link\s*enviado/i.test(state.description ?? "");
+  const isPosPreco = stepNameFollowup === "aguardando pagamento" && !temLinkEnviado;
 
   // Dados do formulário (concurso/formação) + detecção de médico (trilha Médico Legista, sem downsell).
   const campos = await buscarCamposFormulario(state.telefone);
@@ -185,7 +215,7 @@ async function agenteFollowup(state: FollowUpStateType) {
           await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
         }
       } else {
-        await enviarTemplate(state.accountId, state.conversationId, "encerramento", conteudoEnc, { "1": primeiroNome });
+        await enviarTemplateComHistorico(state, "encerramento", conteudoEnc, primeiroNome);
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento:", e);
@@ -194,11 +224,16 @@ async function agenteFollowup(state: FollowUpStateType) {
     return { respostaAgente: "" };
   }
 
-  const nomeMsg = sequencia[contador]!;
+  // Retomada agendada (rec #13): se o agente combinou um retorno numa data e marcou "retomar:" na
+  // descrição, o PRIMEIRO toque acknowledge o combinado (retomada_agendada) em vez do template
+  // genérico — corrige o "Confirmar o quê?" (follow-up que contradizia o acordo). Depois segue a
+  // cadência normal (o marcador é removido na atualização da descrição, abaixo).
+  const temRetomarAgendado = /retomar:/i.test(state.description ?? "") && contador === 0;
+  const nomeMsg = temRetomarAgendado ? "retomada_agendada" : sequencia[contador]!;
   // Personaliza com concurso/dificuldade do formulário (só chega ao lead na janela aberta —
   // fora dela usa o template Meta puro; ver textoEnviar abaixo). campos já buscado acima.
   const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
-  const templateFallback = fallbacks[contador] ?? "encerramento_02";
+  const templateFallback = temRetomarAgendado ? "conexao_duvida" : (fallbacks[contador] ?? "encerramento_02");
   // Fora da janela o lead recebe o template Meta (só {{1}}=nome). O texto REGISTRADO no Chatwoot
   // precisa refletir isso: substitui o nome e remove os segmentos {{ }} de concurso que o template
   // Meta não envia. Sem isso o registro mostrava "[Nome]" cru (ou vazio, quando a chave não existia).
@@ -220,7 +255,7 @@ async function agenteFollowup(state: FollowUpStateType) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar, { "1": primeiroNome });
+      await enviarTemplateComHistorico(state, templateFallback, textoEnviar, primeiroNome);
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
@@ -228,7 +263,9 @@ async function agenteFollowup(state: FollowUpStateType) {
   }
 
   const novoContador = contador + 1;
-  const descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
+  let descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
+  // Remove o marcador "retomar:" após usá-lo, pra o acknowledge do combinado não repetir a cada toque.
+  if (temRetomarAgendado) descricaoAtualizada = descricaoAtualizada.replace(/[^\S\n]*retomar:[^\n]*\n?/i, "").trimEnd();
   const delayProximo = delays[contador] ?? 24 * 60 * 60 * 1000;
   const proxima = agendarMaximizandoJanela(new Date(), delayProximo, msRestantes, { minGapMs: MIN_GAP_JANELA_MS });
   await atualizarKanbanTask(state.accountId, state.taskId, {
@@ -266,7 +303,7 @@ async function agenteLembrete(state: FollowUpStateType) {
           await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
         }
       } else {
-        await enviarTemplate(state.accountId, state.conversationId, "encerramento", conteudoEnc, { "1": primeiroNome });
+        await enviarTemplateComHistorico(state, "encerramento", conteudoEnc, primeiroNome);
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento lembrete:", e);
@@ -307,7 +344,7 @@ async function agenteLembrete(state: FollowUpStateType) {
         await salvarMensagem(state.telefone, { type: "ai", content: conteudo, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
       }
     } else {
-      await enviarTemplate(state.accountId, state.conversationId, templateFallback, textoEnviar, { "1": primeiroNome });
+      await enviarTemplateComHistorico(state, templateFallback, textoEnviar, primeiroNome);
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
@@ -424,7 +461,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
           await salvarMensagem(state.telefone, { type: "ai", content: conteudoEnc, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
         }
       } else {
-        await enviarTemplate(state.accountId, state.conversationId, "encerramento", conteudoEnc ?? "", { "1": primeiroNome });
+        await enviarTemplateComHistorico(state, "encerramento", conteudoEnc ?? "", primeiroNome);
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento Primeira mensagem:", e);
@@ -450,7 +487,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
       }
     } else {
       logger.info("follow-up", `Fora da janela — template: ${nomeMsg}`);
-      await enviarTemplate(state.accountId, state.conversationId, nomeMsg, conteudo, { "1": primeiroNome });
+      await enviarTemplateComHistorico(state, nomeMsg, conteudo, primeiroNome);
     }
   } catch (e) {
     logger.error("follow-up", `Erro ao enviar ${nomeMsg}:`, e);
@@ -662,7 +699,7 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
       }
     } else {
       logger.info("follow-up", "Enviando template inicial: abertura02");
-      await enviarTemplate(state.accountId, state.conversationId, "abertura02", conteudo, { "1": primeiroNome });
+      await enviarTemplateComHistorico(state, "abertura02", conteudo, primeiroNome);
     }
   } catch (e) {
     logger.error("follow-up", "Erro ao enviar template inicial:", e);

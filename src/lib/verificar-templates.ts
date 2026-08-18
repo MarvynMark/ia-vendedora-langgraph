@@ -5,10 +5,18 @@ import { salvarMensagem } from "../db/memoria.ts";
 import { logger } from "./logger.ts";
 import { CONTEUDO_TEMPLATES } from "./templates.ts";
 import { primeiroNomeSaudacao, substituirNome } from "./nome.ts";
+import { estaDentroDaJanela } from "./horario-comercial.ts";
 
 export async function verificarTemplatesPendentes() {
   if (env.MODO_TESTE) {
     logger.debug("template-timer", "Modo teste ativo — verificação de templates bloqueada");
+    return;
+  }
+
+  // A abertura (abertura02) é a PRIMEIRA mensagem que o lead recebe — não pode sair de madrugada.
+  // Fora do expediente (seg-sex 08h20-20h SP) esperamos a próxima passada do cron dentro da janela.
+  if (!estaDentroDaJanela()) {
+    logger.debug("template-timer", "Fora do horário comercial — adiando envio de aberturas");
     return;
   }
 

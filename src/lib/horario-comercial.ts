@@ -38,6 +38,18 @@ function dentroDaJanela(hora: number, minuto: number, diaSemana: number, horaFec
 }
 
 /**
+ * A data cai DENTRO da janela de envio (seg-sex, 08h20-20h, fuso SP)?
+ * Use para decidir se uma mensagem iniciada pela IA (abertura, intro do Walker) pode sair
+ * AGORA ou deve esperar a próxima passada do cron dentro do expediente — evita disparos de
+ * madrugada. Os follow-ups já respeitam o horário via `proximoHorarioComercial` no agendamento;
+ * esta função cobre os disparos imediatos (crons de template/intro) que não agendam por due_date.
+ */
+export function estaDentroDaJanela(date: Date = new Date(), horaFechamento = HORA_FECHAMENTO): boolean {
+  const { hora, minuto, diaSemana } = getComponentesSP(date);
+  return dentroDaJanela(hora, minuto, diaSemana, horaFechamento);
+}
+
+/**
  * Dado um momento e um delay em ms, retorna quando a mensagem deve ser
  * enviada respeitando horário comercial (seg-sex, 08h20-18h, fuso SP).
  * Se o alvo cair fora desse intervalo, avança para o próximo dia útil às 08:20.

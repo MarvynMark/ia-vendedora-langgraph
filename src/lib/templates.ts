@@ -50,6 +50,12 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
     "Ei [Nome], se o valor pesou de cabeça, dá pra dividir em até 12x no boleto ou no PIX, uma parcela por mês, sem precisar de limite no cartão. Quer que eu te mostre como fica?",
   pos_preco_followup_3:
     "Oi [Nome], e lembra: o risco é zero. Você tem 7 dias de garantia pra testar a mentoria por dentro, e se sentir que não é pra você, eu devolvo o valor, sem precisar justificar nada. Faz mais sentido assim?",
+  // Toque D+7: prova social (caso anônimo + 93%), reengaja pelo resultado, sem pressão.
+  pos_preco_prova_social:
+    "Oi [Nome], deixa eu te contar uma coisa rápida: teve gente que entrou comigo com a mesma dúvida que a sua e hoje já tá evoluindo firme. No último Perito Criminal do RS, 93% dos meus alunos passaram pras próximas fases. Quer que eu te mostre por onde você começaria{{ pro [concurso]}}?",
+  // Toque D+14: última chamada consultiva (não agressiva) — dá um sinal ou fica pra mais pra frente.
+  pos_preco_ultima_chamada:
+    "Oi [Nome], não vou ficar te cutucando, então essa é a última vez que te chamo por aqui: se ainda fizer sentido{{ pra sua preparação pro [concurso]}}, me dá um sinal que eu te ajudo no primeiro passo. Se preferir deixar pra mais pra frente, tudo bem, é só me chamar quando for a hora.",
   // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
   // não substitui a variável — igual aos demais fallbacks (conexao_duvida, lembrete_acesso...).
   pos_preco_urgencia:
@@ -60,6 +66,11 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Sequência pós-preço: Conexão (janela fechada — Meta templates) ---
   pos_preco_duvida: "Ficou alguma dúvida sobre o investimento? Me conta aqui que a gente resolve",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
+
+  // --- Retomada agendada: o lead combinou um retorno numa data (card tem "retomar: ...") ---
+  // Reconhece o combinado (não contradiz nem fala de link fantasma) — corrige o caso "Confirmar o quê?".
+  retomada_agendada:
+    "Oi [Nome], como a gente tinha combinado, tô passando aqui pra retomar. Ficou alguma dúvida sobre a mentoria{{ pro [concurso]}}, ou quer que eu já te ajude a dar o próximo passo?",
 
   // --- Recuperação: versão enxuta (downsell 6 meses / Semestral) ---
   // Toque 2 (se o lead não respondeu à cutucada). NÃO enviar para médicos (guarda no graph.ts).

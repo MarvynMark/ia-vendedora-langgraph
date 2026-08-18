@@ -153,7 +153,10 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
   } else if (stepName === "conexão" || stepName === "conexao") {
     tipoFollowup = "followup";
   } else if (stepName.includes("aguardando pagamento")) {
-    tipoFollowup = "lembrete";
+    // Duas subpopulações: COM "link enviado" → lembrete ("o link ainda tá ativo"); SEM → pós-preço
+    // (viu o preço e sumiu, link nunca mandado). Mesma regra de classificar()/verificar-followups.ts.
+    // Antes forçava "lembrete" para todos e o lead sem link recebia o "link fantasma" do diagnóstico.
+    tipoFollowup = /link\s*enviado/i.test(task.description ?? "") ? "lembrete" : "followup";
   } else if (stepName === "ganho") {
     // Proteção: se boas-vindas já foram enviadas pelo pagamento.ts, ignorar
     if ((task.description ?? "").includes("boas-vindas: enviado")) {

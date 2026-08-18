@@ -10,6 +10,7 @@ import { pool } from "../db/pool.ts";
 import { env } from "../config/env.ts";
 import { logger } from "./logger.ts";
 import { houveAiRecente } from "../db/memoria.ts";
+import { estaDentroDaJanela } from "./horario-comercial.ts";
 import { buscarConversa } from "../services/chatwoot.ts";
 import { buscarDadosFormulario } from "../db/formulario.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
@@ -103,6 +104,10 @@ let introEmExecucao = false;
 export async function verificarIntrosPendentes(): Promise<void> {
   if (env.MODO_TESTE) return;
   if (introEmExecucao) return;
+  // A intro do Walker é um push automático (não uma resposta direta a uma mensagem do lead) —
+  // não deve disparar de madrugada. Fora do expediente (seg-sex 08h20-20h SP) espera a próxima
+  // passada do cron. Conversas ativas já são puladas mais abaixo por houveAiRecente.
+  if (!estaDentroDaJanela()) return;
   introEmExecucao = true;
   try {
     const { rows } = await pool.query(

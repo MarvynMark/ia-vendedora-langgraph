@@ -15,9 +15,11 @@ function state(stepName: string, description = ""): FollowUpStateType {
   };
 }
 
-// "Aguardando Pagamento" tem duas subpopulações: quem viu o preço e sumiu (proposta_apresentada,
-// sem link) deve entrar na sequência PÓS-PREÇO (via agente_followup); quem já recebeu o link
-// segue no lembrete de pagamento. Antes, todos caíam no lembrete ("o link ainda tá ativo").
+// "Aguardando Pagamento" tem duas subpopulações, distinguidas por "link enviado" na descrição:
+// quem JÁ recebeu o link segue no lembrete de pagamento ("o link ainda tá ativo"); todo o resto
+// (viu o preço e sumiu, link nunca mandado) entra na sequência PÓS-PREÇO. O DEFAULT é pós-preço:
+// antes o default era lembrete e o lead sem link recebia "o link ainda tá ativo" sobre um link
+// que nunca existiu (o "link fantasma" do diagnóstico), e a sequência pós-preço nunca disparava.
 describe("classificar — Aguardando Pagamento (pós-preço vs lembrete)", () => {
   test("proposta_apresentada SEM link → followup (sequência pós-preço)", async () => {
     const r = await classificar(state("Aguardando Pagamento", "🟢 Concurso: PCDF\nstatus: proposta_apresentada"));
@@ -34,9 +36,9 @@ describe("classificar — Aguardando Pagamento (pós-preço vs lembrete)", () =>
     expect(r.tipoFollowup).toBe("lembrete");
   });
 
-  test("sem status na descrição → lembrete (comportamento padrão)", async () => {
+  test("sem status/link na descrição → followup (pós-preço é o novo default)", async () => {
     const r = await classificar(state("Aguardando Pagamento", "🟢 Concurso: PCDF"));
-    expect(r.tipoFollowup).toBe("lembrete");
+    expect(r.tipoFollowup).toBe("followup");
   });
 
   test("Conexão → followup; Ganho → boas_vindas (regressão dos demais steps)", async () => {
