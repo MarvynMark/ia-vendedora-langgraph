@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
-import { dividirEmFrases } from "../lib/response-formatter.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -45,18 +45,7 @@ export async function enviarImagemEntregaveis(idConta: string, idConversa: strin
   // Envia o texto de apresentação ANTES da imagem (garante a ordem texto -> imagem, que a
   // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e registra o
   // texto para o envio do output filtrar qualquer repetição feita pelo LLM.
-  if (mensagemAntes && mensagemAntes.trim()) {
-    try {
-      for (const frase of dividirEmFrases(mensagemAntes)) {
-        await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(frase));
-        await enviarMensagem(idConta, idConversa, frase);
-      }
-      registrarTextoMidia(idConversa, mensagemAntes);
-      await pausaComDigitando(idConta, idConversa, 3000);
-    } catch (e) {
-      logger.warn("tool:enviar-imagem-entregaveis", "Erro ao enviar mensagem antes da imagem:", e);
-    }
-  }
+  await enviarMensagemAntes(idConta, idConversa, mensagemAntes, "tool:enviar-imagem-entregaveis");
   try {
     logger.info("tool:enviar-imagem-entregaveis", "Baixando imagem de:", IMAGEM_ENTREGAVEIS_URL);
     const res = await fetchComTimeout(IMAGEM_ENTREGAVEIS_URL, { method: "GET", timeout: 30_000 });

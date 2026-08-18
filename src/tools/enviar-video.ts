@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
-import { dividirEmFrases } from "../lib/response-formatter.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -28,18 +28,7 @@ export async function enviarVideoPlataforma(idConta: string, idConversa: string,
   conversasComVideoEnviado.add(idConversa);
 
   // Envia o texto de apresentação ANTES do vídeo (garante a ordem texto -> vídeo)
-  if (mensagemAntes && mensagemAntes.trim()) {
-    try {
-      for (const frase of dividirEmFrases(mensagemAntes)) {
-        await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(frase));
-        await enviarMensagem(idConta, idConversa, frase);
-      }
-      registrarTextoMidia(idConversa, mensagemAntes);
-      await pausaComDigitando(idConta, idConversa, 3000);
-    } catch (e) {
-      logger.warn("tool:enviar-video", "Erro ao enviar mensagem antes do vídeo:", e);
-    }
-  }
+  await enviarMensagemAntes(idConta, idConversa, mensagemAntes, "tool:enviar-video");
   try {
     logger.info("tool:enviar-video", "Baixando vídeo de:", VIDEO_PLATAFORMA_URL);
     const res = await fetchComTimeout(VIDEO_PLATAFORMA_URL, { method: "GET", timeout: 60_000 });

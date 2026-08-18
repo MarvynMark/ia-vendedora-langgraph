@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { criarToolsAgenteVestigium, criarToolsFollowup } from "../../src/tools/factory.ts";
+import { TOOLS_QUE_ENVIAM_TEXTO_AO_LEAD } from "../../src/graphs/main-agent/output.ts";
 
 const CONTEXTO_BASE = {
   idMensagem: "1",
@@ -65,6 +66,20 @@ describe("tool factory - main agent", () => {
     }
     // O áudio 3 foi removido do fluxo
     expect(tools.find(t => t.name === "Enviar_audio_walker_3")).toBeUndefined();
+  });
+
+  // Guarda de consistência: montarOutputDoTurno descarta o `content` que acompanha as tools que
+  // já mandam texto ao lead sozinhas. Se alguém criar uma 5ª tool com `mensagem_antes` e esquecer
+  // de listá-la, a duplicação da conv 5385 volta silenciosamente.
+  test("toda tool com mensagem_antes está em TOOLS_QUE_ENVIAM_TEXTO_AO_LEAD", () => {
+    const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
+    for (const t of tools) {
+      const temMensagemAntes = JSON.stringify(t.schema ?? {}).includes("mensagem_antes");
+      expect({ tool: t.name, listada: TOOLS_QUE_ENVIAM_TEXTO_AO_LEAD.has(t.name) }).toEqual({
+        tool: t.name,
+        listada: temMensagemAntes,
+      });
+    }
   });
 });
 

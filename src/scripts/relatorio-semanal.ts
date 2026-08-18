@@ -66,26 +66,40 @@ const sumiramPosPreco = +f.sumiram_pos_preco, novos = +f.novos;
 // em ordem de id (antigas primeiro). Uma task antiga pode ter entrado no step ESTA
 // semana, então varremos TODAS as páginas uma vez e filtramos por step_changed_at.
 // ─────────────────────────────────────────────────────────────────────────────
-async function varrerKanban(): Promise<{ ganho: string[]; agPagto: string[] }> {
-  const ganho: string[] = [], agPagto: string[] = [];
+// Cada lead vira {title, link} — link abre a conversa direto no CRM pra o Pedro contatar.
+type LeadRef = { title: string; link: string };
+const CRM_BASE = `${env.CHATWOOT_BASE_URL}/app/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations`;
+
+async function varrerKanban(): Promise<{ ganho: LeadRef[]; agPagto: LeadRef[] }> {
+  const ganho: LeadRef[] = [], agPagto: LeadRef[] = [];
   for (let page = 1; page <= 120; page++) {
     let tasks: KanbanTaskResumo[] = [];
-    tasks = await listarKanbanTasks(env.CHATWOOT_ACCOUNT_ID, BOARD_ID, STEP_GANHO, page);
+    // Retry por página: a varredura faz ~74 requisições e uma pode dar timeout — não deixa
+    // um erro transitório abortar o relatório inteiro.
+    for (let tent = 1; tent <= 3; tent++) {
+      try { tasks = await listarKanbanTasks(env.CHATWOOT_ACCOUNT_ID, BOARD_ID, STEP_GANHO, page); break; }
+      catch (e) {
+        if (tent === 3) throw e;
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
     if (tasks.length === 0) break;
     for (const t of tasks) {
       const x = t as unknown as { step_changed_at?: string; board_step_id: number };
       const sc = x.step_changed_at ?? "";
       if (sc >= deISO && sc < ateISO) {
-        if (x.board_step_id === STEP_GANHO) ganho.push(t.title);
-        else if (x.board_step_id === STEP_AG_PAGTO) agPagto.push(t.title);
+        const conv = t.conversations?.[0]?.display_id ?? null;
+        const ref: LeadRef = { title: t.title, link: conv ? `${CRM_BASE}/${conv}` : "" };
+        if (x.board_step_id === STEP_GANHO) ganho.push(ref);
+        else if (x.board_step_id === STEP_AG_PAGTO) agPagto.push(ref);
       }
     }
   }
   return { ganho, agPagto };
 }
 
-let vendas = { total: 0, titulos: [] as string[] };
-let aguardando = { total: 0, titulos: [] as string[] };
+let vendas = { total: 0, titulos: [] as LeadRef[] };
+let aguardando = { total: 0, titulos: [] as LeadRef[] };
 let kanbanOk = true;
 try {
   const k = await varrerKanban();
@@ -152,10 +166,13 @@ function gerarHtml(d: {
   periodo: string; leads: number; novos: number; engajaram: number; chegaramPreco: number;
   sumiramPosPreco: number; vendas: number; aguardando: number; kanbanOk: boolean;
   convGeral: string; convPreco: string; pctChegouPreco: string; custoUsd: string;
-  vendasTitulos: string[]; aguardandoTitulos: string[];
+  vendasTitulos: LeadRef[]; aguardandoTitulos: LeadRef[];
 }): string {
-  const li = (arr: string[]) => arr.length
-    ? arr.map(t => `<li>${t.replace(/</g, "&lt;")}</li>`).join("")
+  const esc = (s: string) => s.replace(/</g, "&lt;");
+  const li = (arr: LeadRef[], comLink = false) => arr.length
+    ? arr.map(r => (comLink && r.link)
+        ? `<li><a href="${r.link}" target="_blank" rel="noopener">${esc(r.title)} ↗</a></li>`
+        : `<li>${esc(r.title)}</li>`).join("")
     : "<li>(nenhum no período)</li>";
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -186,6 +203,7 @@ function gerarHtml(d: {
   .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:680px){.two{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
   ul{margin:6px 0 0;padding-left:18px}li{font-size:13.5px;color:var(--soft);margin:4px 0}
+  a{color:var(--accent);text-decoration:none;font-weight:600}a:hover{text-decoration:underline}
   .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--muted)}
 </style></head><body><div class="wrap">
   <div class="eyebrow">Relatório de Vendas · IA "Perito Walker" · Instituto Vestigium</div>
@@ -205,9 +223,10 @@ function gerarHtml(d: {
     <p>dos leads que <b>viram o preço sumiram logo depois</b> (a IA falou por último e ninguém respondeu). É onde mora quase toda a perda de venda — alvo do "closer" humano e da recuperação em escada.</p></div>
 
   <h2>Ações da semana</h2>
+  <p style="font-size:13.5px;color:var(--soft);margin:0 0 12px">👉 <b>Pedro:</b> os leads <b>aguardando pagamento</b> têm link direto pra abrir a conversa no CRM e entrar em contato.</p>
   <div class="two">
-    <div class="card"><div class="eyebrow" style="color:var(--won)">Vendas fechadas</div><ul>${li(d.vendasTitulos)}</ul></div>
-    <div class="card"><div class="eyebrow" style="color:var(--wait)">Aguardando pagamento (chase!)</div><ul>${li(d.aguardandoTitulos)}</ul></div>
+    <div class="card"><div class="eyebrow" style="color:var(--won)">Vendas fechadas (${d.vendasTitulos.length})</div><ul>${li(d.vendasTitulos)}</ul></div>
+    <div class="card"><div class="eyebrow" style="color:var(--wait)">Aguardando pagamento — contatar (${d.aguardandoTitulos.length})</div><ul>${li(d.aguardandoTitulos, true)}</ul></div>
   </div>
 
   <div class="foot">Fontes: banco de conversas (funil AI-led) · Kanban fazer.ai (vendas)${d.custoUsd ? " · Langfuse (custo)" : ""}.${d.custoUsd ? ` Custo do período: US$ ${d.custoUsd}.` : ""} Gerado automaticamente por <code>bun run relatorio</code>.</div>

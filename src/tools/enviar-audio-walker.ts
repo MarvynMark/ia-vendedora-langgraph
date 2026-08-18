@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando, calcularDelayDigitando, registrarTextoMidia } from "../services/chatwoot.ts";
-import { dividirEmFrases } from "../lib/response-formatter.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -46,20 +46,7 @@ export async function enviarAudioWalker(
   // Envia o texto de contexto ANTES do áudio. Garante a ordem texto -> áudio (que a
   // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e deixa
   // a apresentação do áudio personalizada, para não parecer um áudio gravado solto.
-  if (mensagemAntes && mensagemAntes.trim()) {
-    try {
-      // Cada frase vira uma mensagem separada, com "digitando" proporcional antes de cada
-      for (const frase of dividirEmFrases(mensagemAntes)) {
-        await pausaComDigitando(idConta, idConversa, calcularDelayDigitando(frase));
-        await enviarMensagem(idConta, idConversa, frase);
-      }
-      // Registra o texto para que o envio do output filtre qualquer repetição feita pelo LLM
-      registrarTextoMidia(idConversa, mensagemAntes);
-      await pausaComDigitando(idConta, idConversa, 3000);
-    } catch (e) {
-      logger.warn("tool:enviar-audio-walker", "Erro ao enviar mensagem antes do áudio:", e);
-    }
-  }
+  await enviarMensagemAntes(idConta, idConversa, mensagemAntes, "tool:enviar-audio-walker");
 
   const url = URLS_AUDIO[numero];
   try {
