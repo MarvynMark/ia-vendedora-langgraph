@@ -8,7 +8,8 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado } from "../../services/chatwoot.ts";
+import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
@@ -185,6 +186,13 @@ async function executarAgente(state: MainAgentStateType) {
 
   // Carregar histórico antes de montar o system prompt para poder injetar contexto de continuação
   const historico = await buscarHistorico(state.telefone, 50);
+  // Snapshot do que a IA já disse: consultado pelas tools de mídia antes de enviar o
+  // mensagem_antes, para não repetir uma frase já mandada em turnos anteriores (conv 5525).
+  // Precisa acontecer ANTES de qualquer tool rodar (limparTextosMidia já passou, na linha ~173).
+  registrarSaidasRecentes(
+    state.idConversa,
+    historico.filter((m) => m.type === "ai").map((m) => m.content),
+  );
   const mensagensHistorico = historico
     .map((m) => {
       if (m.type === "human") {
@@ -283,11 +291,20 @@ async function executarAgente(state: MainAgentStateType) {
     // Pegar apenas mensagens NOVAS (geradas pelo agente), ignorando o histórico passado como input
     // Sem isso, respostas anteriores do AI são re-concatenadas no output, causando snowball
     const newMsgs = msgs.slice(messages.length);
-    const output = newMsgs
-      .filter((m: { _getType: () => string }) => m._getType() === "ai")
-      .map((m: { content: unknown }) => (typeof m.content === "string" ? m.content : ""))
-      .filter(s => s.trim().length > 0)
-      .join("\n\n");
+    // Descarta o `content` que acompanha tool_call de MÍDIA: a tool já mandou esse texto ao lead
+    // pelo mensagem_antes, e repeti-lo aqui era a duplicação da conv 5385. Ver output.ts.
+    const { output, preambulosDescartados, mensagensAntes } = montarOutputDoTurno(newMsgs as never);
+
+    if (preambulosDescartados.length > 0) {
+      logger.warn("main-agent", "Preâmbulo de tool de mídia descartado (duplicaria o mensagem_antes)", {
+        idConversa: state.idConversa,
+        preambulos: preambulosDescartados.map(p => p.slice(0, 120)),
+      });
+    }
+
+    // Rede de segurança: registra o mensagem_antes no filtro mesmo quando a tool retornou cedo
+    // pelo dedupe (mídia já enviada) e portanto não chamou registrarTextoMidia.
+    for (const t of mensagensAntes) registrarTextoMidiaNaoEnviado(state.idConversa, t);
 
     // Salvar user message no histórico (não salvar mensagens SISTEMA — elas confundem o LLM ao reaparecer)
     if (!mensagemOriginal.startsWith("[SISTEMA:")) {
@@ -313,7 +330,14 @@ async function executarAgente(state: MainAgentStateType) {
         }
       }
     }
-    await garantirMidiaEntregue(output, toolsChamadas, state.idConta, state.idConversa);
+    // Recebe o texto COMPLETO (inclusive o preâmbulo descartado): esta guarda detecta por regex
+    // "a IA narrou o envio mas não chamou a tool", e perder o preâmbulo abriria um buraco nela.
+    await garantirMidiaEntregue(
+      [output, ...preambulosDescartados].join("\n"),
+      toolsChamadas,
+      state.idConta,
+      state.idConversa,
+    );
 
     // Persiste no histórico os textos de apresentação de mídia (mensagem_antes) enviados neste
     // turno. As tools de mídia mandam esse texto direto pro WhatsApp mas NÃO o salvavam no
@@ -389,12 +413,12 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
   const frasesBrutas = dividirMensagem(formatado).flatMap((bloco) => dividirEmFrases(bloco));
-  let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f));
+  let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f));
   // Salvaguarda: se o filtro esvaziou a mensagem só por causa do fecho passivo (a IA respondeu
   // apenas com um "estou aqui para ajudar"), não ficar em silêncio — relaxa APENAS esse filtro e
   // envia a última frase. Se sobrou só duplicata de mídia / nome de tool, aí sim fica em silêncio.
   if (frases.length === 0 && frasesBrutas.length > 0) {
-    const semFechoPassivo = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoEhNomeDeTool(f));
+    const semFechoPassivo = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f));
     if (semFechoPassivo.length > 0) {
       logger.warn("main-agent", "Só fecho passivo sobrou após o filtro — enviando a última frase pra não ficar em silêncio");
       frases = [semFechoPassivo[semFechoPassivo.length - 1]!];

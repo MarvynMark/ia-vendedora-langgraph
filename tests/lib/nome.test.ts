@@ -24,6 +24,13 @@ describe("primeiroNomeSaudacao", () => {
     expect(primeiroNomeSaudacao("", "aluno(a)")).toBe("aluno(a)");
     expect(primeiroNomeSaudacao("Ana", "aluno(a)")).toBe("Ana");
   });
+
+  test("nome sem nenhuma letra (símbolo) → fallback (evita 'Oi ~.')", () => {
+    expect(primeiroNomeSaudacao("~")).toBe("");
+    expect(primeiroNomeSaudacao("~.")).toBe("");
+    expect(primeiroNomeSaudacao(".")).toBe("");
+    expect(primeiroNomeSaudacao("😀")).toBe("");
+  });
 });
 
 describe("substituirNome", () => {
@@ -79,5 +86,24 @@ describe("substituirCampos (personalização de follow-up)", () => {
       .toBe("Sei que organizar organização de tempo é o que mais trava.");
     expect(substituirCampos(t, { nome: null, dificuldade: null }))
       .toBe("Sei que é o que mais trava.");
+  });
+
+  test("concurso genérico ('Todos') → tratado como ausente (sem 'aprovação em Todos')", () => {
+    for (const generico of ["Todos", "todas", "vários", "não sei", "qualquer", "tanto faz"]) {
+      const out = substituirCampos(T, { nome: "Maria", concurso: generico });
+      expect(out).toBe("Oi Maria, imagino que a rotina tá corrida.");
+      expect(out.toLowerCase()).not.toContain(generico.toLowerCase());
+    }
+  });
+
+  test("concurso longo demais (frase colada) → tratado como ausente", () => {
+    const frase = "quero passar em qualquer concurso da área de perícia criminal do país inteiro";
+    expect(substituirCampos(T, { nome: "Maria", concurso: frase }))
+      .toBe("Oi Maria, imagino que a rotina tá corrida.");
+  });
+
+  test("concurso real (até nome de instituto) ainda é injetado", () => {
+    expect(substituirCampos(T, { nome: "Maria", concurso: "Instituto de Perícia do Maranhão" }))
+      .toBe("Oi Maria, imagino que a rotina tá corrida, ainda mais pra quem quer a aprovação em Instituto de Perícia do Maranhão.");
   });
 });

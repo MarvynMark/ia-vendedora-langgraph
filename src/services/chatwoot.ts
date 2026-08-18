@@ -3,6 +3,7 @@ import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { comRetry } from "../lib/retry.ts";
 import { logger } from "../lib/logger.ts";
 import { TEMPLATE_META } from "../lib/templates.ts";
+import { ehRepeticaoDeAlgum } from "../lib/similaridade.ts";
 
 const BASE_URL = env.CHATWOOT_BASE_URL;
 const TOKEN = env.CHATWOOT_API_TOKEN;
@@ -327,25 +328,39 @@ const textosMidiaOriginaisPorConversa = new Map<string, string[]>();
 // Como as apresentações de mídia são frases únicas (uma vez por conversa), manter persistente
 // não causa falso-positivo em turnos legítimos posteriores.
 const textosMidiaPersistentePorConversa = new Map<string, string[]>();
+// Cap por conversa: os registros de filtro nunca eram limpos e cresciam indefinidamente por
+// processo. As apresentações de mídia são poucas por conversa, então 20 é folgado.
+const MAX_TEXTOS_FILTRO = 20;
+// Normalização LEVE, específica dos filtros por regex (blocoNarraEnvioMidia, blocoNarraAcaoInterna,
+// blocoTemFraseProibida). Ela PRESERVA acentos de propósito — vários desses regexes dependem
+// deles (ex.: /[áa]udio|v[íi]deo|imagem/). Não confundir com `normalizar` de lib/similaridade.ts,
+// que remove acentos e serve à comparação por trigramas. As duas coexistem por isso.
 function normalizarTextoMidia(s: string): string {
   return (s ?? "").toLowerCase().replace(/[.,!?;:]/g, "").replace(/\s+/g, " ").trim();
 }
+function acrescentarComCap(mapa: Map<string, string[]>, chave: string, texto: string): void {
+  const arr = mapa.get(chave) ?? [];
+  arr.push(texto);
+  mapa.set(chave, arr.slice(-MAX_TEXTOS_FILTRO));
+}
+// Registra um texto de apresentação de mídia que FOI enviado ao lead: entra nos registros de
+// filtro E na lista de originais (que vira histórico via obterTextosMidia).
 export function registrarTextoMidia(idConversa: string | number, texto: string): void {
-  const t = normalizarTextoMidia(texto);
-  if (!t) return;
-  const chave = String(idConversa);
-  const arr = textosMidiaPorConversa.get(chave) ?? [];
-  arr.push(t);
-  textosMidiaPorConversa.set(chave, arr);
-  const arrP = textosMidiaPersistentePorConversa.get(chave) ?? [];
-  arrP.push(t);
-  textosMidiaPersistentePorConversa.set(chave, arrP);
   const orig = (texto ?? "").trim();
-  if (orig) {
-    const arrO = textosMidiaOriginaisPorConversa.get(chave) ?? [];
-    arrO.push(orig);
-    textosMidiaOriginaisPorConversa.set(chave, arrO);
-  }
+  if (!orig) return;
+  const chave = String(idConversa);
+  registrarTextoMidiaNaoEnviado(idConversa, orig);
+  acrescentarComCap(textosMidiaOriginaisPorConversa, chave, orig);
+}
+// Registra um texto que NÃO foi enviado ao lead (descartado por já ter sido dito, ou preâmbulo de
+// tool que o LLM duplicou no output). Entra só nos registros de FILTRO — nunca no histórico, senão
+// gravaríamos uma mensagem fantasma que o lead nunca viu.
+export function registrarTextoMidiaNaoEnviado(idConversa: string | number, texto: string): void {
+  const orig = (texto ?? "").trim();
+  if (!orig) return;
+  const chave = String(idConversa);
+  acrescentarComCap(textosMidiaPorConversa, chave, orig);
+  acrescentarComCap(textosMidiaPersistentePorConversa, chave, orig);
 }
 export function limparTextosMidia(idConversa: string | number): void {
   textosMidiaPorConversa.delete(String(idConversa));
@@ -366,9 +381,33 @@ export function blocoDuplicaMidia(idConversa: string | number, bloco: string): b
   // em que a run concorrente não re-registrou o mensagem_antes (#3).
   const arr = [...(textosMidiaPorConversa.get(chave) ?? []), ...(textosMidiaPersistentePorConversa.get(chave) ?? [])];
   if (arr.length === 0) return false;
-  const b = normalizarTextoMidia(bloco);
-  if (b.length < 5) return false;
-  return arr.some(t => t.includes(b));
+  // Comparação tolerante a PARÁFRASE. Antes era substring exata, que deixava passar
+  // "Vi que você é formado em Medicina..." quando o registrado era
+  // "Acabei de ver que você é formado em Medicina..." (duplicação da conv 5385).
+  return ehRepeticaoDeAlgum(bloco, arr);
+}
+
+// Snapshot do que a IA já disse ao lead nos últimos turnos desta conversa. Preenchido pelo grafo
+// a partir do histórico (n8n_historico_mensagens) antes de qualquer tool rodar, e consultado pelas
+// tools de mídia antes de enviar o mensagem_antes. Fecha o caso em que o LLM escreve a reação como
+// texto num turno e a repete no mensagem_antes do turno seguinte (duplicação da conv 5525).
+const saidasRecentesPorConversa = new Map<string, string[]>();
+const MAX_SAIDAS_RECENTES = 6; // ~2-3 turnos: o bastante para pegar a repetição sem falso-positivo
+
+export function registrarSaidasRecentes(idConversa: string | number, textos: string[]): void {
+  saidasRecentesPorConversa.set(
+    String(idConversa),
+    textos.map(t => (t ?? "").trim()).filter(Boolean).slice(-MAX_SAIDAS_RECENTES),
+  );
+}
+
+/** O que a IA já disse recentemente: histórico do turno + apresentações de mídia deste processo. */
+export function saidasRecentes(idConversa: string | number): string[] {
+  const chave = String(idConversa);
+  return [
+    ...(saidasRecentesPorConversa.get(chave) ?? []),
+    ...(textosMidiaPersistentePorConversa.get(chave) ?? []),
+  ];
 }
 
 // Retorna true se o bloco é apenas uma NARRAÇÃO de envio de mídia ("vou te mandar o áudio",
@@ -450,6 +489,26 @@ export function blocoTemFraseProibida(bloco: string): boolean {
     /\b(se precisar|se tiver (mais )?(alguma )?d[úu]vida|qualquer (coisa|d[úu]vida)).*(me avis|me cham|[ée] s[óo] (me )?(avis|cham|fal)|estou (aqui|por aqui)|conte comigo)/,
   ];
   return proibidas.some((re) => re.test(b));
+}
+
+// Jargão INTERNO de estratégia de venda que nunca deve aparecer numa mensagem ao lead. O LLM às
+// vezes vaza fragmentos das próprias instruções do prompt ("isso derruba a barreira sem rebaixar a
+// âncora" — conv 5577) ou termos de tática comercial. Rede de segurança determinística (o prompt
+// já não deveria expor isso, mas o filtro garante que nunca chegue ao lead).
+const JARGAO_INTERNO = [
+  /derruba(r|)\s+a\s+barreira/,
+  /rebaixar\s+a\s+[âa]ncora/,
+  /\bancoragem\b/,
+  /\bdownsell\b/,
+  /\bupsell\b/,
+  /\bprova social\b/,
+  /\bgatilho(s)?\s+menta(l|is)\b/,
+  /\bquebra\s+de\s+obje[çc][ãa]o/,
+];
+export function blocoVazaJargaoInterno(bloco: string): boolean {
+  const b = normalizarTextoMidia(bloco);
+  if (!b) return false;
+  return JARGAO_INTERNO.some((re) => re.test(b));
 }
 
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade

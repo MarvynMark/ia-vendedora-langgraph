@@ -24,6 +24,7 @@ export function primeiroNomeSaudacao(nomeCru: string | null | undefined, fallbac
   if (!primeiro) return fallback;
   if (SO_NUMERO_RE.test(primeiro)) return fallback;                 // "+5518...", "18 99753-7716"
   if ((primeiro.match(/\d/g) ?? []).length >= 4) return fallback;   // muitos dígitos = wa_id/telefone
+  if (!/\p{L}/u.test(primeiro)) return fallback;                    // sem nenhuma letra: "~", ".", emojis → evita "Oi ~."
   if (PLACEHOLDERS_GENERICOS.has(primeiro.toLowerCase())) return fallback; // "Conversa", "Contato"...
   return primeiro;
 }
@@ -55,13 +56,26 @@ export function substituirNome(texto: string, nomeCru: string | null | undefined
  *   "...quem quer a aprovação em PCDF é corrida" OU, sem concurso, "...quem quer é corrida".
  *   (Delimitador `{{ }}` — não colide com o `]` dos placeholders `[campo]`.)
  */
+// Valores genéricos do formulário que NÃO devem ser interpolados como se fossem um concurso ou
+// dificuldade específicos: o lead marcou "Todos"/"não sei". Interpolados crus geram frases como
+// "a aprovação em Todos". Tratados como ausentes (o segmento opcional {{ }} some).
+const CAMPO_GENERICO_RE = /^(todos?|todas?|v[aá]ri[oa]s?|qualquer( um)?|outr[oa]s?|nenhum[ao]?|ainda n[aã]o sei|n[aã]o sei|sei l[aá]|tanto faz|indecis[oa]|tudo)$/i;
+
+// Sanitiza um campo do formulário para interpolação: vazio, genérico ou longo demais (texto livre
+// colado cru, que denuncia automação) → "" (tratado como ausente pelo segmento opcional).
+function campoValidoOuVazio(valor: string | null | undefined, maxLen: number): string {
+  const v = (valor ?? "").trim();
+  if (!v || CAMPO_GENERICO_RE.test(v) || v.length > maxLen) return "";
+  return v;
+}
+
 export function substituirCampos(
   texto: string,
   campos: { nome?: string | null; concurso?: string | null; dificuldade?: string | null },
 ): string {
   const valores: Record<string, string> = {};
-  const concurso = (campos.concurso ?? "").trim();
-  const dificuldade = (campos.dificuldade ?? "").trim();
+  const concurso = campoValidoOuVazio(campos.concurso, 40);      // siglas/nomes de concurso são curtos
+  const dificuldade = campoValidoOuVazio(campos.dificuldade, 80); // frase de dor, mas não um parágrafo
   if (concurso) valores["concurso"] = concurso;
   if (dificuldade) valores["dificuldade"] = dificuldade.charAt(0).toLowerCase() + dificuldade.slice(1);
 

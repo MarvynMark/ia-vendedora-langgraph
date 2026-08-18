@@ -24,6 +24,20 @@ mock.module("../../src/services/chatwoot.ts", () => ({
   atualizarKanbanTask: mockNoOp,
   moverKanbanTask: mockNoOp,
   buscarKanbanBoard: mock(async () => ({ id: 1, board_steps: [] })),
+  // O grafo (e as tools de mídia que ele importa) usam estes — sem eles o import quebra
+  pausaComDigitando: mockNoOp,
+  calcularDelayDigitando: () => 0,
+  limparTextosMidia: () => {},
+  obterTextosMidia: () => [],
+  registrarTextoMidia: () => {},
+  registrarTextoMidiaNaoEnviado: () => {},
+  registrarSaidasRecentes: () => {},
+  saidasRecentes: () => [],
+  blocoDuplicaMidia: () => false,
+  blocoNarraEnvioMidia: () => false,
+  blocoNarraAcaoInterna: () => false,
+  blocoTemFraseProibida: () => false,
+  blocoEhNomeDeTool: () => false,
 }));
 
 mock.module("../../src/db/memoria.ts", () => ({
@@ -55,6 +69,7 @@ mock.module("../../src/lib/response-formatter.ts", () => ({
   formatarTexto: mockFormatarTexto,
   formatarSsml: mock(async (t: string) => t),
   dividirMensagem: (t: string) => [t],
+  dividirEmFrases: (t: string) => [t],
 }));
 
 const { enviarAudioNo } = await import("../../src/graphs/main-agent/graph.ts");

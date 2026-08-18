@@ -19,10 +19,13 @@ import {
   blocoNarraAcaoInterna,
   blocoTemFraseProibida,
   blocoNarraEnvioMidia,
+  blocoVazaJargaoInterno,
   registrarTextoMidia,
   limparTextosMidia,
 } from "../services/chatwoot.ts";
 import { dividirEmFrases } from "../lib/response-formatter.ts";
+import { montarOutputDoTurno } from "../graphs/main-agent/output.ts";
+import { ehRepeticaoDeAlgum } from "../lib/similaridade.ts";
 
 const STEPS = [
   { id: 1, name: "Novo Lead" }, { id: 7, name: "Primeira mensagem" }, { id: 10, name: "Conexao" },
@@ -151,6 +154,31 @@ const CENARIOS: Cenario[] = [
     },
   },
   {
+    // Reproduz a conv 5385: na Mensagem 2 o LLM punha a reação no mensagem_antes do áudio 1 E no
+    // content da mesma resposta, e o lead recebia "…formado em Medicina…" duas vezes.
+    id: "duplicacao-msg2",
+    alvo: "Mensagem 2 não pode repetir a reação (mensagem_antes do áudio 1 vs texto do turno)",
+    nome: "Luiz",
+    concurso: "PCDF",
+    formulario: "Concurso: PCDF | Formação: Medicina | Nível: Iniciante | Maior dificuldade: Primeira vez estudando | Motivo da mentoria: Direcionamento | Pronto para garantir: Sim, com certeza!",
+    turns: [
+      "sim",
+      "sim, sinto muito isso",
+      "deu certo, consegui ver",
+    ],
+    checagens: ({ textos }) => {
+      const p: string[] = [];
+      // Quantas vezes a formação foi anunciada ao lead. O roteiro pede exatamente uma.
+      const mencoes = textos
+        .flatMap(t => dividirEmFrases(t))
+        .filter(f => /(vi|acabei de ver|percebi|notei).{0,30}(formad|medicina)/i.test(f));
+      if (mencoes.length > 1) {
+        p.push(`Anunciou a formação ${mencoes.length}x: ${mencoes.map(m => `"${m.slice(0, 50)}"`).join(" | ")}`);
+      }
+      return p;
+    },
+  },
+  {
     id: "elegibilidade-area",
     alvo: "Dúvida de elegibilidade de área: enquadramento honesto, não 'sim fazemos' + pivô pra venda",
     nome: "Ana",
@@ -185,6 +213,92 @@ const CENARIOS: Cenario[] = [
       return p;
     },
   },
+  {
+    // Fase 2 / rec #6: no 2º pedido de preço a IA deve DAR o número, não segurar em loop.
+    id: "segundo-pedido-preco",
+    alvo: "2º pedido de preço deve receber o número na hora, não outro 'já já te passo'",
+    nome: "Bruno",
+    concurso: "PCDF",
+    formulario: "Concurso: PCDF | Formação: Direito | Nível: Iniciante | Maior dificuldade: foco | Pronto para garantir: Sim, com certeza!",
+    turns: [
+      "oi, tô começando agora",
+      "quanto custa a mentoria?",
+      "cara, só me passa o valor por favor, é isso que eu preciso saber pra decidir",
+    ],
+    checagens: ({ textos }) => {
+      const p: string[] = [];
+      const ultimas = textos.slice(-4);
+      const deuPreco = contem(ultimas, /3\.?197|1\.?997|\b997\b|\b315\b|\b394\b|98,?35|\b197\b/);
+      if (!deuPreco) p.push("Segurou o preço mesmo após o lead pedir 2x (não deu o número)");
+      return p;
+    },
+  },
+  {
+    // Fase 2 / rec #8: após o vídeo, a IA deve avançar aos entregáveis quando o lead reage,
+    // sem travar cobrando "conseguiu abrir o vídeo?".
+    id: "buraco-video",
+    alvo: "Após o vídeo, avançar aos entregáveis na reação do lead, sem travar em 'conseguiu abrir?'",
+    nome: "Marina",
+    concurso: "PCDF",
+    formulario: "Concurso: PCDF | Formação: Odontologia | Nível: Iniciante | Maior dificuldade: tempo | Pronto para garantir: Sim, com certeza!",
+    turns: [
+      "sim",
+      "sim, sinto isso",
+      "pode mandar o vídeo",
+      "achei muito bom",
+    ],
+    checagens: ({ textos, chamadas }) => {
+      const p: string[] = [];
+      const foiEntregaveis = chamadas.some(c => /imagem_entregaveis/i.test(c.nome)) || contem(textos, /tá incluso|acompanhamento de perto|método gravado|encontros ao vivo/i);
+      if (!foiEntregaveis) p.push("Não avançou pros entregáveis após a reação ao vídeo");
+      const ultimas = textos.slice(-2);
+      if (contem(ultimas, /conseguiu (abrir|ver)|abriu o v[íi]deo|deu certo (o|pra) (abrir|ver)/i)) p.push("Ainda cobrou confirmação de abertura do vídeo (buraco do vídeo)");
+      return p;
+    },
+  },
+  {
+    // Fase 2 / rec #9: falta de RENDA não pode ser respondida com boilerplate de parcelamento
+    // (parcelar não muda que a parcela precisa caber). Deve validar + descer plano OU tratar não-agora.
+    id: "renda-sem-parcelamento",
+    alvo: "Falta de renda ('não tenho como pagar') não deve ser respondida só com parcelamento",
+    nome: "Talita",
+    concurso: "PCDF",
+    formulario: "Concurso: PCDF | Formação: Enfermagem | Nível: Iniciante | Maior dificuldade: constância",
+    turns: [
+      "tô começando agora",
+      "quanto custa?",
+      "nossa, é bastante. sinceramente não tenho como pagar isso agora, tô desempregada",
+    ],
+    checagens: ({ textos }) => {
+      const p: string[] = [];
+      const ultimas = textos.slice(-3);
+      const falaParcelamento = contem(ultimas, /parcel|boleto|pix/i);
+      const desceOuNaoAgora = contem(ultimas, /semestral|trimestral|mais enxut|3 meses|6 meses|quando (as coisas|o momento|melhorar|puder)|te chamo|posso te chamar|mais pra frente/i);
+      if (falaParcelamento && !desceOuNaoAgora) p.push("Respondeu falta de renda só com parcelamento (sem descer plano nem tratar como não-agora)");
+      return p;
+    },
+  },
+  {
+    // Fase 2 / rec #11: lead inbound quente não deve percorrer as 8 mensagens (áudio/vídeo/imagem)
+    // antes do preço — fast-track.
+    id: "fast-track",
+    alvo: "Lead quente ('quero a mentoria, qual valor?') não deve receber mídia antes do preço",
+    nome: "Rafa",
+    concurso: "PCDF",
+    formulario: "Concurso: PCDF | Formação: Direito | Nível: Avançado | Pronto para garantir: Sim, com certeza!",
+    turns: [
+      "oi! eu quero muito fazer a mentoria, já acompanho o Walker. qual o valor pra eu começar hoje?",
+      "pode mandar o valor à vista e o parcelado",
+    ],
+    checagens: ({ textos, chamadas }) => {
+      const p: string[] = [];
+      const deuPreco = contem(textos, /3\.?197|\b315\b|1\.?997|\b197\b|\b997\b/);
+      const midiaAntesPreco = chamadas.some(c => /audio|video|imagem/i.test(c.nome));
+      if (!deuPreco) p.push("(inconclusivo — não deu preço ao lead quente)");
+      else if (midiaAntesPreco) p.push("Enviou mídia (áudio/vídeo/imagem) a um lead quente antes do preço (não fez fast-track)");
+      return p;
+    },
+  },
 ];
 
 // Detecção genérica de bugs de vazamento em qualquer texto (roda os filtros do projeto)
@@ -195,7 +309,15 @@ function bugsDeVazamento(textos: string[]): string[] {
     if (blocoEhNomeDeTool(f)) p.push(`Nome de tool vazado: "${f.slice(0, 60)}"`);
     if (blocoNarraAcaoInterna(f)) p.push(`Ação interna/nota 3ª pessoa vazada: "${f.slice(0, 60)}"`);
     if (blocoTemFraseProibida(f)) p.push(`Frase proibida: "${f.slice(0, 60)}"`);
+    if (blocoVazaJargaoInterno(f)) p.push(`Jargão interno de venda vazado: "${f.slice(0, 60)}"`);
     if (blocoNarraEnvioMidia(CONV, f)) p.push(`Narração de envio de mídia: "${f.slice(0, 60)}"`);
+  }
+  // Repetição de algo já dito ao lead (duplicação das convs 5385/5525), inclusive parafraseada.
+  for (let i = 0; i < frases.length; i++) {
+    const anteriores = frases.slice(0, i);
+    if (anteriores.length && ehRepeticaoDeAlgum(frases[i]!, anteriores)) {
+      p.push(`Repetiu frase já dita ao lead: "${frases[i]!.slice(0, 60)}"`);
+    }
   }
   return [...new Set(p)];
 }
@@ -216,11 +338,13 @@ async function rodarCenario(c: Cenario, llm: ChatOpenAI) {
     messages.push(new HumanMessage(turn));
     const res: any = await agent.invoke({ messages });
     const novas = res.messages.slice(messages.length);
-    // captura texto da IA (inclui mensagem_antes das tools de mídia, que também vão pro lead)
-    for (const m of novas) {
-      if (m?.tool_calls?.length) for (const tc of m.tool_calls) { const a = tc.args?.mensagem_antes; if (typeof a === "string" && a.trim()) textosIA.push(a); }
-      if (typeof m?.content === "string" && m.content.trim() && m.constructor?.name?.includes("AI")) textosIA.push(m.content);
-    }
+    // Captura o que o lead REALMENTE recebe, na mesma ordem da produção: primeiro o
+    // mensagem_antes (enviado pela tool) e depois o output do turno. Usa montarOutputDoTurno para
+    // não divergir do grafo — antes o backtest somava o `content` de todas as AIMessages,
+    // inclusive o preâmbulo que a produção descarta.
+    const { output, mensagensAntes } = montarOutputDoTurno(novas);
+    textosIA.push(...mensagensAntes);
+    if (output.trim()) textosIA.push(output);
     messages.length = 0; messages.push(...res.messages);
     temHistoricoAI = true;
   }

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../src/lib/horario-comercial.ts";
+import { proximoHorarioComercial, agendarMaximizandoJanela, estaDentroDaJanela } from "../../src/lib/horario-comercial.ts";
 
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 function sp(date: Date) {
@@ -61,6 +61,26 @@ describe("proximoHorarioComercial (fuso SP, janela 08h20-20h)", () => {
     const c = sp(r);
     expect(c.hora * 60 + c.min).toBeGreaterThanOrEqual(8 * 60 + 20);
     expect(c.hora).toBeLessThan(20);
+  });
+});
+
+describe("estaDentroDaJanela (gate de disparos imediatos: abertura/intro)", () => {
+  test("madrugada (01:00 SP, dia útil) → false", () => {
+    // 2026-07-15 04:00 UTC = 01:00 SP (quarta)
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 15, 4, 0, 0)))).toBe(false);
+  });
+  test("antes da abertura (08:00 SP) → false; 08:20 SP → true", () => {
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 15, 11, 0, 0)))).toBe(false);   // 08:00 SP
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 15, 11, 20, 0)))).toBe(true);   // 08:20 SP
+  });
+  test("meio do expediente (12:00 SP, dia útil) → true", () => {
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 15, 15, 0, 0)))).toBe(true);    // 12:00 SP quarta
+  });
+  test("fechamento (20:00 SP) → false", () => {
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 15, 23, 0, 0)))).toBe(false);   // 20:00 SP (limite exclusivo)
+  });
+  test("fim de semana (sábado 12:00 SP) → false", () => {
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)))).toBe(false);   // sábado
   });
 });
 

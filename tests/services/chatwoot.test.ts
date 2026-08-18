@@ -26,7 +26,11 @@ import {
   blocoNarraAcaoInterna,
   blocoTemFraseProibida,
   blocoEhNomeDeTool,
+  blocoVazaJargaoInterno,
   obterTextosMidia,
+  registrarTextoMidiaNaoEnviado,
+  registrarSaidasRecentes,
+  saidasRecentes,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -436,6 +440,17 @@ describe("chatwoot service", () => {
       expect(blocoTemFraseProibida("Tenha uma excelente tarde também!")).toBe(false);
     });
 
+    test("filtra o jargão interno de venda vazado (blocoVazaJargaoInterno)", () => {
+      // O fragmento literal do prompt que vazou na conv 5577
+      expect(blocoVazaJargaoInterno("Isso derruba a barreira sem rebaixar a âncora")).toBe(true);
+      expect(blocoVazaJargaoInterno("vou fazer um downsell pro Semestral")).toBe(true);
+      expect(blocoVazaJargaoInterno("aqui entra a prova social dos alunos")).toBe(true);
+      expect(blocoVazaJargaoInterno("é uma ancoragem de valor")).toBe(true);
+      // Mensagens legítimas ao lead não são jargão interno
+      expect(blocoVazaJargaoInterno("93% dos meus alunos passaram pras próximas fases")).toBe(false);
+      expect(blocoVazaJargaoInterno("O plano Semestral fica em 12x de R$ 197")).toBe(false);
+    });
+
     test("filtra os fechos passivos que vazaram na 4409 (fase de pagamento)", () => {
       expect(blocoTemFraseProibida("Se precisar de mais alguma coisa ou tiver dúvidas sobre o pagamento, estou aqui para ajudar!")).toBe(true);
       expect(blocoTemFraseProibida("Se tiver mais alguma dúvida ou precisar de ajuda com o pagamento, me avisa")).toBe(true);
@@ -488,6 +503,93 @@ describe("chatwoot service", () => {
       registrarTextoMidia("simc4", "Entendi. Vi que você é formado em Engenharia Química.");
       limparTextosMidia("simc4"); // simula o começo da run concorrente
       expect(blocoDuplicaMidia("simc4", "vi que você é formado em Engenharia Química")).toBe(true);
+    });
+
+    test("registrarTextoMidiaNaoEnviado entra no filtro mas NÃO no histórico", () => {
+      limparTextosMidia("simc5");
+      registrarTextoMidiaNaoEnviado("simc5", "Vou te mostrar tudo que está incluso!");
+      expect(obterTextosMidia("simc5")).toEqual([]);
+      expect(blocoDuplicaMidia("simc5", "vou te mostrar tudo que está incluso")).toBe(true);
+    });
+  });
+
+  // Duplicação da conv 5385: o LLM repetiu no output o mesmo conteúdo que já tinha ido no
+  // mensagem_antes, mas PARAFRASEADO ("Acabei de ver que" → "Vi que"). A comparação por substring
+  // exata deixava passar; por isso blocoDuplicaMidia hoje usa similaridade por trigramas.
+  describe("blocoDuplicaMidia tolerante a paráfrase (conv 5385)", () => {
+    const ANTES_5385 =
+      "Acabei de ver que você é formado em Medicina e que essa é a primeira vez que está estudando para concursos. Isso é mais comum do que parece, e quase nunca é falta de esforço.";
+
+    beforeEach(() => {
+      limparTextosMidia("c5385");
+      registrarTextoMidia("c5385", ANTES_5385);
+    });
+
+    test("pega a paráfrase que vazava ('Vi que' vs 'Acabei de ver que')", () => {
+      expect(
+        blocoDuplicaMidia(
+          "c5385",
+          "Vi que você é formado em Medicina e que essa é a primeira vez que está estudando para concursos.",
+        ),
+      ).toBe(true);
+    });
+
+    test("continua pegando a frase idêntica", () => {
+      expect(
+        blocoDuplicaMidia("c5385", "Isso é mais comum do que parece, e quase nunca é falta de esforço."),
+      ).toBe(true);
+    });
+
+    test("frase curta de validação NÃO é filtrada por aqui", () => {
+      // "Ótimo, Luiz!" é ruído, mas quem remove é blocoTemFraseProibida — não este filtro.
+      expect(blocoDuplicaMidia("c5385", "Ótimo, Luiz!")).toBe(false);
+    });
+
+    test("não filtra perguntas legítimas do roteiro (falso-positivo)", () => {
+      const legitimas = [
+        "Você também sente isso na hora de estudar?",
+        "E hoje, quanto tempo por dia você consegue estudar de verdade?",
+        "Você já tentou montar um cronograma sozinho?",
+      ];
+      for (const f of legitimas) {
+        expect(blocoDuplicaMidia("c5385", f)).toBe(false);
+      }
+    });
+  });
+
+  // Conv 5525: o mesmo texto reapareceu com uma palavra a mais ("bem mais comum").
+  describe("blocoDuplicaMidia com inserção de palavra (conv 5525)", () => {
+    test("'bem mais comum' vs 'mais comum' é repetição", () => {
+      limparTextosMidia("c5525");
+      registrarTextoMidia(
+        "c5525",
+        "Isso é bem mais comum do que parece, e quase nunca é falta de esforço",
+      );
+      expect(
+        blocoDuplicaMidia("c5525", "Isso é mais comum do que parece, e quase nunca é falta de esforço"),
+      ).toBe(true);
+    });
+  });
+
+  describe("saidasRecentes", () => {
+    test("devolve o que foi registrado + as apresentações de mídia do processo", () => {
+      limparTextosMidia("c-saidas");
+      registrarSaidasRecentes("c-saidas", ["Oi, aqui é o Perito Walker", "Posso te mostrar?"]);
+      registrarTextoMidia("c-saidas", "Dá uma olhada no que eu tenho pra te dizer.");
+      const s = saidasRecentes("c-saidas");
+      expect(s).toContain("Oi, aqui é o Perito Walker");
+      expect(s).toContain("Dá uma olhada no que eu tenho pra te dizer.");
+    });
+
+    test("ignora vazios e limita o tamanho", () => {
+      registrarSaidasRecentes("c-saidas2", ["  ", "a", "b", "c", "d", "e", "f", "g"]);
+      const s = saidasRecentes("c-saidas2");
+      expect(s).not.toContain("  ");
+      expect(s.length).toBeLessThanOrEqual(6);
+    });
+
+    test("conversa sem registro devolve lista vazia", () => {
+      expect(saidasRecentes("c-inexistente")).toEqual([]);
     });
   });
 });

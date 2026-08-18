@@ -126,6 +126,12 @@ export async function verificarFollowupsPendentes() {
 
         const stepInfo = { id: step.id, name: step.name };
 
+        // "Aguardando Pagamento" (8) tem duas subpopulações (viu-preço-sem-link → pós-preço vs
+        // link-enviado → lembrete) que só a descrição distingue. NÃO pré-definir o tipo aqui:
+        // deixa a classificar() decidir pela descrição (senão o pós-preço nunca dispararia, pois
+        // o cron forçava "lembrete" para todo mundo). Demais steps mantêm o tipo pré-definido.
+        const tipoFollowupInicial = step.id === 8 ? undefined : step.tipoFollowup;
+
         void (async () => {
           try {
             const g = await obterGrafoFollowup();
@@ -146,7 +152,7 @@ export async function verificarFollowupsPendentes() {
               displayId: conversa.display_id,
               funilSteps: [],
               idEtapaPerdido: 0,
-              tipoFollowup: step.tipoFollowup,
+              tipoFollowup: tipoFollowupInicial,
               respostaAgente: "",
             }, { configurable: { thread_id: `followup_${telefone}` } });
           } catch (e) {
