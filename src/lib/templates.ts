@@ -78,7 +78,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   recuperacao_enxuta: "Oi [Nome], e se desse pra começar por um caminho mais leve? Tenho o plano de 6 meses, com o mesmo acompanhamento meu, num valor bem menor. Quer ver como fica{{ pro [concurso]}}?",
 
   // --- Sequência de lembrete: Aguardando Pagamento (janela aberta) ---
-  lembrete_1: "Oi [Nome], o link ainda tá ativo. Ficou com alguma dúvida antes de confirmar?",
+  lembrete_1: "Oi [Nome], deixei tudo pronto do meu lado pra você começar. Me diz com sinceridade: travou alguma coisa na hora de finalizar, ou foi mais questão de tempo?",
   lembrete_2:
     "Oi [Nome], vi que você ainda não finalizou. Travou em alguma coisa na hora de finalizar? Me fala que eu te ajudo.",
   lembrete_3: "Oi [Nome], deixo tudo pronto pra você começar quando quiser. Ficou alguma dúvida antes de finalizar?",

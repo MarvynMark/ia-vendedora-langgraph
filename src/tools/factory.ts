@@ -1,6 +1,7 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { refletir } from "./refletir.ts";
 import { criarToolEscalarHumano } from "./escalar-humano.ts";
+import { criarToolAlertarGestor } from "./alertar-gestor.ts";
 import { criarToolAtualizarTarefa, criarToolAtualizarTarefaFollowup } from "./atualizar-tarefa.ts";
 import { criarToolReagirMensagem } from "./reagir-mensagem.ts";
 import { criarToolEnviarVideo } from "./enviar-video.ts";
@@ -37,6 +38,13 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idConta: contexto.idConta,
       idConversa: contexto.idConversa,
       idInbox: contexto.idInbox,
+      ultimaMensagem: contexto.mensagem,
+    }),
+    criarToolAlertarGestor({
+      telefone: contexto.telefone,
+      nome: contexto.nome,
+      idConta: contexto.idConta,
+      idConversa: contexto.idConversa,
       ultimaMensagem: contexto.mensagem,
     }),
     criarToolAtualizarTarefa({ idConta: contexto.idConta, tarefa }, etapasDescricao),

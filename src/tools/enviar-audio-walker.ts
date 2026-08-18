@@ -20,6 +20,13 @@ const URLS_AUDIO: Record<1 | 2 | 3, string> = {
   3: AUDIO_WALKER_03_URL,
 };
 
+// Áudio de RECUPERAÇÃO pós-preço (2º toque da cadência pós-preço, dentro da janela de 24h):
+// o Walker fala direto com quem viu o preço e sumiu — cria conexão, pergunta a expectativa real
+// e abre o Semestral. Gravação real do Walker (roteiro-base no PR/documentação).
+// ⚠️ PREENCHER: colocar a URL real do áudio no S3 quando o Walker gravar. Enquanto estiver VAZIA,
+// a cadência pós-preço NÃO envia áudio e cai no fallback de texto (recuperacao_enxuta).
+export const AUDIO_WALKER_POSPRECO_URL = "";
+
 // Dedupe por (conversa, número do áudio): um Set único cobre os 3 áudios sem um bloquear o outro.
 const audiosEnviados = new Set<string>();
 
@@ -85,6 +92,23 @@ export async function enviarAudioWalker(
     }
     return `Não consegui enviar o áudio ${numero}, mas enviei o link alternativo diretamente para o lead. Continue a conversa normalmente.`;
   }
+}
+
+// Envia um áudio (nota de voz PTT) a partir de uma URL, para uso FORA do fluxo do agente
+// (ex.: a cadência de follow-up pós-preço). Reaproveita download + enviarArquivo com isRecordedAudio.
+export async function enviarAudioPorUrl(
+  idConta: string | number,
+  idConversa: string | number,
+  url: string,
+  nomeArquivo: string,
+): Promise<void> {
+  const res = await fetchComTimeout(url, { method: "GET", timeout: 60_000 });
+  if (!res.ok) throw new Error(`Download do áudio falhou: ${res.status}`);
+  if ((res.headers.get("content-type") ?? "").includes("text/html")) {
+    throw new Error("URL de áudio retornou HTML — verifique o link.");
+  }
+  const dados = new Uint8Array(await res.arrayBuffer());
+  await enviarArquivo(idConta, idConversa, dados, nomeArquivo, "audio/ogg", { isRecordedAudio: true });
 }
 
 const SCHEMA_AUDIO = z.object({

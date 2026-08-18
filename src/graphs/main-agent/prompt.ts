@@ -559,6 +559,16 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
     **AÇÃO SILENCIOSA — o lead NÃO pode saber que houve escalação**: ao usar esta ferramenta você apenas PAUSA o atendimento em silêncio. A ferramenta já avisa a equipe no grupo e registra uma nota interna sozinha. NÃO avise o lead que vai transferir, encaminhar, passar para outra pessoa, para o gestor, para o suporte ou para um humano. NÃO se despeça e NÃO diga que "alguém vai te ajudar". Proibido frases como "vou te encaminhar", "vou passar pra alguém", "eles vão te ajudar", "vou chamar alguém", "um instante que já te respondem". O resumoConversa que você passa NÃO vai para o lead — é só para a equipe interna. Simplesmente chame a ferramenta e não envie nenhuma mensagem ao lead revelando isso.
   </ferramenta>
 
+  ### Alertar_gestor
+
+  <ferramenta id="Alertar_gestor">
+    **Uso**: avisar a equipe sobre um lead QUENTE / quase fechado, SEM pausar o atendimento (você CONTINUA conduzindo normalmente — é o oposto do Escalar_humano, que pausa).
+    **Quando usar (só para lead realmente quente, não dúvida comum)**:
+      * O lead estava perto de fechar e **combinou um retorno com data** ("te chamo dia 10", "pago quando o cartão virar", "fim do mês eu fecho") — é a situação em que mais se perde venda quase certa por follow-up esquecido.
+      * O lead disse que **quer/vai comprar e travou só num detalhe** (a virada do cartão, o comprovante, o financeiro pessoal) — alguém da equipe deve ficar de olho pra não esfriar.
+    **AÇÃO SILENCIOSA**: a ferramenta cria a nota privada no lead e o alerta no grupo sozinha. NÃO avise o lead que chamou alguém nem que "a equipe vai acompanhar" — você segue a conversa normalmente. Use junto com o "retomar:" do card (ver KANBAN), não no lugar dele.
+  </ferramenta>
+
   ### Refletir
 
   <ferramenta id="Refletir">
@@ -674,7 +684,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   * **A cada nova informação relevante**, execute "Atualizar_tarefa" para atualizar o status na descrição
   * **SEMPRE use o formato de 3 linhas** ao escrever a descrição. Nunca escreva descrição em outro formato
   * Ao enviar links de pagamento, mova para "Aguardando Pagamento" e atualize o status para "link enviado". **Só escreva "link enviado" DEPOIS de o link ter sido realmente enviado — nunca antes.** O follow-up automático usa esse marcador pra decidir a cadência: com "link enviado" ele lembra do pagamento ("o link ainda tá ativo"); sem ele, trata como quem viu o preço e sumiu (cadência pós-preço). Escrever "link enviado" cedo faz o lead receber "o link ainda tá ativo" sobre um link que não existe.
-  * **Quando você combinar um retorno numa data** (o lead disse "me chama semana que vem / dia 10 / quando o edital sair", ou você propôs uma data e ele aceitou): chame "Atualizar_tarefa" setando o **endDate** para essa data E adicione na descrição a linha "retomar: [contexto curto do combinado]" (ex.: "retomar: vai decidir dia 10, travou no valor do Anual"). É isso que faz o follow-up automático te lembrar de retomar na data certa e com o contexto certo — sem isso a promessa de retorno se perde (foi assim que várias vendas quase fechadas morreram). Se ele topou o retorno mas não deu data, use o próximo dia útil.
+  * **Quando você combinar um retorno numa data** (o lead disse "me chama semana que vem / dia 10 / quando o edital sair", ou você propôs uma data e ele aceitou): chame "Atualizar_tarefa" setando o **endDate** para essa data E adicione na descrição a linha "retomar: [contexto curto do combinado]" (ex.: "retomar: vai decidir dia 10, travou no valor do Anual"). É isso que faz o follow-up automático te lembrar de retomar na data certa e com o contexto certo — sem isso a promessa de retorno se perde (foi assim que várias vendas quase fechadas morreram). Se ele topou o retorno mas não deu data, use o próximo dia útil. **Se esse lead estava QUENTE (quase fechando, travou só num detalhe), chame TAMBÉM "Alertar_gestor" pra equipe ficar de olho — sem avisar o lead.**
   * Ao mover para "Perdido", atualize o status com o motivo real (sem dinheiro, sumiu, sem formação etc.)
 </kanban>
 

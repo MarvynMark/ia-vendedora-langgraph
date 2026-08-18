@@ -8,6 +8,7 @@ import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../lib/nome.ts";
 import { buscarCamposFormulario } from "../../db/formulario.ts";
 import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
+import { AUDIO_WALKER_POSPRECO_URL, enviarAudioPorUrl } from "../../tools/enviar-audio-walker.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
 // da janela de 24h (economiza envios pagos à Meta sem parecer spam).
@@ -141,21 +142,24 @@ const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] a
 // última chamada consultiva (D+14). Cadência mais longa e espaçada porque o pós-preço é o
 // maior vazamento do funil e a recuperação antes morria em 24-48h (diagnóstico).
 const SEQUENCIA_POS_PRECO = [
-  "pos_preco_reforco",
-  "recuperacao_enxuta",
-  "pos_preco_followup_2",
-  "pos_preco_followup_3",
-  "pos_preco_prova_social",
-  "pos_preco_ultima_chamada",
+  "pos_preco_reforco",       // t1: cutucada leve reforçando a proposta
+  "pos_preco_audio_walker",  // t2: ÁUDIO do Walker (dentro da janela 24h) — conexão + abre o Semestral
+  "recuperacao_enxuta",      // t3: reforça o Semestral em texto (se o áudio não fechou)
+  "pos_preco_followup_2",    // t4: parcelado sem limite
+  "pos_preco_prova_social",  // t5: prova social (~D+7)
+  "pos_preco_ultima_chamada",// t6: última chamada consultiva (~D+14)
 ] as const;
 
-// Pós-preço: t1(entrada)→t2 3h (mesmo dia, na janela), t2→t3 e t3→t4 dia seguinte, t4→t5 ~D+7
-// (prova social), t5→t6 ~D+14 (última chamada), t6→encerramento +3d. Espaçado, sem 2 toques/dia.
+// Marcador do toque de áudio (não é um template de texto — enviado por enviarAudioPorUrl).
+const TOQUE_AUDIO_POSPRECO = "pos_preco_audio_walker";
+
+// Pós-preço: t1(entrada)→t2 3h (áudio no mesmo dia, dentro da janela grátis), t2→t3 e t3→t4 dia
+// seguinte, t4→t5 ~D+7 (prova social), t5→t6 ~D+14 (última chamada), t6→encerramento +3d.
 const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 5 * 24 * 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
-// Fallbacks pagos (fora da janela 24h), por posição. Reusam templates Meta já aprovados
-// (pos_preco_duvida/urgencia) — os toques novos (prova social/última chamada) só existem em texto
-// livre dentro da janela; fora dela caem no fallback aprovado correspondente.
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_urgencia", "pos_preco_duvida", "pos_preco_urgencia"] as const;
+// Fallbacks pagos (fora da janela 24h), por posição. O áudio (t2) não pode ser template Meta →
+// fora da janela cai em recuperacao_enxuta (abre o Semestral em texto). Toques novos (prova
+// social/última chamada) também caem em fallback aprovado (duvida/urgencia).
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_duvida", "pos_preco_urgencia"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -196,10 +200,13 @@ async function agenteFollowup(state: FollowUpStateType) {
   const delays = isPosPreco ? DELAYS_POS_PRECO_MS : DELAYS_CONEXAO_MS;
   const nomeEncerramento = isPosPreco ? "pos_preco_encerramento" : "conexao_encerramento";
 
-  // Guarda de médico: não oferecer o downsell "versão enxuta" (Semestral de Perito) — troca por um toque de dúvida.
+  // Guarda de médico: não oferecer o downsell Semestral de Perito — nem o áudio que ABRE o
+  // Semestral, nem o toque "versão enxuta". Troca ambos por um toque de dúvida (texto).
   if (ehMedico) {
-    const iEnxuta = sequencia.indexOf("recuperacao_enxuta");
-    if (iEnxuta >= 0) { sequencia[iEnxuta] = "pos_preco_followup_1"; fallbacks[iEnxuta] = "pos_preco_duvida"; }
+    for (const chave of [TOQUE_AUDIO_POSPRECO, "recuperacao_enxuta"]) {
+      const i = sequencia.indexOf(chave);
+      if (i >= 0) { sequencia[i] = "pos_preco_followup_1"; fallbacks[i] = "pos_preco_duvida"; }
+    }
   }
 
   logger.info("follow-up", `Modo: ${isPosPreco ? "pós-preço" : "conexão"}, contador: ${contador}`);
@@ -230,24 +237,38 @@ async function agenteFollowup(state: FollowUpStateType) {
   // cadência normal (o marcador é removido na atualização da descrição, abaixo).
   const temRetomarAgendado = /retomar:/i.test(state.description ?? "") && contador === 0;
   const nomeMsg = temRetomarAgendado ? "retomada_agendada" : sequencia[contador]!;
+
+  // Toque de ÁUDIO pós-preço (rec do usuário): o Walker fala direto com quem sumiu no preço, cria
+  // conexão e abre o Semestral — mais difícil de ignorar que texto. Só envia áudio DENTRO da janela
+  // de 24h E com a URL já configurada; senão (janela fechada ou áudio ainda não gravado) cai no
+  // texto que abre o Semestral (recuperacao_enxuta), pra não deixar o toque vazio.
+  const ehAudioPosPreco = nomeMsg === TOQUE_AUDIO_POSPRECO;
+  const podeEnviarAudio = ehAudioPosPreco && dentroJanela && AUDIO_WALKER_POSPRECO_URL !== "";
+  const nomeMsgEfetivo = (ehAudioPosPreco && !podeEnviarAudio) ? "recuperacao_enxuta" : nomeMsg;
+
   // Personaliza com concurso/dificuldade do formulário (só chega ao lead na janela aberta —
   // fora dela usa o template Meta puro; ver textoEnviar abaixo). campos já buscado acima.
-  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
+  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsgEfetivo] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   const templateFallback = temRetomarAgendado ? "conexao_duvida" : (fallbacks[contador] ?? "encerramento_02");
   // Fora da janela o lead recebe o template Meta (só {{1}}=nome). O texto REGISTRADO no Chatwoot
   // precisa refletir isso: substitui o nome e remove os segmentos {{ }} de concurso que o template
   // Meta não envia. Sem isso o registro mostrava "[Nome]" cru (ou vazio, quando a chave não existia).
-  const textoFallback = CONTEUDO_TEMPLATES[templateFallback] ?? CONTEUDO_TEMPLATES[nomeMsg] ?? "";
+  const textoFallback = CONTEUDO_TEMPLATES[templateFallback] ?? CONTEUDO_TEMPLATES[nomeMsgEfetivo] ?? "";
   const textoEnviar = dentroJanela ? conteudo : substituirCampos(textoFallback, { nome: state.title });
 
-  // Trava anti-duplicata: não reenvia se for idêntico ao último que o agente mandou.
+  // Trava anti-duplicata: não reenvia se for idêntico ao último que o agente mandou (não vale pro áudio).
   const ultimaAgente = await ultimaMensagemAgente(state.accountId, state.conversationId);
-  const ehDuplicata = textoEnviar.trim() !== "" && ultimaAgente.trim() === textoEnviar.trim();
+  const ehDuplicata = !podeEnviarAudio && textoEnviar.trim() !== "" && ultimaAgente.trim() === textoEnviar.trim();
 
-  logger.info("follow-up", `Enviando ${nomeMsg} (${contador + 1}/${sequencia.length}) — janela: ${dentroJanela}${ehDuplicata ? " — PULADO (idêntico ao último)" : ""}`);
+  logger.info("follow-up", `Enviando ${podeEnviarAudio ? "áudio pós-preço" : nomeMsgEfetivo} (${contador + 1}/${sequencia.length}) — janela: ${dentroJanela}${ehDuplicata ? " — PULADO (idêntico ao último)" : ""}`);
 
   try {
-    if (ehDuplicata) {
+    if (podeEnviarAudio) {
+      await enviarAudioPorUrl(state.accountId, state.conversationId, AUDIO_WALKER_POSPRECO_URL, "walker-posprecoo.ogg");
+      if (state.telefone) {
+        await salvarMensagem(state.telefone, { type: "ai", content: "[áudio do Walker — retomada pós-preço]", tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+      }
+    } else if (ehDuplicata) {
       // idêntico ao último envio — não reenvia
     } else if (dentroJanela) {
       await enviarMensagem(state.accountId, state.conversationId, conteudo);

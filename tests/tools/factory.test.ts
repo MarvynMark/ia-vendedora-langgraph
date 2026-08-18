@@ -15,16 +15,17 @@ const CONTEXTO_BASE = {
 };
 
 describe("tool factory - main agent", () => {
-  test("cria 9 tools", () => {
+  test("cria 10 tools", () => {
     const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
-    expect(tools.length).toBe(9);
+    expect(tools.length).toBe(10);
   });
 
-  test("tools têm nomes corretos (incluindo os 2 áudios do Walker)", () => {
+  test("tools têm nomes corretos (incluindo os 2 áudios do Walker e o Alertar_gestor)", () => {
     const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
 
     const nomes = tools.map(t => t.name).sort();
     expect(nomes).toEqual([
+      "Alertar_gestor",
       "Atualizar_tarefa",
       "Buscar_contexto_similar",
       "Enviar_audio_walker_1",
