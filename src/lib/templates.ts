@@ -15,18 +15,18 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // aparece se o concurso do lead for conhecido (via substituirCampos). NA JANELA FECHADA (template
   // Meta) a personalização de concurso NÃO chega ao lead (a Meta usa o template aprovado com só {{1}}).
   fup1_reforco:
-    "Oi [Nome], imagino que a rotina tá corrida{{, ainda mais pra quem quer a aprovação em [concurso]}}.\n\nMas separei um tempo pra ver seu caso e não quero que você perca essa chance. Me dá um oi rapidinho?",
+    "Oi [Nome], imagino que a rotina tá corrida{{, ainda mais pra quem quer a aprovação em [concurso]}}.\n\nSeparei um tempo pra olhar o seu caso com calma. Me dá um oi rapidinho que eu te mostro o que enxerguei?",
   // Prova social em TEXTO (sem cabeçalho de imagem — evita o erro Meta #132000 do Chatwoot 4.15.1).
   fup2_prova_social:
     "Ei [Nome], essa semana mais alunos meus passaram na frente estudando com direção, não sozinhos.\n\nSeu perfil tem tudo pra entrar nesse caminho. Quer que eu te mostre como?",
   fup3_urgencia:
-    "Oi [Nome], uma pergunta rápida: você já sabe montar um cronograma de estudos pro seu concurso{{ de [concurso]}}? É onde a maioria se perde. Quer que eu te mostre por onde começar?",
+    "Oi [Nome], não cheguei a ter um retorno seu, e tá tudo bem. Se em algum momento fizer sentido organizar os estudos{{ pro [concurso]}} com um direcionamento, é só me dar um sinal que eu te ajudo. Fico por aqui, no seu tempo.",
 
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
   olhinho_followup: "👀",
   encerramento_02:
-    "Antes de eu encerrar seu atendimento por aqui: ficou com alguma dúvida que eu possa esclarecer? Se ainda fizer sentido pra você começar, é só me dar um sinal.",
+    "Oi [Nome], não quero te encher, então vou deixar a porta aberta por aqui. Se em algum momento fizer sentido organizar seus estudos com um direcionamento, é só me dar um sinal que eu te ajudo, no seu tempo.",
 
   // --- Sequência de recuperação: Conexão (janela aberta) ---
   // Leads que já conversaram mas pararam de responder
@@ -35,7 +35,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
     "Oi [Nome], deixa eu te perguntar direto: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
   conexao_followup_3: "Oi [Nome], se ainda fizer sentido pra você, consigo te mostrar o próximo passo de forma bem tranquila. Quer?",
   conexao_encerramento:
-    "Oi [Nome], antes de eu deixar o espaço livre por aqui: ficou alguma dúvida que eu possa esclarecer? Se ainda fizer sentido pra você, é só me dar um sinal.",
+    "Oi [Nome], vou te dar um espaço, sem pressão nenhuma. Se ficou alguma dúvida do que a gente conversou, ou se mais pra frente você quiser retomar, é só me chamar que eu te ajudo.",
 
   // --- Sequência de recuperação: Conexão (janela fechada — Meta templates) ---
   conexao_duvida: "Ficou alguma dúvida sobre o que conversamos? Pode me chamar aqui sem compromisso",
@@ -53,15 +53,15 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // Toque D+7: prova social (caso anônimo + 93%), reengaja pelo resultado, sem pressão.
   pos_preco_prova_social:
     "Oi [Nome], deixa eu te contar uma coisa rápida: teve gente que entrou comigo com a mesma dúvida que a sua e hoje já tá evoluindo firme. No último Perito Criminal do RS, 93% dos meus alunos passaram pras próximas fases. Quer que eu te mostre por onde você começaria{{ pro [concurso]}}?",
-  // Toque D+14: última chamada consultiva (não agressiva) — dá um sinal ou fica pra mais pra frente.
+  // Toque D+14: fecho por VALOR/porta aberta (não "última chamada" — fecho/pressão dá ~0% de resposta).
   pos_preco_ultima_chamada:
-    "Oi [Nome], não vou ficar te cutucando, então essa é a última vez que te chamo por aqui: se ainda fizer sentido{{ pra sua preparação pro [concurso]}}, me dá um sinal que eu te ajudo no primeiro passo. Se preferir deixar pra mais pra frente, tudo bem, é só me chamar quando for a hora.",
+    "Oi [Nome], não vou ficar te cutucando. Se em algum momento fizer sentido retomar{{ sua preparação pro [concurso]}}, é só me dar um sinal que eu te ajudo no primeiro passo, no seu tempo. Fico por aqui.",
   // Sem [Nome]: também é usada como template PAGO fora da janela (fallback), onde o código
   // não substitui a variável — igual aos demais fallbacks (conexao_duvida, lembrete_acesso...).
   pos_preco_urgencia:
     "Oi, não quero te apressar. Só me diz o que ficou pesando, o valor ou alguma dúvida, que eu vejo a melhor forma de encaixar pro teu momento.",
   pos_preco_encerramento:
-    "Oi [Nome], antes de encerrar: foi o valor que pesou ou ficou alguma dúvida? Se ainda fizer sentido, me dá um sinal que a gente vê a melhor forma pra você.",
+    "Oi [Nome], sem pressão nenhuma: se foi o valor que pesou ou ficou alguma dúvida, me fala que a gente vê junto a melhor forma pro teu momento. E se preferir retomar mais pra frente, é só me chamar.",
 
   // --- Sequência pós-preço: Conexão (janela fechada — Meta templates) ---
   pos_preco_duvida: "Ficou alguma dúvida sobre o investimento? Me conta aqui que a gente resolve",
@@ -80,10 +80,10 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Sequência de lembrete: Aguardando Pagamento (janela aberta) ---
   lembrete_1: "Oi [Nome], deixei tudo pronto do meu lado pra você começar. Me diz com sinceridade: travou alguma coisa na hora de finalizar, ou foi mais questão de tempo?",
   lembrete_2:
-    "Oi [Nome], vi que você ainda não finalizou. Travou em alguma coisa na hora de finalizar? Me fala que eu te ajudo.",
-  lembrete_3: "Oi [Nome], deixo tudo pronto pra você começar quando quiser. Ficou alguma dúvida antes de finalizar?",
+    "Oi [Nome], se travou alguma coisa na hora de pagar (o boleto não gerou, o cartão não passou, qualquer coisa), me manda um print ou me fala aqui que eu resolvo com você na hora.",
+  lembrete_3: "Oi [Nome], deixo tudo prontinho do meu lado pra quando você quiser começar. Se ficou alguma dúvida ou travou algo no pagamento, é só me chamar que eu te ajudo, sem pressa.",
   lembrete_urgencia:
-    "Oi [Nome], sei que a correria toma conta. Se ainda quiser garantir seu acesso, é só me chamar que eu te ajudo a finalizar sem complicação. O que ficou pendente?",
+    "Oi [Nome], sei que a correria toma conta. Se quiser finalizar quando der, é só me chamar que eu te ajudo sem complicação. O que ficou pendente?",
   lembrete_encerramento:
     "Oi [Nome], vou te dar um tempo pra pensar sem pressão. Se travou algo no pagamento ou ficou alguma dúvida, me fala que eu resolvo com você.",
 
@@ -91,7 +91,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   lembrete_acesso:
     "Quando você confirmar o pagamento, te envio todos os acessos na hora pra começar ainda hoje",
   lembrete_urgencia_meta:
-    "Oi, sei que a correria toma conta. Se ainda quiser garantir seu acesso, é só me chamar que eu te ajudo a finalizar sem complicação. O que ficou pendente?",
+    "Oi, sei que a correria toma conta. Se quiser finalizar quando der, é só me chamar que eu te ajudo sem complicação. O que ficou pendente?",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
 };
 
