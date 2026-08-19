@@ -554,8 +554,9 @@ function atualizarContadorNutrir(description: string, novoValor: number): string
 const SEQUENCIA_NUTRIR = [
   { abordagem: "reengajamento",       template: "nutrir_reengajamento", proximoDelayDias: 7 },
   { abordagem: "reconsulta_mentoria", template: "nutrir_reconsulta",    proximoDelayDias: 14 },
-  { abordagem: "ebook",               template: "nutrir_ebook",         proximoDelayDias: 30 },
-  { abordagem: "reabertura",          template: "nutrir_reabertura",    proximoDelayDias: 60 },
+  { abordagem: "ebook",               template: "nutrir_ebook",          proximoDelayDias: 30 },
+  { abordagem: "video_aprovada",      template: "nutrir_video_aprovada", proximoDelayDias: 30 },
+  { abordagem: "reabertura",          template: "nutrir_reabertura",     proximoDelayDias: 60 },
 ] as const;
 
 async function agenteNutrir(state: FollowUpStateType) {
