@@ -12,12 +12,19 @@ mock.module("../../src/services/chatwoot.ts", () => ({
   enviarTemplate: async (...args: unknown[]) => { enviarTemplateCalls.push(args); },
   buscarKanbanBoard: async () => ({}),
   enviarMensagem: async () => {},
+  enviarArquivo: async () => {},
   contarMensagensIncoming: async () => 0,
   verificarJanela24h: async () => false,
   msRestantesJanela24h: async () => 0,
   verificarLeadRespondeuUltimo: async () => false,
   ultimaMensagemAgente: async () => "",
   atualizarKanbanTask: async () => {},
+  // Usados por módulos transitivos (mensagem-antes / enviar-audio-walker), stubs no-op:
+  pausaComDigitando: async () => {},
+  calcularDelayDigitando: () => 0,
+  registrarTextoMidia: () => {},
+  registrarTextoMidiaNaoEnviado: () => {},
+  saidasRecentes: () => [],
 }));
 mock.module("../../src/db/memoria.ts", () => ({
   salvarMensagem: async (telefone: string, msg: { content: string }) => {
