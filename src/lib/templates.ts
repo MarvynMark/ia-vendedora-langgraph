@@ -102,8 +102,9 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
     "Oi [Nome], faz um tempo que a gente não conversa. Se o momento tiver melhorado e você ainda quiser entrar na mentoria comigo, é só me dar um sinal, sem pressão.",
   nutrir_ebook:
     "Oi [Nome], separei um material meu sobre perícia que pode te ajudar a dar os primeiros passos, de forma gratuita: https://www.csiacademy.com.br/ebooks",
+  // Vídeo de prova social criado SEM variável na Meta (bodyVars 0) → sem [Nome].
   nutrir_video_aprovada:
-    "Oi [Nome], gravei um bate-papo com uma aluna que passou no concurso — vale muito ver a trajetória dela na prática, sem compromisso nenhum: https://www.youtube.com/watch?v=NEuvOrENWdc",
+    "Oi, gravei um bate-papo com uma aluna que passou no concurso, vale muito ver a trajetória dela na prática: https://www.youtube.com/watch?v=NEuvOrENWdc",
   nutrir_reabertura:
     "Oi [Nome], tô abrindo uma turma nova da mentoria e lembrei de você. Se agora fizer mais sentido começar com acompanhamento, me chama que a gente vê o teu caso, sem pressão.",
 };
@@ -154,6 +155,6 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   nutrir_reengajamento: { language: "pt_BR", bodyVars: 1 },
   nutrir_reconsulta: { language: "pt_BR", bodyVars: 1 },
   nutrir_ebook: { language: "pt_BR", bodyVars: 1 },
-  nutrir_video_aprovada: { language: "pt_BR", bodyVars: 1 },
+  nutrir_video_aprovada: { language: "pt_BR", bodyVars: 0 },
   nutrir_reabertura: { language: "pt_BR", bodyVars: 1 },
 };
