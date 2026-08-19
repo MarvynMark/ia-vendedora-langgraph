@@ -1,6 +1,4 @@
 import { StateGraph, END } from "@langchain/langgraph";
-import { ChatOpenAI } from "@langchain/openai";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
@@ -13,10 +11,9 @@ import { AUDIO_WALKER_POSPRECO_URL, enviarAudioPorUrl } from "../../tools/enviar
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
 // da janela de 24h (economiza envios pagos à Meta sem parecer spam).
 const MIN_GAP_JANELA_MS = 60 * 60 * 1000; // 1h
-import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
+import { salvarMensagem } from "../../db/memoria.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
-import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
 
 // Envia um template Meta (fora da janela de 24h) E persiste no histórico, para que o registro
 // da conversa reflita o que o lead recebeu. Sem isso, todo envio de template ficava invisível
@@ -551,44 +548,32 @@ function atualizarContadorNutrir(description: string, novoValor: number): string
   return description ? `${description}\n🔁 - Follow-ups: ${novoValor}` : `🔁 - Follow-ups: ${novoValor}`;
 }
 
+// Nutrir dispara SEMPRE fora da janela de 24h (leads frios, delays de dias/semanas), então usa
+// template Meta aprovado — texto livre do LLM não pode ser enviado fora da janela (era o bug:
+// gerava a mensagem e o enviarMensagemNo bloqueava por estar fora da janela, sem fallback).
 const SEQUENCIA_NUTRIR = [
-  {
-    abordagem: "reengajamento",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead estava em negociação mas não seguiu em frente. Envie uma mensagem de reengajamento suave — sem pitch, sem pressão. Apenas retome o contato de forma humana e curiosa. Máximo 2 linhas. Não mencione produto nenhum agora.`,
-    proximoDelayDias: 7,
-  },
-  {
-    abordagem: "reconsulta_mentoria",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead demonstrou interesse na mentoria mas não seguiu — muitas vezes por não poder no momento (financeiro/cartão), não por falta de vontade. Faça um contato consultivo e leve: pergunte se o momento melhorou e se ele ainda quer entrar na mentoria, sem pressão nem urgência. NÃO ofereça nenhum outro produto (não vendemos IMLC nem Clube). Máximo 2 linhas.`,
-    proximoDelayDias: 14,
-  },
-  {
-    abordagem: "ebook",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead ainda não entrou na mentoria. Envie o link do meu e-book gratuito como gesto de valor, sem pressão. Diga que é um material meu pra quem quer entrar na área de perícia. NÃO ofereça nenhum produto pago. Curto. Link: https://www.csiacademy.com.br/ebooks`,
-    proximoDelayDias: 30,
-  },
-  {
-    abordagem: "reabertura",
-    prompt: `Você é o Professor Perito Walker, falando em 1ª pessoa (eu, meu método, minha mentoria). Este lead demonstrou interesse há um tempo mas não entrou na mentoria. Avise, de forma leve e humana, que você está abrindo uma turma nova, e pergunte se agora faz mais sentido pra ele começar. Sem pressão, SEM inventar escassez com números, e NÃO ofereça nenhum outro produto. Máximo 2 linhas.`,
-    proximoDelayDias: 60,
-  },
-];
+  { abordagem: "reengajamento",       template: "nutrir_reengajamento", proximoDelayDias: 7 },
+  { abordagem: "reconsulta_mentoria", template: "nutrir_reconsulta",    proximoDelayDias: 14 },
+  { abordagem: "ebook",               template: "nutrir_ebook",         proximoDelayDias: 30 },
+  { abordagem: "reabertura",          template: "nutrir_reabertura",    proximoDelayDias: 60 },
+] as const;
 
 async function agenteNutrir(state: FollowUpStateType) {
   logger.info("follow-up", "executando agente nutrir...");
 
-  // Verifica se o lead já respondeu recentemente
+  // Se o lead está ATIVO (janela de 24h aberta = respondeu nas últimas 24h), não nutre agora:
+  // o atendimento normal cuida. Antes usava contarMensagensIncoming (histórico INTEIRO), que era
+  // sempre > 0 pra lead que já engajou → o nurturing pausava pra sempre e nunca disparava.
   try {
-    const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId);
-    if (totalIncoming > 0) {
-      logger.info("follow-up", "Lead já respondeu — pausando nurturing");
-      // Agenda próximo contato em 30 dias
-      const proxima = proximoHorarioComercial(new Date(), 30 * 24 * 60 * 60 * 1000);
+    const janelaAberta = await verificarJanela24h(state.accountId, state.conversationId);
+    if (janelaAberta) {
+      logger.info("follow-up", "Lead ativo (janela aberta) — adiando nurturing 3 dias");
+      const proxima = proximoHorarioComercial(new Date(), 3 * 24 * 60 * 60 * 1000);
       await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
       return { respostaAgente: "" };
     }
   } catch (e) {
-    logger.warn("follow-up", "Erro ao verificar incoming:", e);
+    logger.warn("follow-up", "Erro ao verificar janela no nutrir:", e);
   }
 
   const contador = lerContadorNutrir(state.description ?? "");
@@ -602,46 +587,19 @@ async function agenteNutrir(state: FollowUpStateType) {
     return { respostaAgente: "" };
   }
 
-  logger.info("follow-up", `Nurturing ${item.abordagem} (${contador + 1}/${SEQUENCIA_NUTRIR.length})`);
+  logger.info("follow-up", `Nurturing ${item.abordagem} (${contador + 1}/${SEQUENCIA_NUTRIR.length}) via template ${item.template}`);
 
-  const historico = await buscarHistorico(state.telefone, 30);
-  const msgsHistorico = historico.map((m) => {
-    if (m.type === "human") return new HumanMessage(m.content);
-    return new AIMessage(m.content);
-  });
-
-  const model = new ChatOpenAI({
-    modelName: env.OPENAI_MODEL,
-    openAIApiKey: env.OPENAI_API_KEY,
-    temperature: 0.8,
-  });
-
-  const langfuseHandler = criarLangfuseHandler("follow-up-nutrir", {
-    sessionId: state.telefone,
-    userId: state.telefone,
-    metadata: { taskId: state.taskId, abordagem: item.abordagem, contador },
-    tags: ["follow-up", "nutrir"],
-  });
-
-  let resposta = "";
+  // Nutrir é sempre fora da janela → envia o template Meta aprovado (entrega de verdade) e persiste.
+  // O texto registrado é a versão personalizada (concurso/nome); o que chega ao lead é o template
+  // aprovado com {{1}}=nome. Se o template ainda não estiver aprovado na Meta, o envio erra e é
+  // logado — o contador avança mesmo assim (evita loop; ativa de vez após a aprovação).
+  const primeiroNome = primeiroNomeSaudacao(state.title);
+  const campos = await buscarCamposFormulario(state.telefone);
+  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[item.template] ?? "", { nome: state.title, concurso: campos?.concurso });
   try {
-    const resultado = await model.invoke(
-      [
-        { role: "system", content: item.prompt },
-        ...msgsHistorico.map(m => ({
-          role: m._getType() === "human" ? "user" as const : "assistant" as const,
-          content: m.content as string,
-        })),
-        { role: "user", content: "<retomar contato com lead>" },
-      ],
-      langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
-    );
-    resposta = resultado.content as string;
+    await enviarTemplateComHistorico(state, item.template, conteudo, primeiroNome);
   } catch (e) {
-    logger.error("follow-up", "Erro no agente nutrir:", e);
-    return { respostaAgente: "" };
-  } finally {
-    await finalizarLangfuseHandler(langfuseHandler);
+    logger.error("follow-up", `Erro ao enviar nutrir ${item.template} (template aprovado na Meta?):`, e);
   }
 
   // Atualiza contador e agenda próximo follow-up
@@ -654,7 +612,7 @@ async function agenteNutrir(state: FollowUpStateType) {
   });
   logger.info("follow-up", `Próximo nurturing agendado para: ${proxima.toISOString()}`);
 
-  return { respostaAgente: resposta };
+  return { respostaAgente: "" };
 }
 
 async function enviarMensagemNo(state: FollowUpStateType) {

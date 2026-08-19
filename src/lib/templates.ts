@@ -93,6 +93,17 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   lembrete_urgencia_meta:
     "Oi, sei que a correria toma conta. Se quiser finalizar quando der, é só me chamar que eu te ajudo sem complicação. O que ficou pendente?",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
+
+  // --- Nutrir (esteira de longo prazo, SEMPRE fora da janela de 24h → só template Meta aprovado) ---
+  // Leads que estavam no funil e esfriaram. Consultivo, sem pressão. {{1}} = primeiro nome.
+  nutrir_reengajamento:
+    "Oi [Nome], lembrei de você por aqui. Como andam os planos com os estudos? Sem compromisso nenhum, só queria saber como você tá.",
+  nutrir_reconsulta:
+    "Oi [Nome], faz um tempo que a gente não conversa. Se o momento tiver melhorado e você ainda quiser entrar na mentoria comigo, é só me dar um sinal, sem pressão.",
+  nutrir_ebook:
+    "Oi [Nome], separei um material meu sobre perícia que pode te ajudar a dar os primeiros passos, sem compromisso nenhum: https://www.csiacademy.com.br/ebooks",
+  nutrir_reabertura:
+    "Oi [Nome], tô abrindo uma turma nova da mentoria e lembrei de você. Se agora fizer mais sentido começar com acompanhamento, me chama que a gente vê o teu caso, sem pressão.",
 };
 
 // Metadados por template aprovado na Meta (idioma e cabeçalho de mídia, quando houver).
@@ -136,4 +147,10 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   pos_preco_duvida: { language: "pt_BR", bodyVars: 0 },
   pos_preco_urgencia: { language: "pt_BR", bodyVars: 0 },
   encerramento_02: { language: "pt_BR", bodyVars: 0 },
+
+  // Nutrir — todos com {{1}} = primeiro nome. Aprovar na Meta (pt_BR).
+  nutrir_reengajamento: { language: "pt_BR", bodyVars: 1 },
+  nutrir_reconsulta: { language: "pt_BR", bodyVars: 1 },
+  nutrir_ebook: { language: "pt_BR", bodyVars: 1 },
+  nutrir_reabertura: { language: "pt_BR", bodyVars: 1 },
 };
