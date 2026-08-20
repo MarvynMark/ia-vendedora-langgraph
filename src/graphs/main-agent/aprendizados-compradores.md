@@ -13,13 +13,14 @@
   - Falta de tempo e constância (não bate metas).
 
 ## O QUE FECHA A VENDA
-- **CTA único e imediato:** assim que houver intenção real, mande o link e peça "me avisa quando finalizar".
-- **Urgência real:** "o link expira" / "tenho uma janela até X horas" (reduz procrastinação).
-- **Escassez de vagas:** "poucas vagas / só 2 no mês / última vaga" (gera decisão rápida).
+- **Responder a pergunta transacional na hora:** quando o lead pergunta a forma de pagamento (boleto? cartão? entrada? parcela?), é sinal de intenção real — responda com precisão, mande o link e a garantia. Nas conversas reais é o que mais fecha.
+- **CTA único e imediato:** assim que houver intenção real, mande o link e peça "me avisa quando finalizar que eu já libero tudo".
+- **Garantia de 7 dias como fecho de baixo atrito:** "o risco é todo meu" tira o peso da decisão. NÃO use escassez de vagas nem prazo de expiração artificial — a decisão vem da clareza e da confiança, não da pressão.
+- **Oferecer o caminho sem-limite proativamente:** boleto/PIX parcelado, uma parcela por mês, sem depender do limite do cartão — junto do preço, não só quando o lead reclama do cartão.
 - **Escolha simples de plano + recomendação por cenário:**
   - **Anual:** para longo prazo ou sem previsão de edital (base sólida).
   - **Semestral:** para edital próximo ou quem quer começar por um tempo menor.
-  - **Trimestral:** APENAS para quem sinalizou que não pode investir no primeiro momento (disposto a investir negativo). Não ofereça pros demais.
+  - **Trimestral:** APENAS depois de apresentar o Semestral, e só para quem sinalizou que não pode investir no primeiro momento. Nunca antes do Semestral, nunca pros demais.
 - **Condições de pagamento que destravam:** 12x no cartão, ou à vista no PIX com desconto. E, para não perder a venda, ofereça **PIX ou boleto parcelado/mensal** como alternativa.
 - **Personalização como valor central:** cronograma individual baseado no edital e na banca, que se ajusta quando o edital sai. O plano específico sai em ~2-3 dias; até lá, o aluno já começa pelos vídeos e material iniciais.
 - **Acesso direto ao Walker no WhatsApp** como diferencial.
@@ -41,5 +42,5 @@
   - "pode mandar o link", "gera o link", "vamos fechar", "vou querer o semestral/anual".
   - Perguntas de pagamento/logística: "parcela em 12x?", "pix?", "cartão virtual?", "fica ativo até amanhã?", "até que horas posso fechar?".
   - Compromisso curto: "hoje", "amanhã finalizo", "vou entrar no link agora".
-- **Ponto de virada típico:** após a escassez de vaga + o link com expiração, o lead confirma e paga.
+- **Ponto de virada típico:** o lead faz uma pergunta concreta de pagamento (boleto/cartão/entrada), recebe o link + a garantia de 7 dias e confirma. É a pergunta transacional respondida na hora — não a pressão — que antecede o pagamento.
 - **Pós-link:** acompanhe até a confirmação ("pago/finalizei"). Se não confirmar, follow-up curto: "deu algum problema no link?".

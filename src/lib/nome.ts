@@ -26,7 +26,17 @@ export function primeiroNomeSaudacao(nomeCru: string | null | undefined, fallbac
   if ((primeiro.match(/\d/g) ?? []).length >= 4) return fallback;   // muitos dígitos = wa_id/telefone
   if (!/\p{L}/u.test(primeiro)) return fallback;                    // sem nenhuma letra: "~", ".", emojis → evita "Oi ~."
   if (PLACEHOLDERS_GENERICOS.has(primeiro.toLowerCase())) return fallback; // "Conversa", "Contato"...
-  return primeiro;
+  return capitalizarNome(primeiro);                                 // "érica"→"Érica", "ADRIANO"→"Adriano"
+}
+
+// Corrige a capitalização de um primeiro nome vindo cru do formulário/Chatwoot: só age quando o
+// token está todo minúsculo ("érica") ou todo maiúsculo ("ADRIANO"), preservando nomes já em caixa
+// mista ("McArthur"). Evita a saudação "Oi, érica" e o gritado "Oi ADRIANO".
+function capitalizarNome(token: string): string {
+  const soUpper = token === token.toLocaleUpperCase("pt-BR");
+  const soLower = token === token.toLocaleLowerCase("pt-BR");
+  if (!soUpper && !soLower) return token;
+  return token.charAt(0).toLocaleUpperCase("pt-BR") + token.slice(1).toLocaleLowerCase("pt-BR");
 }
 
 /**
@@ -69,12 +79,28 @@ function campoValidoOuVazio(valor: string | null | undefined, maxLen: number): s
   return v;
 }
 
+// Separadores que denunciam uma LISTA de concursos ("PCMG, PCES, PCRJ", "PF - PCIPR - PCISC",
+// "PC RJ e PC ES", "PCDF / PCGO"). O hífen exige espaços em volta pra não quebrar "PC-GO".
+const SEP_LISTA_CONCURSO = /\s*(?:,|\/| e | - )\s*/i;
+
+/**
+ * Colapsa uma lista de concursos crua para o PRIMEIRO item, evitando o vazamento robótico
+ * "aprovação em PCMG, PCES, PCRJ" no texto humanizado. Um concurso único ("Perito Criminal PC-GO")
+ * não tem separador de lista e passa intacto. Exportado para reuso no prompt do agente principal.
+ */
+export function primeiroConcurso(valor: string | null | undefined): string {
+  const v = (valor ?? "").trim();
+  if (!v) return v;
+  const partes = v.split(SEP_LISTA_CONCURSO).map((p) => p.trim()).filter(Boolean);
+  return partes.length > 1 ? partes[0]! : v;
+}
+
 export function substituirCampos(
   texto: string,
   campos: { nome?: string | null; concurso?: string | null; dificuldade?: string | null },
 ): string {
   const valores: Record<string, string> = {};
-  const concurso = campoValidoOuVazio(campos.concurso, 40);      // siglas/nomes de concurso são curtos
+  const concurso = campoValidoOuVazio(primeiroConcurso(campos.concurso), 40); // colapsa lista → 1º; siglas curtas
   const dificuldade = campoValidoOuVazio(campos.dificuldade, 80); // frase de dor, mas não um parágrafo
   if (concurso) valores["concurso"] = concurso;
   if (dificuldade) valores["dificuldade"] = dificuldade.charAt(0).toLowerCase() + dificuldade.slice(1);

@@ -127,7 +127,7 @@ const SEQUENCIA_RECUPERACAO_CONEXAO = [
   "conexao_followup_3",
 ] as const;
 
-// Toque 1 dispara no delay INICIAL da etapa (3h). Depois: toque 2 "espremido" pra dentro
+// Toque 1 dispara no delay INICIAL da etapa (1h, ver STEPS_RASTREADOS). Depois: toque 2 "espremido" pra dentro
 // da janela grátis (ideal 24h + clamp da janela); toque 3 no Dia 2 (pago); encerramento Dia 4.
 const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
 

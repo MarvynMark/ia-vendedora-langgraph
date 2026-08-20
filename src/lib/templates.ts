@@ -105,8 +105,10 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // Vídeo de prova social criado SEM variável na Meta (bodyVars 0) → sem [Nome].
   nutrir_video_aprovada:
     "Oi, gravei um bate-papo com uma aluna que passou no concurso, vale muito ver a trajetória dela na prática: https://www.youtube.com/watch?v=NEuvOrENWdc",
+  // Reescrito 20/08 (a copy antiga teve 0 resposta em 17 envios): agora abre com uma pergunta
+  // FÁCIL de responder ("firme ou travou?") em vez do passivo "me chama se fizer sentido".
   nutrir_reabertura:
-    "Oi [Nome], tô abrindo uma turma nova da mentoria e lembrei de você. Se agora fizer mais sentido começar com acompanhamento, me chama que a gente vê o teu caso, sem pressão.",
+    "Oi [Nome], tô abrindo uma turma nova da mentoria e lembrei de você. Antes de qualquer coisa, queria saber: como tá indo a sua preparação, seguiu firme ou acabou travando um pouco?",
 };
 
 // Metadados por template aprovado na Meta (idioma e cabeçalho de mídia, quando houver).
