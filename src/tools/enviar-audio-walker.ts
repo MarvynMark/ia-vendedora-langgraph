@@ -25,7 +25,7 @@ const URLS_AUDIO: Record<1 | 2 | 3, string> = {
 // e abre o Semestral. Gravação real do Walker (roteiro-base no PR/documentação).
 // Gravação real do Walker no S3 (endpoint direto s3.stkd.site — HTTP 200, audio/ogg).
 // Se ficar VAZIA, a cadência pós-preço NÃO envia áudio e cai no fallback de texto (recuperacao_enxuta).
-export const AUDIO_WALKER_POSPRECO_URL = "https://s3.stkd.site/arquivosclientes/Vestigium/audio%20-%2004.opus";
+export const AUDIO_WALKER_POSPRECO_URL: string = "https://s3.stkd.site/arquivosclientes/Vestigium/audio%20-%2004.opus";
 
 // Dedupe por (conversa, número do áudio): um Set único cobre os 3 áudios sem um bloquear o outro.
 const audiosEnviados = new Set<string>();
