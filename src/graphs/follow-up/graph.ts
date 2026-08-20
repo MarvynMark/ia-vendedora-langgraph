@@ -471,7 +471,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   // Contador >= 3: todas as mensagens enviadas → enviar encerramento e mover para Nutrir
   if (contador >= SEQUENCIA_RECUPERACAO_PM.length) {
     logger.info("follow-up", "Sequência Primeira mensagem esgotada — enviando encerramento");
-    const conteudoEnc = CONTEUDO_TEMPLATES["encerramento_02"];
+    const conteudoEnc = substituirNome(CONTEUDO_TEMPLATES["encerramento_02"] ?? "", state.title);
     try {
       if (dentroJanela && conteudoEnc) {
         await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
