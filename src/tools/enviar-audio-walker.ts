@@ -23,9 +23,9 @@ const URLS_AUDIO: Record<1 | 2 | 3, string> = {
 // Áudio de RECUPERAÇÃO pós-preço (2º toque da cadência pós-preço, dentro da janela de 24h):
 // o Walker fala direto com quem viu o preço e sumiu — cria conexão, pergunta a expectativa real
 // e abre o Semestral. Gravação real do Walker (roteiro-base no PR/documentação).
-// ⚠️ PREENCHER: colocar a URL real do áudio no S3 quando o Walker gravar. Enquanto estiver VAZIA,
-// a cadência pós-preço NÃO envia áudio e cai no fallback de texto (recuperacao_enxuta).
-export const AUDIO_WALKER_POSPRECO_URL = "";
+// Gravação real do Walker no S3 (endpoint direto s3.stkd.site — HTTP 200, audio/ogg).
+// Se ficar VAZIA, a cadência pós-preço NÃO envia áudio e cai no fallback de texto (recuperacao_enxuta).
+export const AUDIO_WALKER_POSPRECO_URL = "https://s3.stkd.site/arquivosclientes/Vestigium/audio%20-%2004.opus";
 
 // Dedupe por (conversa, número do áudio): um Set único cobre os 3 áudios sem um bloquear o outro.
 const audiosEnviados = new Set<string>();
