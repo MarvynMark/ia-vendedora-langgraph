@@ -8,6 +8,20 @@ import { logger } from "./logger.ts";
 // Etapas rastreadas: Novo Lead (1), Primeira mensagem (7), Conexao (10), Aguardando Pagamento (8), Nutrir (12)
 // delayMs = quando disparar o 1º toque ao ENTRAR na etapa (fallback p/ cards sem due_date).
 // Deve bater com processarTaskUpdated em routes/followup.ts.
+// Etapa "Perdido" (destino da limpeza de órfãos antigos). Mesmo id usado nos demais scripts.
+const STEP_PERDIDO = 11;
+// Card órfão (sem conversa) mais antigo que isto é duplicata obsoleta → expira pra Perdido em vez
+// de re-agendar +7d pra sempre. 14 dias dá folga de sobra: um lead novo ganha conversa em minutos.
+export const DIAS_ORFAO_EXPIRA = 14;
+
+/** Idade do card em dias a partir do created_at (0 se ausente/inválido). Exportado p/ teste. */
+export function idadeCardDias(createdAt: string | undefined, agoraMs = Date.now()): number {
+  if (!createdAt) return 0;
+  const ms = new Date(createdAt).getTime();
+  if (Number.isNaN(ms)) return 0;
+  return (agoraMs - ms) / (24 * 60 * 60 * 1000);
+}
+
 const STEPS_RASTREADOS = [
   { id: 1,  name: "Novo Lead",            delayMs: 5  * 60 * 1000,            tipoFollowup: "template_inicial"  as const },
   { id: 7,  name: "Primeira mensagem",    delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "template_abertura" as const },
@@ -67,9 +81,20 @@ export async function verificarFollowupsPendentes() {
           task.conversations?.find(c => c.inbox.id === env.CHATWOOT_INBOX_ID)
           ?? task.conversations?.[0];
         if (!conversa) {
-          // Card órfão (sem conversa: card de teste ou conversa removida) — não há como fazer
-          // follow-up. Empurra o due_date pra frente pra parar de re-escanear a cada ciclo do cron.
-          logger.warn("followup-timer", `Task ${task.id} sem conversa associada — adiando 7 dias`);
+          // Card órfão (sem conversa: card de teste ou conversa removida) — não há como fazer follow-up.
+          const idadeDias = idadeCardDias(task.created_at);
+          if (idadeDias > DIAS_ORFAO_EXPIRA) {
+            // Órfão ANTIGO = duplicata obsoleta (o card real do lead já migrou pra Perdido COM a
+            // conversa). Antes o cron empurrava o due_date +7d pra sempre e o card girava à toa.
+            // Agora expira UMA vez pra Perdido, parando o loop de reciclagem.
+            logger.info("followup-timer", `Task ${task.id} (${task.title}) órfã há ${Math.round(idadeDias)}d — expirando para Perdido`);
+            try {
+              await atualizarKanbanTask(accountId, task.id, { board_step_id: STEP_PERDIDO });
+            } catch { /* noop */ }
+            continue;
+          }
+          // Órfão RECENTE (pode ganhar conversa em breve): empurra o due_date pra parar de re-escanear.
+          logger.warn("followup-timer", `Task ${task.id} sem conversa associada (${Math.round(idadeDias)}d) — adiando 7 dias`);
           try {
             await atualizarKanbanTask(accountId, task.id, {
               due_date: proximoHorarioComercial(new Date(), 7 * 24 * 60 * 60 * 1000).toISOString(),

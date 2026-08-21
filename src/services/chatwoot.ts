@@ -874,6 +874,8 @@ export interface KanbanTaskResumo {
   description: string | null;
   due_date: string | null;
   date_status: "overdue" | "due_soon" | null;
+  created_at?: string;
+  step_changed_at?: string;
   conversation_ids: number[];
   conversations: Array<{
     id: number;
