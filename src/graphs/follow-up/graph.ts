@@ -457,7 +457,18 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   try {
     const totalIncoming = await contarMensagensIncoming(state.accountId, state.conversationId, { ignorarGrupoEspera: true });
     if (totalIncoming > 0) {
-      logger.info("follow-up", "Lead já respondeu — encerrando sequência Primeira mensagem");
+      // O lead ENGAJOU (respondeu), mas o card ficou preso em "Primeira mensagem" porque o agente
+      // principal não o moveu pra Conexão. Antes, aqui a sequência só PARAVA e o card ficava num
+      // limbo: o abertura02 é pulado (ele já foi contactado), mas a régua de Conexão nunca rodava
+      // (o card não está em Conexão) → 0 follow-up pra sempre, o cron só empurrava o prazo.
+      // Agora movemos pra Conexão pra ele entrar na recuperação certa ("ficou alguma dúvida?").
+      const stepConexao = state.funilSteps.find(s => /conex/i.test(s.name));
+      if (stepConexao) {
+        logger.info("follow-up", `Lead engajou mas preso em Primeira mensagem — movendo para Conexão (step ${stepConexao.id})`);
+        await atualizarKanbanTask(state.accountId, state.taskId, { board_step_id: stepConexao.id });
+      } else {
+        logger.info("follow-up", "Lead já respondeu — encerrando (Conexão não encontrada no funil)");
+      }
       return { respostaAgente: "" };
     }
   } catch (e) {
