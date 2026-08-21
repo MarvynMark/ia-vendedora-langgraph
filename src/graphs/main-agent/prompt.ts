@@ -191,6 +191,8 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 
   ## MENSAGEM 2 — REAGIR + ÁUDIO 1
 
+  > **Kanban (silencioso, faça ANTES de reagir):** o lead acabou de responder à abertura, então **mova o card pra "Conexão"** e ponha o status "qualificando" chamando **Atualizar_tarefa**. Não comente isso com o lead.
+
   Reaja de forma curta ao que o lead disse e conecte com a formação e a dor dele. Sem nome repetido, sem validação, e sem anunciar o áudio (ele chega sozinho logo depois).
 
   1. Chame **Enviar_audio_walker_1** preenchendo **mensagem_antes** com uma reação curta + a conexão com [formação] e [maior_dificuldade]. Sem anunciar o áudio.

@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
@@ -208,6 +208,30 @@ async function executarAgente(state: MainAgentStateType) {
     });
 
   const temHistoricoAI = mensagensHistorico.some(m => m._getType() === "ai");
+
+  // GUARD DETERMINÍSTICO — mover pra Conexão quando o lead engaja.
+  // O prompt manda mover o card pra "Conexão" na 1ª resposta substantiva do lead, mas o LLM
+  // não obedece de forma confiável: o Atualizar_tarefa é uma ação silenciosa que ele dropa no
+  // meio do pitch (chama uma vez no início e não avança mais). Resultado: leads engajados ficam
+  // presos em "Primeira mensagem" sem NENHUM follow-up (conv 4811 Maikon e ~150 outros). Aqui
+  // garantimos em CÓDIGO: se a conversa já começou (a IA já falou → o lead está respondendo ao
+  // pitch), a mensagem é real (não SISTEMA) e o card ainda está em Novo Lead(1)/Primeira msg(7),
+  // move pra Conexão. Só AVANÇA (1/7 → Conexão); nunca regride (não toca em etapas posteriores).
+  const msgLeadAtual = state.mensagensAgregadas || state.mensagemProcessada;
+  const stepAtualCard = Number((tarefa as Record<string, unknown>)["board_step_id"] ?? 0);
+  if (temHistoricoAI && !msgLeadAtual.startsWith("[SISTEMA:") && (stepAtualCard === 1 || stepAtualCard === 7)) {
+    const stepConexao = etapas.find(s => /conex/i.test(s.name));
+    const taskId = (tarefa as Record<string, unknown>)["id"];
+    if (stepConexao && taskId) {
+      try {
+        await atualizarKanbanTask(state.idConta, taskId as number, { board_step_id: stepConexao.id });
+        (tarefa as Record<string, unknown>)["board_step_id"] = stepConexao.id; // reflete no turno atual
+        logger.info("main-agent", `Card ${taskId} movido p/ Conexão (lead engajou; estava em step ${stepAtualCard})`);
+      } catch (e) {
+        logger.warn("main-agent", "Falha ao mover card p/ Conexão (guard determinístico):", e);
+      }
+    }
+  }
 
   let systemPrompt = gerarPromptAgentePrincipal({
     tarefa,
