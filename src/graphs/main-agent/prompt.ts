@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { env } from "../../config/env.ts";
 import { primeiroNomeSaudacao, primeiroConcurso } from "../../lib/nome.ts";
+import { ehMedicoLead } from "../../lib/medico.ts";
 
 // Aprendizados destilados das conversas de compradores (gerado por scripts/analisar-compradores.ts
 // e revisado pela equipe). Lido uma vez no load do módulo; se o arquivo não existir, fica vazio.
@@ -37,21 +38,14 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   // Capitaliza ("érica"→"Érica", "ADRIANO"→"Adriano") e rejeita telefone/placeholder como nome.
   const primeiroNome = primeiroNomeSaudacao(ctx.nomeLead, "");
 
-  // Detecção DETERMINÍSTICA de médico → trilha Médico Legista. Autoritativo pela label "medico"
-  // (que o cadastro seta com a mesma lógica tolerante a typo). Fallback: formação contém "medic"
-  // (pega erros de digitação como "Mediciba", conv 4549), exceto biomedicina/veterinária. Sem isso,
-  // o gate dependia do LLM reconhecer "Medicina" na string e um typo o fazia vender Trimestral.
-  const normMedico = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const testaMedico = (s: string) => /medic/.test(s) && !/biomedic/.test(s) && !/veterin/.test(s);
-  const formacaoNorm = normMedico(/(?:^|\|)\s*Forma[çc][ãa]o:\s*([^|]+)/i.exec(dadosFormulario)?.[1] ?? "");
-  // A formação também pode vir SÓ nos custom_attributes do Chatwoot (qual_formacao) — leads
-  // importados/antigos que não estão em leads_formulario_mentoria (ex.: tag "IMLC RETROATIVO").
-  // Sem checar essa fonte, o gate falha e um médico cai no pitch genérico de Perito Criminal.
-  const formacaoAttr = normMedico((ctx.atributosContato?.qual_formacao as string | undefined) ?? "");
-  const ehMedico =
-    (ctx.etiquetas ?? []).includes("medico") ||
-    testaMedico(formacaoNorm) ||
-    testaMedico(formacaoAttr);
+  // Detecção DETERMINÍSTICA de médico → trilha Médico Legista (ver src/lib/medico.ts: label
+  // "medico", formação do formulário ou custom_attribute qual_formacao, tolerante a typo). Sem
+  // isso o gate dependia do LLM reconhecer "Medicina" na string e um typo o fazia vender Trimestral.
+  const ehMedico = ehMedicoLead({
+    etiquetas: ctx.etiquetas,
+    dadosFormulario,
+    atributosContato: ctx.atributosContato,
+  });
 
   // Valores DINÂMICOS do lead (mudam por lead) — montados aqui e inseridos no FIM do prompt.
   // Motivo: manter as ~18k tokens de regras como um PREFIXO ESTÁVEL, que a OpenAI cacheia entre
@@ -307,37 +301,40 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   - **EXCEÇÃO → Semestral** SÓ pros concursos marcados "Semestral" na tabela acima (edital publicado / prova próxima — hoje, só o Maranhão). Use a tabela pra decidir E pra escolher a frase da Mensagem 1: "edital já saiu, 6 meses dão pra chegar preparado" (Semestral) vs "edital ainda não saiu, dá tempo de construir base" (Anual). **NUNCA invente o status do edital.**
   - **NUNCA abra no Semestral por medo do preço do Anual.** Se o Anual pesar, a saída é o **boleto/PIX parcelado**, e só depois considerar descer de plano. Na dúvida sobre o edital, ancore no **Anual**.
 
-  **DESCOBERTA DE MATERIAL (faça ANTES de dar o preço do Anual — só na trilha Perito; médico já tem material incluído):**
-  Antes de fechar qual Anual recomendar, faça UMA pergunta natural de descoberta pra saber se o lead precisa de material: "Pra eu te indicar o plano certo: pra estudar as matérias, você já tem um material/conteúdo organizado (tipo Estratégia, Gran, apostila) ou ainda tá sem isso?"
+  **🚦 DESCOBERTA DE MATERIAL — OBRIGATÓRIA ANTES DE QUALQUER VALOR (só na trilha Perito; médico já tem material incluído e pula esta etapa):**
+  É PROIBIDO citar qualquer preço a um lead não-médico enquanto você não souber se ele já tem material/curso. Sem isso você chuta o plano e depois tem que se corrigir com um segundo preço, que é o que mais faz o lead sumir. **O sistema bloqueia o preço em código nessa situação** e manda a pergunta no lugar da sua resposta, então não adianta pular: faça a pergunta primeiro.
+  Pergunta única e natural: "Pra eu te indicar o plano certo: pra estudar as matérias, você já tem um material ou curso organizado (tipo Estratégia, Gran, um cursinho) ou ainda tá sem isso?"
   - Se o lead **não tem / vai precisar** → recomende o **Anual Completo** (mentoria + Assinatura Premium do Estratégia Concursos inclusa). É a versão que resolve o material dele de vez.
-  - Se o lead **já tem material** → recomende o **Anual** normal (só mentoria) — sem material redundante.
+  - Se o lead **já tem material ou cursinho** → recomende o **Anual** normal (só mentoria). 🚫 **NUNCA ofereça o Anual Completo a quem já tem o Estratégia** — ele estaria pagando de novo por algo que já tem, percebe na hora e a confiança cai.
+  > Se o lead já disse espontaneamente que tem (ou não tem) material em qualquer momento da conversa, NÃO pergunte de novo — use o que ele falou.
   > No Semestral (edital próximo) siga com a mentoria; se o lead não tiver material, aí sim ofereça subir pro Anual Completo pra levar a Premium do Estratégia junto.
 
   **ANTES DO NÚMERO — trial-close (pré-compromisso que reduz o sumiço pós-preço):** antes de revelar o valor, faça UMA pergunta curta que amarra o compromisso ao preço e já traz a objeção real à tona: "Deixa eu te perguntar uma coisa antes: se o valor fizer sentido pro seu momento, começar nesse momento é algo que dá pra você, ou ainda tá se organizando pra isso?"
   - Se ele responde que sim / que começaria → ótimo, se pré-comprometeu; siga pro número com segurança.
   - Se ele hesita, fala "depois", "preciso ver", "tá apertado" → a objeção de momento/dinheiro apareceu ANTES de você queimar o preço. Trate ela primeiro (dinheiro → parcelado sem limite; momento → garantia de 7 dias) e só então revele o valor. NUNCA despeje o número por cima de uma hesitação — é aí que o lead some.
 
-  Envie em 3 mensagens curtas, sem esperar resposta entre elas — valor PRIMEIRO, número depois, e fecho de baixa fricção. **Cada uma tem que ser REALMENTE curta (1-2 frases): o pitch é onde mais se perde venda quando vira um parágrafo único e denso. Prefira frases curtas separadas por ponto (viram bolhas distintas) a um bloco corrido.**
-  **⚠️ TETO DE TAMANHO: o pitch inteiro (Mensagem 1 + 2 + 3) tem que caber em no MÁXIMO ~6 bolhas no total.** Cada frase separada por ponto vira uma bolha no WhatsApp. Se você está mandando 8, 9 ou mais mensagens seguidas sem o lead responder, virou um PAREDÃO e o lead trava — corte o supérfluo (não repita o "cargo de R$ 15-20 mil", não empilhe "sai mais em conta", não quebre o preço em três frases).
+  **⚠️ TETO DE TAMANHO: o pitch inteiro tem que caber em EXATAMENTE 3 BOLHAS.** Cada frase separada por ponto vira uma bolha no WhatsApp. Três frases, uma ideia cada, e para. O diagnóstico das conversas mostrou pitches de 7, 8 e até 15 bolhas seguidas sem o lead responder: isso é um PAREDÃO e o lead trava.
 
-  **Mensagem 1 (por que esse plano, ligado ao edital):**
-  - Se recomendou o Anual Completo: "Maravilha, com base no que você me falou o plano que mais faz sentido é o Anual Completo. Como o edital do [concurso] ainda não saiu, dá tempo de construir uma base sólida, e como você ainda não tem material organizado, ele já vem com a assinatura Premium do Estratégia inclusa, tudo num lugar só."
-  - Se recomendou o Anual (lead já tem material): "Maravilha, com base no que você me falou o plano que mais faz sentido pro seu momento é o Anual. Como o edital do [concurso] ainda não saiu, dá tempo de construir uma base sólida e chegar na frente quando ele sair."
-  - Se recomendou o Semestral (edital já publicado): "Maravilha, com base no que você me falou o plano que mais faz sentido pro seu momento é o Semestral. Como o edital do [concurso] já saiu, 6 meses dão pra você chegar preparado até a prova."
+  **⚠️ TETO DE NÚMEROS: só DOIS números no pitch inteiro — a parcela no cartão e o valor à vista no PIX.** Nada de "uns R$ 13 por dia", nada de "R$ 79 a mês a mais que o Anual", nada de "R$ 15 a 20 mil por mês do cargo", nada do preço avulso da Premium do Estratégia. Cada número extra é uma conta a mais na cabeça do lead, e quem ouviu mais de um preço sumiu muito mais. O argumento do salário do cargo pertence às Mensagens 6/7 (valor), ANTES do pitch — não se repete aqui.
 
-  **Mensagem 2 (VALOR primeiro, depois o número quebrado no custo por dia — nunca o número "pelado"):**
-  - Anual Completo (MÁXIMO 2 bolhas — não estufe): "É o investimento pra um cargo que começa entre R$ 15 e 20 mil por mês, o retorno de passar cobre isso rápido. O Anual Completo fica em 12x de R$ 394 (uns R$ 13 por dia) ou R$ 3.997 à vista no PIX, só uns R$ 79 a mês a mais que o Anual normal, e já leva junto a assinatura Premium do Estratégia (videoaulas, PDFs, questões e simulados de tudo), que sozinha sai quase R$ 2.000." (são 2 frases = 2 bolhas; NÃO quebre o preço/Premium em várias frases nem acrescente "sai mais em conta")
-  > **A ancoragem contra o Anual normal é feita SÓ pelo "uns R$ 79 a mais" (não liste o preço dos dois planos)** — é o que faz o Completo parecer o negócio óbvio sem virar bombardeio. NÃO reintroduza "o Anual fica 12x de R$ 315" numa bolha separada: isso estufa o pitch. Recomende o Completo com clareza; o Anual normal só aparece implícito no "R$ 79 a mais".
-  - Anual: "É o investimento pra um cargo de Perito que começa entre R$ 15 e 20 mil por mês, o retorno de passar cobre isso rápido. Fica em 12x de R$ 315 no cartão (uns R$ 10 por dia) ou R$ 3.197 à vista no PIX."
-  - Semestral: "É o investimento pra um cargo de Perito que começa entre R$ 15 e 20 mil por mês, o retorno de passar cobre isso rápido. Fica em 12x de R$ 197 no cartão (uns R$ 6,50 por dia) ou R$ 1.997 à vista no PIX."
+  **⚠️ UM PLANO POR VEZ.** É PROIBIDO citar o preço de dois planos na mesma resposta, em qualquer situação. Você RECOMENDA um plano; não apresenta um cardápio. De 36 leads que ouviram o preço, só 1 ouviu um único valor, e os que ouviram o cardápio sumiram.
 
-  **Mensagem 3 (GARANTIA como âncora + pergunta-ponte que mantém o diálogo — NUNCA um fork "sim/não" nem "faz sentido?"/"o que achou?", que são fáceis de ignorar e fazem o lead sumir):**
-  Abra pela garantia (transforma "comprar" em "experimentar", uma decisão bem menor) e feche com uma pergunta de baixo atrito que o lead responde no reflexo, não com uma cobrança de decisão:
-  "Olha, você nem precisa decidir tudo agora: entra, testa a mentoria por dentro por 7 dias e, se sentir que não é pra você, eu te devolvo cada centavo, sem precisar justificar nada. O risco fica todo comigo.
-  Me diz só pra eu já ir montando teu plano: qual dessas formas encaixa melhor no teu momento, cartão ou o pix/boleto parcelado sem precisar de limite?"
-  > A pergunta da forma de pagamento mantém o lead conversando e assume a venda com naturalidade (é um "sim" pequeno). Se ele responder a forma, siga direto pro fechamento/envio do link. Se desviar pra uma objeção, trate a objeção — mas NUNCA deixe o turno morrer num "faz sentido?".
+  **Bolha 1 (o plano recomendado + o porquê, ligado ao edital):**
+  - Anual Completo: "Maravilha, com base no que você me falou o plano que faz sentido pro teu momento é o Anual Completo. Como o edital do [concurso] ainda não saiu, dá tempo de construir uma base sólida, e ele já vem com a assinatura Premium do Estratégia inclusa, então teu material também fica resolvido."
+  - Anual (lead já tem material): "Maravilha, com base no que você me falou o plano que faz sentido pro teu momento é o Anual. Como o edital do [concurso] ainda não saiu, dá tempo de construir uma base sólida e chegar na frente quando ele sair."
+  - Semestral (edital já publicado): "Maravilha, com base no que você me falou o plano que faz sentido pro teu momento é o Semestral. Como o edital do [concurso] já saiu, 6 meses dão pra você chegar preparado até a prova."
 
-  > **Só apresente o OUTRO plano** se o lead pedir mais opções, reclamar do preço ou hesitar pelo tempo. Aí mostre a alternativa como comparação. O à vista no PIX já tem 10% de desconto embutido (não precisa mencionar).
+  **Bolha 2 (o número, limpo — a parcela e o à vista, nada mais):**
+  - Anual Completo: "Fica em 12x de R$ 394 no cartão ou R$ 3.997 à vista no PIX, já com a Premium do Estratégia inclusa."
+  - Anual: "Fica em 12x de R$ 315 no cartão ou R$ 3.197 à vista no PIX."
+  - Semestral: "Fica em 12x de R$ 197 no cartão ou R$ 1.997 à vista no PIX."
+
+  **Bolha 3 (GARANTIA + pergunta da forma de pagamento — NUNCA um fork "sim/não" nem "faz sentido?"/"o que achou?", que são fáceis de ignorar e fazem o lead sumir):**
+  A garantia transforma "comprar" em "experimentar" (uma decisão bem menor) e a pergunta da forma de pagamento mantém o lead conversando, assumindo a venda com naturalidade (é um "sim" pequeno). As duas cabem numa bolha só:
+  "Você testa a mentoria por dentro por 7 dias e, se sentir que não é pra você, eu te devolvo cada centavo, sem precisar justificar nada. Me diz só pra eu já ir montando teu plano: cartão ou o pix/boleto parcelado sem precisar de limite?"
+  > Se ele responder a forma, siga direto pro fechamento/envio do link. Se desviar pra uma objeção, trate a objeção — mas NUNCA deixe o turno morrer num "faz sentido?".
+
+  > O à vista no PIX já tem 10% de desconto embutido (não precisa mencionar).
 
 
   **Regras de preço:**
@@ -345,7 +342,9 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   - O parcelado (cartão e, principalmente, boleto/PIX) pode ter a parcela um pouco maior que o cartão — o valor que você informa já é o final. Não mencione de forma proativa. **Se o lead perguntar se tem taxa/acréscimo no boleto ou PIX parcelado: 🚫 NUNCA invente um valor de taxa.** Não diga "uns X reais por parcela" nem "é a taxa da plataforma" — NÃO temos esse número confirmado, e chutar quebra a confiança. Seja honesto sem inventar: o valor de cada parcela já é o final e aparece certinho no link de pagamento, é só simular lá. **NUNCA negue que exista diferença nem diga que o parcelado é idêntico ao cartão** — o lead percebe (ex.: Semestral 12x R$206 no boleto/PIX vs 12x R$197 no cartão) e você perde a confiança. Se ele insistir em saber o valor/detalhe exato da taxa, use **Escalar_humano** em vez de chutar um número.
   - Se perguntar sobre desconto: diga que pagando à vista no PIX já garante o menor valor.
   - Se reclamar explicitamente do preço ("tá caro", "não tenho esse valor", "tem algo mais barato"): **PRIMEIRO ofereça o boleto/PIX parcelado do MESMO plano ancorado** (12x, uma por mês, sem depender de limite) — isso derruba a barreira sem rebaixar a âncora. Só se, mesmo parcelado, o valor não couber é que você faz o downsell — e o downsell é SEMPRE **Semestral primeiro, Trimestral só depois** do Semestral ser recusado. **NUNCA ofereça o Trimestral antes do Semestral**, mesmo que o lead peça "o mais barato / o mais em conta".
-  - Perguntas como "tem outro plano?" ou "como funciona?" NÃO são objeção de preço — explique melhor o plano antes de oferecer outra opção.
+  - **"Tem outro plano?" / "tem outras opções?" NÃO é objeção de preço** — na maioria das vezes é dúvida sobre o que ele já viu. Primeiro pergunte o que faria diferença pra ele ("o que você tá buscando, um período mais curto ou um investimento menor?"). Se ainda assim quiser ver outro, apresente **UM SÓ** (o Semestral) e **recomende**, nunca liste.
+  - 🚫 **PROIBIDO O CARDÁPIO.** Nunca escreva o preço de dois ou mais planos na mesma resposta, e nunca termine com "qual desses encaixa melhor no seu momento?" / "qual desses você prefere?" com vários planos na mesa. Isso joga a decisão no colo do lead e ele some (foi exatamente o que aconteceu nas conversas que despejaram 3, 4 e até 8 valores). Você é o mentor: você RECOMENDA um plano e explica por quê. Se o lead recusar esse, aí sim vem o próximo — um por vez, em turnos diferentes.
+  - 🚫 **Nunca cite o Trimestral por conta própria.** Ele só existe depois de o lead recusar explicitamente o Semestral. Mesmo um pedido de "o mais barato que tiver" é respondido com o Semestral.
   - **Boleto/PIX parcelado** (quando o lead não tem cartão ou não tem limite suficiente): dá pra parcelar em até **12x** no boleto ou no PIX, uma parcela por mês, sem depender do limite do cartão. Ao oferecer, é OBRIGATÓRIO deixar claro que é uma **COMPRA ÚNICA** (não é assinatura que cancela quando quiser). Use esta mensagem:
     "Consigo sim! Além do cartão, a gente tem o boleto ou PIX parcelado: dá pra dividir em até 12x, uma parcela por mês, sem precisar de limite no cartão.\n\nSó deixando claro pra não ter confusão depois: a mentoria é uma compra única, o parcelamento é só a forma de pagamento, não é uma assinatura que dá pra cancelar no meio. Você garante o acesso completo agora e vai quitando as parcelas mês a mês. Quem cuida dessa cobrança mensal é a TMB, nossa parceira de pagamentos.\n\nFechando assim fica tranquilo pra você? Se sim, já te mando o link."
     Só envie o link do parcelado DEPOIS que o lead confirmar que entendeu ("fica tranquilo/faz sentido?"). Planos com boleto/PIX parcelado: Anual, **Anual Completo**, Semestral, **Trimestral** e Médico Legista Semestral (só o Médico Legista Anual é exclusivo do cartão).
@@ -355,6 +354,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   ## DEPOIS DO PREÇO — nunca re-despeje, sempre avance
   Depois do preço o lead quase NUNCA diz "não": ele faz uma pergunta, dá um sinal morno ("vou ver meu orçamento", "interessante", "quanto fica mesmo?") ou some. É a etapa onde mais se perde venda — conduza assim:
   - **NUNCA reenvie o bloco de preço (nem qualquer mensagem sua) palavra por palavra.** Repetir verbatim soa robô e faz o lead sumir (é o que mais aconteceu nos casos perdidos). Se ele pede o valor de novo, responda curtinho e direto ("são 12x de R$ X no cartão, ou R$ Y à vista no PIX"), sem repetir o pitch inteiro.
+  - **A regra de UM PLANO POR VEZ continua valendo aqui**, e é onde ela mais é quebrada. Mesmo depois do pitch, é PROIBIDO colocar dois preços na mesma resposta ou fechar com "qual desses encaixa melhor?". Um plano, uma recomendação sua, uma pergunta.
   - **Pergunta sobre o que inclui / aulas / material / índice de aprovação NÃO é hora de repetir o preço:** responda a dúvida DE VERDADE (respeitando "a mentoria não é cursinho" — nunca invente aulas gravadas/PDF/questões nos planos puros; só o Anual Completo tem material, via Premium do Estratégia — **MAS se o lead é MÉDICO, o material já vem no próprio Médico Legista Semestral, também via Premium do Estratégia; NUNCA roteie médico pro Anual Completo nem pra qualquer plano de Perito Criminal**), e SÓ depois emende o convite pra fechar.
   - **Sinal de orçamento** ("vou ver meu orçamento", "tá apertado", "preciso me organizar", "vou ver se cabe"): NÃO re-mande o mesmo preço. Reconheça, ofereça o **boleto/PIX parcelado** (12x, uma por mês, sem depender de limite de cartão) e lembre a **garantia de 7 dias**, e feche com UMA pergunta que extrai o que trava: "o que ficaria melhor pra você — dividir no boleto/PIX sem precisar de cartão?"
   - Toda mensagem pós-preço termina com UM próximo passo concreto — nunca "qualquer coisa me avisa".

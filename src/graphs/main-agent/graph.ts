@@ -9,6 +9,10 @@ import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } fro
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { temPrecoDePlano } from "../../lib/planos.ts";
+import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
+import { ehMedicoLead } from "../../lib/medico.ts";
+import { descobertaMaterialFeita, materialDeclaradoPeloLead, PERGUNTA_DESCOBERTA_MATERIAL } from "../../lib/gate-material.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
@@ -163,6 +167,47 @@ async function garantirMidiaEntregue(
         logger.error("main-agent", `garantirMidiaEntregue (${nome}) erro:`, e);
       }
     }
+  }
+}
+
+// Etapas do funil de onde o card AINDA pode avançar para "Aguardando Pagamento". Ficar de fora
+// significa "não mexe": Aguardando Pagamento (já lá), Ganho, Perdido e Nutrir.
+const STEPS_ANTES_DO_PAGAMENTO = [1, 7, 10];
+
+// Reescreve a linha "👤 - Descrição: <status>" do card preservando o resto da descrição (formato
+// de 3 linhas definido no prompt). Se a linha não existir, acrescenta ao fim.
+export function comStatusNaDescricao(descricao: string, status: string): string {
+  const d = (descricao ?? "").trimEnd();
+  const RE_LINHA_STATUS = /^(.*Descri[çc][ãa]o:\s*).*$/im;
+  if (RE_LINHA_STATUS.test(d)) return d.replace(RE_LINHA_STATUS, `$1${status}`);
+  return d ? `${d}\n👤 - Descrição: ${status}` : `👤 - Descrição: ${status}`;
+}
+
+// Move o card para "Aguardando Pagamento" quando o preço é apresentado. Ver o comentário no
+// ponto de chamada (dentro de executarAgente) para o porquê de isto não poder ficar com o LLM.
+export async function moverParaAguardandoPagamento(
+  idConta: string,
+  tarefa: Record<string, unknown>,
+  etapas: Array<{ id: number; name: string }>,
+  linkEnviado: boolean,
+): Promise<void> {
+  const stepAtual = Number(tarefa["board_step_id"] ?? 0);
+  if (!STEPS_ANTES_DO_PAGAMENTO.includes(stepAtual)) return;
+  const stepPagamento = etapas.find(s => /aguardando\s*pagamento/i.test(s.name));
+  const taskId = tarefa["id"];
+  if (!stepPagamento || !taskId) return;
+  // "link enviado" é o que separa, no follow-up, a sequência de LEMBRETE (link na mão, falta
+  // pagar) da sequência PÓS-PREÇO (viu o preço e sumiu — a que leva o áudio do Walker).
+  const status = linkEnviado ? "link enviado" : "em negociação";
+  try {
+    await atualizarKanbanTask(idConta, taskId as number, {
+      board_step_id: stepPagamento.id,
+      description: comStatusNaDescricao(String(tarefa["description"] ?? ""), status),
+    });
+    tarefa["board_step_id"] = stepPagamento.id; // reflete no turno atual
+    logger.info("main-agent", `Card ${taskId} movido p/ Aguardando Pagamento (preço apresentado; estava em step ${stepAtual})`);
+  } catch (e) {
+    logger.warn("main-agent", "Falha ao mover card p/ Aguardando Pagamento (guard determinístico):", e);
   }
 }
 
@@ -376,7 +421,42 @@ async function executarAgente(state: MainAgentStateType) {
       });
     }
 
-    return { outputAgente: output };
+    // GATE DE MATERIAL — o preço não sai antes de saber se o lead já tem material/curso.
+    // A pergunta de descoberta só acontecia em 20 de 62 conversas que chegaram ao preço; sem ela
+    // o agente chuta o plano e depois se corrige com um segundo preço (conv 5929). Médico passa
+    // direto: a trilha Médico Legista já inclui o material.
+    let outputFinal = output;
+    const historicoComTurnoAtual = [...historico, { type: "human", content: mensagemOriginal }];
+    // O gate vale só para o PRIMEIRO preço da conversa. Se o lead já ouviu um valor antes (inclusive
+    // nas conversas que já estavam em andamento no deploy), perguntar de material agora sairia do
+    // nada — e travaria uma resposta legítima do tipo "quanto era mesmo?".
+    const precoJaApresentado = historico.some((m) => m.type === "ai" && temPrecoDePlano(m.content ?? ""));
+    if (
+      temPrecoDePlano(outputFinal) &&
+      !precoJaApresentado &&
+      !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }) &&
+      !descobertaMaterialFeita(historicoComTurnoAtual) &&
+      materialDeclaradoPeloLead(historicoComTurnoAtual) === null
+    ) {
+      logger.warn("main-agent", "Preço bloqueado: descoberta de material ainda não foi feita", {
+        idConversa: state.idConversa,
+        outputBloqueado: outputFinal.slice(0, 160),
+      });
+      outputFinal = PERGUNTA_DESCOBERTA_MATERIAL;
+    }
+
+    // GUARD DETERMINÍSTICO — mover pra "Aguardando Pagamento" ao apresentar o preço.
+    // Mesmo modo de falha do guard de Conexão acima: o prompt manda mover o card no pitch e o LLM
+    // dropa o Atualizar_tarefa. Consequência cara: a SEQUENCIA_POS_PRECO (que leva o áudio de
+    // recuperação do Walker em t+3h) só roda para cards em "Aguardando Pagamento", e só 13 dos 61
+    // leads que ouviram o preço desde 17/08 chegaram lá — o áudio disparou 1 vez em 8 dias.
+    // Só AVANÇA: não toca em cards já em Aguardando Pagamento(8), Ganho(9) ou Perdido(11).
+    if (temPrecoDePlano(outputFinal)) {
+      const linkEnviado = /peritowalker\.com\.br\/(mentoria|medicolegista)/i.test(outputFinal);
+      await moverParaAguardandoPagamento(state.idConta, tarefa as Record<string, unknown>, etapas, linkEnviado);
+    }
+
+    return { outputAgente: outputFinal };
   } catch (e) {
     logger.error("main-agent", "Erro no agente:", e);
     return { outputAgente: "", erroFatal: true };
@@ -437,7 +517,9 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
   const frasesBrutas = dividirMensagem(formatado).flatMap((bloco) => dividirEmFrases(bloco));
-  let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f));
+  // Trava de cardápio: no máximo UM plano com preço por turno (ver blocoIntroduzSegundoPlano).
+  iniciarTurnoDePreco(state.idConversa);
+  let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f) && !blocoIntroduzSegundoPlano(state.idConversa, f) && !blocoPerguntaEscolhaDeCardapio(state.idConversa, f));
   // Salvaguarda: se o filtro esvaziou a mensagem só por causa do fecho passivo (a IA respondeu
   // apenas com um "estou aqui para ajudar"), não ficar em silêncio — relaxa APENAS esse filtro e
   // envia a última frase. Se sobrou só duplicata de mídia / nome de tool, aí sim fica em silêncio.

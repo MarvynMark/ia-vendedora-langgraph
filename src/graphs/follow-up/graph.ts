@@ -4,6 +4,7 @@ import { env } from "../../config/env.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../lib/nome.ts";
+import { ehMedicoPorFormacao } from "../../lib/medico.ts";
 import { buscarCamposFormulario } from "../../db/formulario.ts";
 import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
 import { AUDIO_WALKER_POSPRECO_URL, enviarAudioPorUrl } from "../../tools/enviar-audio-walker.ts";
@@ -112,13 +113,9 @@ export async function classificar(state: FollowUpStateType) {
   return { tipoFollowup };
 }
 
-// Detecta médico pela formação do formulário (mesma lógica do prompt principal): "medic" na
-// formação, exceto biomedicina/veterinária. Médico segue a trilha Médico Legista, que NÃO tem
-// downsell — por isso não recebe o toque da "versão enxuta" (Semestral de Perito).
-function ehMedicoPorFormacao(formacao: string | null | undefined): boolean {
-  const f = (formacao ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  return /medic/.test(f) && !/biomedic/.test(f) && !/veterin/.test(f);
-}
+// Médico segue a trilha Médico Legista, que NÃO tem downsell — por isso não recebe o toque da
+// "versão enxuta" (Semestral de Perito). Detecção em src/lib/medico.ts, compartilhada com o
+// prompt do agente principal e com o gate de material.
 
 // Sequência de recuperação para leads em Conexão (já conversaram mas pararam de responder)
 const SEQUENCIA_RECUPERACAO_CONEXAO = [
