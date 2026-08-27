@@ -43,7 +43,13 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência pós-preço: Conexão (janela aberta) ---
   // Acionada quando lead viu o pitch de preço e sumiu (description contém "status: proposta_apresentada")
-  // Toque 1: cutucada leve reforçando a proposta enviada (sem downsell, sem escassez).
+  // Toque 1: a GARANTIA de 7 dias. Saiu do pitch de propósito — despejada junto com o preço ela
+  // é gasta antes de existir hesitação; aqui ela chega exatamente quando o lead travou, e
+  // transforma "comprar" em "experimentar", que é uma decisão bem menor.
+  pos_preco_garantia:
+    "Oi [Nome], pensei aqui e queria que você soubesse de uma coisa antes de decidir: você não precisa decidir tudo agora. Entra, testa a mentoria por dentro por 7 dias e, se sentir que não é pra você, eu te devolvo cada centavo, sem precisar justificar nada. O risco fica todo comigo. Ficou alguma dúvida que eu possa resolver?",
+  // Reforço da proposta (sem downsell, sem escassez). Segue como fallback pago do toque 1 — é o
+  // template já aprovado na Meta; a garantia acima vai como texto livre dentro da janela de 24h.
   pos_preco_reforco: "Oi [Nome], só voltei aqui rapidinho. Lembra que na mentoria você não estuda no escuro: eu te digo exatamente o que priorizar{{ pro [concurso]}} e acompanho de perto. Ficou alguma dúvida sobre a proposta que te mandei?",
   pos_preco_followup_1: "Oi [Nome], ficou alguma dúvida sobre o investimento ou sobre como a mentoria funciona? Me pergunta aqui que eu te respondo.",
   pos_preco_followup_2:

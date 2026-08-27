@@ -425,10 +425,17 @@ export function blocoNarraEnvioMidia(idConversa: string | number, bloco: string)
   const anunciaEnvio =
     /\bvou\b.{0,15}\b(mandar|enviar|passar|mostrar)\b/.test(b) ||
     /\bte (mando|envio|mandarei|enviarei)\b/.test(b);
-  if (!anunciaEnvio) return false;
+  const citaMidia = /[áa]udio|v[íi]deo|imagem/.test(b);
+  // CONVITE REDUNDANTE a consumir a mídia ("dá uma olhada no vídeo e me conta o que mais te chamou
+  // atenção"). O mensagem_antes JÁ convidou; a paráfrase escapava do anunciaEnvio (não tem "vou
+  // mandar") e do blocoDuplicaMidia (não bate literalmente), e o lead recebia a mesma frase duas
+  // vezes — conv 6005. Só filtra quando cita a mídia, para não pegar "dá uma olhada no link".
+  const conviteRedundante =
+    /\b(d[áa]\s+uma\s+(olhada|olhadinha|conferida)|assiste|assista|confere|confira|escuta|ouve)\b/.test(b) && citaMidia;
+  if (!anunciaEnvio && !conviteRedundante) return false;
+  if (conviteRedundante) return true;
   // Confirma que é narração de MÍDIA: cita áudio/vídeo/imagem, ou é um anúncio curto e sem
   // conteúdo ("vou te mandar agora"). Num turno de mídia, esse tipo de bolha nunca carrega info nova.
-  const citaMidia = /[áa]udio|v[íi]deo|imagem/.test(b);
   const soAnuncio = b.split(" ").length <= 6;
   return citaMidia || soAnuncio;
 }

@@ -136,7 +136,7 @@ const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] a
 // última chamada consultiva (D+14). Cadência mais longa e espaçada porque o pós-preço é o
 // maior vazamento do funil e a recuperação antes morria em 24-48h (diagnóstico).
 const SEQUENCIA_POS_PRECO = [
-  "pos_preco_reforco",       // t1: cutucada leve reforçando a proposta
+  "pos_preco_garantia",      // t1: a GARANTIA de 7 dias (saiu do pitch — é o argumento que resolve a hesitação)
   "pos_preco_audio_walker",  // t2: ÁUDIO do Walker (dentro da janela 24h) — conexão + abre o Semestral
   "recuperacao_enxuta",      // t3: reforça o Semestral em texto (se o áudio não fechou)
   "pos_preco_followup_2",    // t4: parcelado sem limite
