@@ -47,7 +47,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // é gasta antes de existir hesitação; aqui ela chega exatamente quando o lead travou, e
   // transforma "comprar" em "experimentar", que é uma decisão bem menor.
   pos_preco_garantia:
-    "Oi [Nome], pensei aqui e queria que você soubesse de uma coisa antes de decidir: você não precisa decidir tudo agora. Entra, testa a mentoria por dentro por 7 dias e, se sentir que não é pra você, eu te devolvo cada centavo, sem precisar justificar nada. O risco fica todo comigo. Ficou alguma dúvida que eu possa resolver?",
+    "Oi [Nome], pensei aqui e queria que você soubesse de uma coisa: você pode entrar, testar a mentoria por 7 dias e, se sentir que não é pra você, eu devolvo seu investimento, sem precisar justificar nada. Sem risco pra você. Você estaria disposto a ver se faz sentido pra você?",
   // Reforço da proposta (sem downsell, sem escassez). Segue como fallback pago do toque 1 — é o
   // template já aprovado na Meta; a garantia acima vai como texto livre dentro da janela de 24h.
   pos_preco_reforco: "Oi [Nome], só voltei aqui rapidinho. Lembra que na mentoria você não estuda no escuro: eu te digo exatamente o que priorizar{{ pro [concurso]}} e acompanho de perto. Ficou alguma dúvida sobre a proposta que te mandei?",
