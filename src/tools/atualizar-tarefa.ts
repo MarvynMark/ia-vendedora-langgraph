@@ -1,6 +1,8 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { atualizarKanbanTask } from "../services/chatwoot.ts";
+import { delayInicialMs } from "../lib/delays-followup.ts";
+import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
 import { logger } from "../lib/logger.ts";
 
 interface ContextoAtualizarTarefaMainAgent {
@@ -17,15 +19,29 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
         return JSON.stringify({ erro: "Tarefa não encontrada." });
       }
 
+      // O PRAZO NÃO É MAIS DECIDIDO PELO LLM. Ele chutava um endDate (quase sempre "amanhã de
+      // tarde") e isso sobrescrevia a cadência calibrada: na conv 6671 o card entrou em Aguardando
+      // Pagamento com o link já enviado — o lembrete de abandono de checkout deveria sair em 20
+      // minutos e foi agendado para 36 horas depois. Agora o due_date vem de delayInicialMs, a
+      // mesma função que o cron e o webhook usam.
+      const stepDestino = Number(input.stepId);
+      const nomeEtapa =
+        (contexto.tarefa["board"] as { steps?: Array<{ id: number; name: string }> } | undefined)
+          ?.steps?.find(s => s.id === stepDestino)?.name ?? "";
+      const dueDate = proximoHorarioComercial(
+        new Date(),
+        delayInicialMs(nomeEtapa, input.description ?? ""),
+      );
+
       try {
         const resultado = await atualizarKanbanTask(
           contexto.idConta,
           taskId,
           {
-            board_step_id: Number(input.stepId),
+            board_step_id: stepDestino,
             title: input.title,
             description: input.description,
-            due_date: input.endDate,
+            due_date: dueDate.toISOString(),
           },
         );
         return JSON.stringify(resultado);
@@ -36,12 +52,11 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
     },
     {
       name: "Atualizar_tarefa",
-      description: `Atualiza a tarefa (mover etapa, título, descrição, prazo). Ação interna e silenciosa — nunca comente com o lead.\n\nIDs das etapas:\n${etapasDescricao}\nUse o ID da etapa atual se não houver mudança de etapa. Ao editar a descrição, sempre mantenha o conteúdo original.`,
+      description: `Atualiza a tarefa (mover etapa, título, descrição, prazo). Ação interna e silenciosa — nunca comente com o lead.\n\nIDs das etapas:\n${etapasDescricao}\nUse o ID da etapa atual se não houver mudança de etapa. Ao editar a descrição, sempre mantenha o conteúdo original.\n\nO prazo do próximo follow-up é calculado automaticamente pela etapa — você não define data.`,
       schema: z.object({
         stepId: z.string().describe("ID da etapa destino no Kanban"),
         title: z.string().describe("Título da tarefa"),
         description: z.string().describe("Descrição da tarefa"),
-        endDate: z.string().describe("Data limite no formato ISO 8601 com fuso horário"),
       }),
     },
   );

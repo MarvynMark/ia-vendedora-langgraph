@@ -495,7 +495,17 @@ export function blocoTemFraseProibida(bloco: string): boolean {
     // "dúvida" falharia. A exigência de abertura passiva + verbo de oferta já evita falso-positivo.
     /\b(se precisar|se tiver (mais )?(alguma )?d[úu]vida|qualquer (coisa|d[úu]vida)).*(me avis|me cham|[ée] s[óo] (me )?(avis|cham|fal)|estou (aqui|por aqui)|conte comigo)/,
   ];
-  return proibidas.some((re) => re.test(b));
+  if (proibidas.some((re) => re.test(b))) return true;
+
+  // BOLHA DE PURA VALIDAÇÃO ("Ótimo, Analyce!", "Perfeito!", "Maravilha, João"). O prompt proíbe
+  // desde sempre, mas o LLM abre respostas com ela e o lead recebe uma bolha vazia de conteúdo
+  // (conv 6671). Só derruba quando a frase é SÓ isso: "Maravilha, o plano que faz sentido..."
+  // carrega conteúdo e passa. O "de nada" entra aqui pelo mesmo motivo — encerra o turno sem
+  // próximo passo, que é o fecho morto que o roteiro bane.
+  const soValidacao =
+    /^(que )?(bom|[óo]timo|perfeito|maravilha|show|boa|legal|isso|massa|top|de nada|imagina|disponha)\b/.test(b) &&
+    b.split(/\s+/).length <= 4;
+  return soValidacao;
 }
 
 // Jargão INTERNO de estratégia de venda que nunca deve aparecer numa mensagem ao lead. O LLM às
