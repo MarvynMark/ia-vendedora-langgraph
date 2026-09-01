@@ -59,6 +59,11 @@ export const env = {
   TMB_WEBHOOK_HEADER: (process.env["TMB_WEBHOOK_HEADER"] ?? "x-tmb-token").toLowerCase(),
   TMB_WEBHOOK_SECRET: process.env["TMB_WEBHOOK_SECRET"] ?? "",
 
+  // Meta Marketing API — só para os relatórios de mídia (bun run meta). Opcionais: sem elas o app
+  // sobe normal, apenas o script de relatório avisa que falta configurar.
+  META_ACCESS_TOKEN: process.env["META_ACCESS_TOKEN"] ?? "",
+  META_AD_ACCOUNT_ID: process.env["META_AD_ACCOUNT_ID"] ?? "",
+
   KANBAN_BOARD_ID: Number(process.env["KANBAN_BOARD_ID"] ?? "1"),
   GRUPO_ESPERA_LINK: process.env["GRUPO_ESPERA_LINK"] ?? "https://chat.whatsapp.com/IV5ub2oizto08ulrTaNuTO?mode=gi_t",
   TEMPLATE_DELAY_MS: Number(process.env["TEMPLATE_DELAY_MS"] ?? "300000"), // 5 minutos

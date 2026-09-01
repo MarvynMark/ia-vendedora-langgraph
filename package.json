@@ -13,7 +13,8 @@
     "relatorio": "bun run src/scripts/relatorio-semanal.ts",
     "visualize": "bun run src/visualize-graphs.ts",
     "typecheck": "bunx tsc --noEmit",
-    "test": "NODE_ENV=test bun test"
+    "test": "NODE_ENV=test bun test",
+    "meta": "bun run src/scripts/meta-ads.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
