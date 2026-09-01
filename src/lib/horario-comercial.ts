@@ -13,6 +13,16 @@ const HORA_FECHAMENTO = 20;
 const HORA_REABERTURA = 8; // hora para reagendar quando cai fora do intervalo permitido
 const MINUTO_REABERTURA = 20;
 
+// Janela do PRIMEIRO contato (intro do Walker e template de abertura) — mais larga e TODOS OS DIAS.
+// Ela é diferente da janela de follow-up de propósito: o lead acabou de preencher o formulário e
+// está com o celular na mão, então responder em minutos é o que converte; represar até o próximo
+// dia útil é o que mata. Medido em 31/08/26: com a janela de follow-up aplicada aqui (seg-sex
+// 08h20-20h), os leads de sábado e domingo esperaram de 36 a 50h e o fim de semana fechou sem
+// nenhuma venda. Além disso, 21% dos leads chegam DEPOIS das 20h — 21h é o pico de captação do dia.
+// Os 12,5% que chegam de madrugada seguem esperando: mensagem às 3h da manhã queima o lead.
+const HORA_ABERTURA_PRIMEIRO_CONTATO = 7;
+const HORA_FECHAMENTO_PRIMEIRO_CONTATO = 24; // até 23:59
+
 function getComponentesSP(date: Date): { hora: number; minuto: number; diaSemana: number } {
   // Para ler a hora de PAREDE em SP a partir de um instante UTC, soma o offset (negativo).
   const spTime = new Date(date.getTime() + SP_OFFSET_MS);
@@ -47,6 +57,17 @@ function dentroDaJanela(hora: number, minuto: number, diaSemana: number, horaFec
 export function estaDentroDaJanela(date: Date = new Date(), horaFechamento = HORA_FECHAMENTO): boolean {
   const { hora, minuto, diaSemana } = getComponentesSP(date);
   return dentroDaJanela(hora, minuto, diaSemana, horaFechamento);
+}
+
+/**
+ * A data cai dentro da janela do PRIMEIRO CONTATO (07h-23h59, TODOS os dias, fuso SP)?
+ * Use só para a intro do Walker e o template de abertura — mensagens disparadas logo depois de o
+ * lead preencher o formulário. Fim de semana entra: o lead que aplica no sábado precisa ser
+ * atendido no sábado. Para follow-up e recuperação continue usando `estaDentroDaJanela`.
+ */
+export function estaDentroDaJanelaPrimeiroContato(date: Date = new Date()): boolean {
+  const { hora } = getComponentesSP(date);
+  return hora >= HORA_ABERTURA_PRIMEIRO_CONTATO && hora < HORA_FECHAMENTO_PRIMEIRO_CONTATO;
 }
 
 /**

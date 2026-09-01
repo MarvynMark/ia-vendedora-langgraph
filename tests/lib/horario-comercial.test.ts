@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { proximoHorarioComercial, agendarMaximizandoJanela, estaDentroDaJanela } from "../../src/lib/horario-comercial.ts";
+import { proximoHorarioComercial, agendarMaximizandoJanela, estaDentroDaJanela, estaDentroDaJanelaPrimeiroContato } from "../../src/lib/horario-comercial.ts";
 
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 function sp(date: Date) {
@@ -81,6 +81,33 @@ describe("estaDentroDaJanela (gate de disparos imediatos: abertura/intro)", () =
   });
   test("fim de semana (sábado 12:00 SP) → false", () => {
     expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)))).toBe(false);   // sábado
+  });
+});
+
+describe("estaDentroDaJanelaPrimeiroContato (intro/abertura: 07h-23h59, TODOS os dias)", () => {
+  // O bug que motivou esta janela: com a regra de follow-up (seg-sex 08h20-20h), os leads que
+  // aplicaram no sábado 29/08/26 só foram atendidos na segunda às 08h20 — 36 a 50h de espera,
+  // e o fim de semana fechou sem nenhuma venda.
+  test("sábado ao meio-dia → true (o lead de fim de semana é atendido no fim de semana)", () => {
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)))).toBe(true);
+  });
+  test("domingo às 21h (pico de captação) → true", () => {
+    // 2026-07-20 00:00 UTC = domingo 19/07 21:00 SP
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 20, 0, 0, 0)))).toBe(true);
+  });
+  test("21h e 23h em dia útil → true (21% dos leads chegam depois das 20h)", () => {
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 16, 0, 0, 0)))).toBe(true);  // qua 21:00 SP
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 16, 2, 30, 0)))).toBe(true); // qua 23:30 SP
+  });
+  test("madrugada segue bloqueada: 01h e 06h59 → false; 07h → true", () => {
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 15, 4, 0, 0)))).toBe(false);   // 01:00 SP
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 15, 9, 59, 0)))).toBe(false);  // 06:59 SP
+    expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 15, 10, 0, 0)))).toBe(true);   // 07:00 SP
+  });
+  test("é mais larga que a janela de follow-up (não a substitui)", () => {
+    const sabado = new Date(Date.UTC(2026, 6, 18, 15, 0, 0));
+    expect(estaDentroDaJanela(sabado)).toBe(false);                  // follow-up: não
+    expect(estaDentroDaJanelaPrimeiroContato(sabado)).toBe(true);    // primeiro contato: sim
   });
 });
 
