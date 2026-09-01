@@ -4,6 +4,7 @@ import type { ChatwootFollowUpPayload } from "../types/chatwoot.ts";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { atualizarKanbanTask } from "../services/chatwoot.ts";
 import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
+import { delayInicialMs } from "../lib/delays-followup.ts";
 import { primeiroNomeSaudacao } from "../lib/nome.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
@@ -76,20 +77,12 @@ async function processarTaskUpdated(payload: ChatwootFollowUpPayload) {
     return { status: "ignored", reason: "step_not_tracked" };
   }
 
-  // Calcular due_date conforme a etapa
-  // Delay do 1º toque ao entrar na etapa. Deve bater com STEPS_RASTREADOS em verificar-followups.ts.
-  let proximaData: Date;
-  if (newStepName.includes("novo lead")) {
-    proximaData = proximoHorarioComercial(new Date(), 5 * 60 * 1000); // 5 min
-  } else if (newStepName.includes("primeira mensagem")) {
-    proximaData = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000); // 1 dia (lead frio, acabou de receber a abertura)
-  } else if (newStepName.includes("conexão") || newStepName.includes("conexao")) {
-    proximaData = proximoHorarioComercial(new Date(), 1 * 60 * 60 * 1000); // 1h (lead morno, parou de responder — recupera no mesmo dia enquanto quente)
-  } else if (newStepName.includes("aguardando pagamento")) {
-    proximaData = proximoHorarioComercial(new Date(), 20 * 60 * 1000); // 20 min (cutucada rápida, sem interromper o checkout)
-  } else {
-    proximaData = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000); // amanhã
-  }
+  // Delay do 1º toque ao entrar na etapa (ver src/lib/delays-followup.ts). Em "Aguardando
+  // Pagamento" a descrição decide: com "link enviado" é lembrete (20min), sem é pós-preço (1h).
+  const proximaData = proximoHorarioComercial(
+    new Date(),
+    delayInicialMs(newStepName, payload.task.description ?? ""),
+  );
 
   // Ao mover para etapa que inicia nova sequência, zerar o contador de follow-ups
   // para evitar que o contador da etapa anterior faça o agente pular mensagens

@@ -2,6 +2,7 @@ import { env } from "../config/env.ts";
 import { listarKanbanTasks, atualizarKanbanTask, buscarConversa } from "../services/chatwoot.ts";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import { proximoHorarioComercial } from "./horario-comercial.ts";
+import { delayInicialMs } from "./delays-followup.ts";
 import { primeiroNomeSaudacao } from "./nome.ts";
 import { logger } from "./logger.ts";
 
@@ -22,12 +23,15 @@ export function idadeCardDias(createdAt: string | undefined, agoraMs = Date.now(
   return (agoraMs - ms) / (24 * 60 * 60 * 1000);
 }
 
+// O delay do 1º toque de cada etapa vem de delayInicialMs (src/lib/delays-followup.ts), que também
+// é usado pelo webhook em routes/followup.ts — os dois precisam concordar, e antes concordavam só
+// por um comentário "deve bater com".
 const STEPS_RASTREADOS = [
-  { id: 1,  name: "Novo Lead",            delayMs: 5  * 60 * 1000,            tipoFollowup: "template_inicial"  as const },
-  { id: 7,  name: "Primeira mensagem",    delayMs: 24 * 60 * 60 * 1000,       tipoFollowup: "template_abertura" as const },
-  { id: 10, name: "Conexao",              delayMs: 1  * 60 * 60 * 1000,       tipoFollowup: "followup"          as const },
-  { id: 8,  name: "Aguardando Pagamento", delayMs: 20 * 60 * 1000,            tipoFollowup: "lembrete"          as const },
-  { id: 12, name: "Nutrir",               delayMs: 3  * 24 * 60 * 60 * 1000,  tipoFollowup: "nutrir"            as const },
+  { id: 1,  name: "Novo Lead",            tipoFollowup: "template_inicial"  as const },
+  { id: 7,  name: "Primeira mensagem",    tipoFollowup: "template_abertura" as const },
+  { id: 10, name: "Conexao",              tipoFollowup: "followup"          as const },
+  { id: 8,  name: "Aguardando Pagamento", tipoFollowup: "lembrete"          as const },
+  { id: 12, name: "Nutrir",               tipoFollowup: "nutrir"            as const },
 ];
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -68,7 +72,7 @@ export async function verificarFollowupsPendentes() {
       try {
         // Sem due_date: agendar pela primeira vez
         if (!task.due_date) {
-          const proximaData = proximoHorarioComercial(new Date(), step.delayMs);
+          const proximaData = proximoHorarioComercial(new Date(), delayInicialMs(step.name, task.description ?? ""));
           await atualizarKanbanTask(accountId, task.id, { due_date: proximaData.toISOString() });
           logger.info("followup-timer", `due_date agendada para task ${task.id} (${task.title}) → ${proximaData.toISOString()}`);
           continue;
@@ -142,7 +146,7 @@ export async function verificarFollowupsPendentes() {
         // Avançar due_date imediatamente antes de disparar o grafo — evita re-disparo pelo próximo
         // ciclo do cron (a cada 5 min) caso o grafo demore ou a task permaneça "overdue" na API
         try {
-          const proximaProvisoria = proximoHorarioComercial(new Date(), step.delayMs);
+          const proximaProvisoria = proximoHorarioComercial(new Date(), delayInicialMs(step.name, task.description ?? ""));
           await atualizarKanbanTask(accountId, task.id, { due_date: proximaProvisoria.toISOString() });
           logger.info("followup-timer", `due_date avançada preventivamente para task ${task.id} → ${proximaProvisoria.toISOString()}`);
         } catch (e) {
