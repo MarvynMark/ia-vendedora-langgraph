@@ -54,14 +54,21 @@ export function blocoIntroduzSegundoPlano(idConversa: string | number, bloco: st
   return true;
 }
 
-// "Qual desses planos encaixa melhor no seu momento?" — o fecho que devolve a decisão pro lead.
-// O prompt proíbe, mas quando o LLM desobedece e a trava acima derruba os outros planos, essa
-// pergunta fica órfã ("qual desses?" com um plano só na tela), o que é pior que o cardápio.
+// "Qual desses planos encaixa melhor no seu momento?" — quando a trava acima derruba um plano,
+// uma pergunta de escolha que se referia a ele fica órfã ("qual desses?" apontando pra algo que o
+// lead não recebeu), o que é pior que o cardápio.
 const RE_ESCOLHA_DE_CARDAPIO =
   /qu(al|ais)\s+(desses|dessas|destes|destas|delas|deles)\b|qual\s+(plano|op[çc][ãa]o)\s+(voc[êe]|faz|encaixa|prefere)/i;
+
+// O fecho OFICIAL do pitch ("Qual desses encaixa melhor pro seu momento? O Anual Completo ou o
+// Semestral? Pode ser transparente comigo.") casa com o regex acima, mas nomeia os dois planos que
+// SOBREVIVEM à trava — nunca é órfão. Sem esta exceção, um turno em que a trava barrasse um
+// terceiro plano deixaria o lead com os preços e sem nenhuma pergunta.
+const RE_FECHO_OFICIAL = /transparente comigo/i;
 
 /** True se a frase pede ao lead que escolha entre planos que a trava acabou de remover do turno. */
 export function blocoPerguntaEscolhaDeCardapio(idConversa: string | number, bloco: string): boolean {
   if (!travouNoTurno.has(String(idConversa))) return false;
+  if (RE_FECHO_OFICIAL.test(bloco ?? "")) return false;
   return RE_ESCOLHA_DE_CARDAPIO.test(bloco ?? "");
 }

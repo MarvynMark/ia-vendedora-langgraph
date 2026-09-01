@@ -107,3 +107,23 @@ describe("blocoPerguntaEscolhaDeCardapio", () => {
     expect(blocoPerguntaEscolhaDeCardapio("t2", "Quer que eu já te passe o link?")).toBe(false);
   });
 });
+
+describe("fecho oficial do pitch", () => {
+  beforeEach(() => iniciarTurnoDePreco("t3"));
+
+  test("nunca é derrubado, mesmo quando a trava barrou um terceiro plano", () => {
+    blocoIntroduzSegundoPlano("t3", "O Anual Completo fica em 12x de R$ 394");
+    blocoIntroduzSegundoPlano("t3", "Tem também o Semestral, 12x de R$ 197");
+    expect(blocoIntroduzSegundoPlano("t3", "E o Trimestral por 12x de R$ 98,35")).toBe(true);
+    expect(
+      blocoPerguntaEscolhaDeCardapio("t3", "Qual desses encaixa melhor pro seu momento? O Anual Completo ou o Semestral? Pode ser transparente comigo."),
+    ).toBe(false);
+  });
+
+  test("a pergunta de escolha SEM a assinatura do fecho continua sendo derrubada", () => {
+    blocoIntroduzSegundoPlano("t3", "O Anual fica em 12x de R$ 315");
+    blocoIntroduzSegundoPlano("t3", "E o Semestral por 12x de R$ 197");
+    blocoIntroduzSegundoPlano("t3", "E o Trimestral por 12x de R$ 98,35");
+    expect(blocoPerguntaEscolhaDeCardapio("t3", "Qual desses três você prefere?")).toBe(true);
+  });
+});
