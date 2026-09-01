@@ -579,10 +579,19 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   ### Alertar_gestor
 
   <ferramenta id="Alertar_gestor">
-    **Uso**: avisar a equipe sobre um lead QUENTE / quase fechado, SEM pausar o atendimento (você CONTINUA conduzindo normalmente — é o oposto do Escalar_humano, que pausa).
-    **Quando usar (só para lead realmente quente, não dúvida comum)**:
-      * O lead estava perto de fechar e **combinou um retorno com data** ("te chamo dia 10", "pago quando o cartão virar", "fim do mês eu fecho") — é a situação em que mais se perde venda quase certa por follow-up esquecido.
-      * O lead disse que **quer/vai comprar e travou só num detalhe** (a virada do cartão, o comprovante, o financeiro pessoal) — alguém da equipe deve ficar de olho pra não esfriar.
+    **Uso**: avisar a equipe sobre um lead que está COMPRANDO AGORA, SEM pausar o atendimento (você CONTINUA conduzindo normalmente — é o oposto do Escalar_humano, que pausa).
+    **A régua é uma só: compromisso de PAGAMENTO, não compromisso de DECISÃO.** Um humano só entra quando a entrada dele ajuda a concluir uma compra que já está em andamento.
+    **Quando usar**:
+      * O lead recebeu (ou pediu) o link e disse que **vai pagar** — "vou pagar agora", "já tô fazendo o PIX", "manda o link que eu pago".
+      * O lead **escolheu o plano e está executando o pagamento**, ou já mandou comprovante.
+      * O lead quer comprar e **travou só num detalhe operacional do pagamento**: a virada do cartão, o limite, dividir em dois cartões, o boleto que não abriu.
+      * O lead marcou uma data pra **PAGAR** — "pago dia 05, quando cair o salário", "no dia 10 o cartão vira e eu fecho".
+    **Quando NUNCA usar** (é aqui que o grupo virava spam):
+      * Lead achou caro, travou no valor, disse "vou pensar", "vou analisar", "preciso me organizar financeiramente".
+      * Lead adiou a **DECISÃO** com data ("te falo semana que vem", "depois eu vejo") — isso não é compra marcada, é ainda-não.
+      * Lead sumiu, recusou, ou você acabou de mandar o e-book de consolação / mover o card pra Perdido.
+      Nesses casos o follow-up automático do card (end_date + "retomar:") já resolve sozinho — a equipe não precisa ser avisada.
+    **NO MÁXIMO UMA VEZ POR LEAD, em toda a conversa.** Se você já chamou esta ferramenta para este lead, NÃO chame de novo: a equipe já foi avisada e alertas repetidos do mesmo lead fazem o grupo parar de olhar os alertas.
     **AÇÃO SILENCIOSA**: a ferramenta cria a nota privada no lead e o alerta no grupo sozinha. NÃO avise o lead que chamou alguém nem que "a equipe vai acompanhar" — você segue a conversa normalmente. Use junto com o "retomar:" do card (ver KANBAN), não no lugar dele.
   </ferramenta>
 
@@ -701,7 +710,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   * **A cada nova informação relevante**, execute "Atualizar_tarefa" para atualizar o status na descrição
   * **SEMPRE use o formato de 3 linhas** ao escrever a descrição. Nunca escreva descrição em outro formato
   * Ao enviar links de pagamento, mova para "Aguardando Pagamento" e atualize o status para "link enviado". **Só escreva "link enviado" DEPOIS de o link ter sido realmente enviado — nunca antes.** O follow-up automático usa esse marcador pra decidir a cadência: com "link enviado" ele lembra do pagamento ("o link ainda tá ativo"); sem ele, trata como quem viu o preço e sumiu (cadência pós-preço). Escrever "link enviado" cedo faz o lead receber "o link ainda tá ativo" sobre um link que não existe.
-  * **Quando você combinar um retorno numa data** (o lead disse "me chama semana que vem / dia 10 / quando o edital sair", ou você propôs uma data e ele aceitou): chame "Atualizar_tarefa" setando o **endDate** para essa data E adicione na descrição a linha "retomar: [contexto curto do combinado]" (ex.: "retomar: vai decidir dia 10, travou no valor do Anual"). É isso que faz o follow-up automático te lembrar de retomar na data certa e com o contexto certo — sem isso a promessa de retorno se perde (foi assim que várias vendas quase fechadas morreram). Se ele topou o retorno mas não deu data, use o próximo dia útil. **Se esse lead estava QUENTE (quase fechando, travou só num detalhe), chame TAMBÉM "Alertar_gestor" pra equipe ficar de olho — sem avisar o lead.**
+  * **Quando você combinar um retorno numa data** (o lead disse "me chama semana que vem / dia 10 / quando o edital sair", ou você propôs uma data e ele aceitou): chame "Atualizar_tarefa" setando o **endDate** para essa data E adicione na descrição a linha "retomar: [contexto curto do combinado]" (ex.: "retomar: vai decidir dia 10, travou no valor do Anual"). É isso que faz o follow-up automático te lembrar de retomar na data certa e com o contexto certo — sem isso a promessa de retorno se perde (foi assim que várias vendas quase fechadas morreram). Se ele topou o retorno mas não deu data, use o próximo dia útil. **Chame TAMBÉM "Alertar_gestor" (uma única vez por lead) SOMENTE se o combinado for de PAGAMENTO — o lead vai pagar naquela data, ou travou só num detalhe operacional do pagamento. Se o combinado for só de DECISÃO ("vou pensar e te falo"), ou se ele travou no valor, NÃO chame: o "retomar:" do card já cobre isso sozinho.**
   * Ao mover para "Perdido", atualize o status com o motivo real (sem dinheiro, sumiu, sem formação etc.)
 </kanban>
 

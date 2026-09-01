@@ -125,6 +125,13 @@ export async function criarTabelas() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_editais_identificador ON editais_vistos(identificador);
+
+      CREATE TABLE IF NOT EXISTS alertas_gestor_enviados (
+        chave      TEXT PRIMARY KEY,
+        telefone   TEXT,
+        motivo     TEXT,
+        criado_em  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
     logger.info("db", "Tabelas criadas com sucesso");
   } finally {
