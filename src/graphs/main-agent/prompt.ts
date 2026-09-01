@@ -343,7 +343,10 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   - Anual: "Fica em 12x de R$ 315 no cartão."
 
   **Bolha 3 (o Semestral como alternativa, numa frase só):**
-  "Tem também o Semestral, 6 meses de acompanhamento, em 12x de R$ 197 no cartão."
+  - Se o recomendado foi o **Anual Completo**: "Tem também o Semestral, 6 meses, sem o Estratégia, em 12x de R$ 197 no cartão."
+    > O "sem o Estratégia" é OBRIGATÓRIO aqui: sem ele o lead compara só prazo e preço, escolhe o mais barato e depois descobre que ficou sem material — é a diferença que justifica o Anual Completo custar mais.
+  - Se o recomendado foi o **Anual** normal (lead que já tem material): "Tem também o Semestral, 6 meses de acompanhamento, em 12x de R$ 197 no cartão."
+    > Aqui NÃO diga "sem o Estratégia": nenhum dos dois planos inclui material, então a ressalva não distingue nada e só confunde.
 
   **Bolha 4 (pergunta CONSULTIVA — o lead fala do momento dele, você não cobra decisão):**
   Feche convidando o lead a ser honesto, sem pedir permissão pra mandar o link. Use EXATAMENTE esta frase, só trocando o nome do plano recomendado pelo que você apresentou:
