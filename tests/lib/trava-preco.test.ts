@@ -11,28 +11,23 @@ function filtrarTurno(idConversa: string, frases: string[]): string[] {
 describe("trava de cardápio (blocoIntroduzSegundoPlano)", () => {
   beforeEach(() => iniciarTurnoDePreco("t1"));
 
-  test("pitch de um plano só passa inteiro", () => {
+  test("o pitch de dois planos passa inteiro (Anual recomendado + Semestral)", () => {
     const frases = [
-      "Maravilha, o plano que faz sentido pro teu momento é o Anual Completo",
-      "Fica em 12x de R$ 394 no cartão ou R$ 3.997 à vista no PIX, já com a Premium do Estratégia inclusa",
-      "Você testa por 7 dias e, se não for pra você, devolvo cada centavo. Cartão ou boleto parcelado?",
+      "Maravilha, o plano que faz sentido pro teu momento é o Anual Completo, que já vem com a Premium do Estratégia inclusa",
+      "Fica em 12x de R$ 394 no cartão",
+      "Tem também o Semestral, 6 meses de acompanhamento, em 12x de R$ 197 no cartão",
+      "Algum desses encaixa pro seu momento? Pode ser transparente comigo",
     ];
     expect(filtrarTurno("t1", frases)).toEqual(frases);
   });
 
-  test("cardápio: mantém o primeiro plano e derruba os demais (caso da conv 5917)", () => {
+  test("o TERCEIRO plano é derrubado — é ele que vira cardápio (caso da conv 5917)", () => {
     const frases = [
-      "Além do Anual Completo, temos o plano Anual normal, que é só a mentoria",
-      "Ele fica em 12x de R$ 315 no cartão ou R$ 3.197 à vista no PIX",
-      "Se você preferir algo mais enxuto, tem o Semestral, por 12x de R$ 197 ou R$ 1.997 à vista",
-      "Se precisar de algo ainda mais enxuto, tem o Trimestral, por 12x de R$ 98,35 ou R$ 997 à vista",
-      "Qual desses planos você acha que encaixa melhor no seu momento?",
+      "Ele fica em 12x de R$ 315 no cartão",
+      "Se você preferir algo mais enxuto, tem o Semestral, por 12x de R$ 197",
+      "Se precisar de algo ainda mais enxuto, tem o Trimestral, por 12x de R$ 98,35",
     ];
-    expect(filtrarTurno("t1", frases)).toEqual([
-      "Além do Anual Completo, temos o plano Anual normal, que é só a mentoria",
-      "Ele fica em 12x de R$ 315 no cartão ou R$ 3.197 à vista no PIX",
-      "Qual desses planos você acha que encaixa melhor no seu momento?",
-    ]);
+    expect(filtrarTurno("t1", frases)).toEqual([frases[0]!, frases[1]!]);
   });
 
   test("frases sem preço nunca são derrubadas", () => {
@@ -53,16 +48,19 @@ describe("trava de cardápio (blocoIntroduzSegundoPlano)", () => {
     expect(filtrarTurno("t1", frases)).toEqual(frases);
   });
 
-  test("a primeira frase com preço passa mesmo trazendo dois planos (melhor que ficar sem preço)", () => {
-    const frases = ["O Anual é 12x de R$ 315 e o Semestral 12x de R$ 197", "E o Trimestral sai por 12x de R$ 98,35"];
+  test("a primeira frase com preço passa mesmo trazendo três planos de uma vez", () => {
+    const frases = [
+      "O Anual é 12x de R$ 315, o Semestral 12x de R$ 197 e o Trimestral 12x de R$ 98,35",
+      "E ainda tem o Anual Completo por 12x de R$ 394",
+    ];
     expect(filtrarTurno("t1", frases)).toEqual([frases[0]!]);
   });
 
   test("a trava é por TURNO: o downsell do turno seguinte é permitido", () => {
-    filtrarTurno("t1", ["O Anual fica em 12x de R$ 315"]);
-    // turno seguinte, depois de o lead recusar
-    expect(filtrarTurno("t1", ["Então o Semestral: 12x de R$ 197 ou R$ 1.997 à vista"])).toEqual([
-      "Então o Semestral: 12x de R$ 197 ou R$ 1.997 à vista",
+    filtrarTurno("t1", ["O Anual fica em 12x de R$ 315", "Tem também o Semestral, 12x de R$ 197"]);
+    // turno seguinte, depois de o lead recusar os dois
+    expect(filtrarTurno("t1", ["Então o Trimestral: 12x de R$ 98,35 no cartão"])).toEqual([
+      "Então o Trimestral: 12x de R$ 98,35 no cartão",
     ]);
   });
 
@@ -71,36 +69,40 @@ describe("trava de cardápio (blocoIntroduzSegundoPlano)", () => {
     iniciarTurnoDePreco("B");
     expect(blocoIntroduzSegundoPlano("A", "O Anual fica em 12x de R$ 315")).toBe(false);
     expect(blocoIntroduzSegundoPlano("B", "O Semestral fica em 12x de R$ 197")).toBe(false);
-    expect(blocoIntroduzSegundoPlano("A", "O Semestral fica em 12x de R$ 197")).toBe(true);
+    expect(blocoIntroduzSegundoPlano("A", "Tem também o Semestral, 12x de R$ 197")).toBe(false); // 2º plano de A
+    expect(blocoIntroduzSegundoPlano("A", "E o Trimestral, 12x de R$ 98,35")).toBe(true);        // 3º plano de A
+    expect(blocoIntroduzSegundoPlano("B", "E o Anual Completo, 12x de R$ 394")).toBe(false);     // 2º plano de B
   });
 
-  test("trilha de médico: o segundo plano do médico também é travado", () => {
+  test("trilha de médico: os dois planos de médico passam pela trava (é o prompt que a restringe a um)", () => {
     const frases = [
-      "O Médico Legista Semestral fica em 12x de R$ 394 ou R$ 3.997 à vista",
+      "O Médico Legista Semestral fica em 12x de R$ 394 no cartão",
       "Se quiser um plano mais longo, o Médico Legista Anual sai por 12x de R$ 641",
     ];
-    expect(filtrarTurno("t1", frases)).toEqual([frases[0]!]);
+    expect(filtrarTurno("t1", frases)).toEqual(frases);
   });
 });
 
 describe("blocoPerguntaEscolhaDeCardapio", () => {
   beforeEach(() => iniciarTurnoDePreco("t2"));
 
-  test("derruba a pergunta órfã depois de a trava remover os outros planos", () => {
+  test("derruba a pergunta órfã depois de a trava remover um terceiro plano", () => {
     expect(blocoIntroduzSegundoPlano("t2", "O Anual fica em 12x de R$ 315")).toBe(false);
-    expect(blocoIntroduzSegundoPlano("t2", "E o Semestral por 12x de R$ 197")).toBe(true);
-    expect(blocoPerguntaEscolhaDeCardapio("t2", "Qual desses planos encaixa melhor no seu momento?")).toBe(true);
-    expect(blocoPerguntaEscolhaDeCardapio("t2", "Qual dessas opções faz mais sentido pra você?")).toBe(true);
+    expect(blocoIntroduzSegundoPlano("t2", "E o Semestral por 12x de R$ 197")).toBe(false);
+    expect(blocoIntroduzSegundoPlano("t2", "E o Trimestral por 12x de R$ 98,35")).toBe(true);
+    expect(blocoPerguntaEscolhaDeCardapio("t2", "Qual desses três planos encaixa melhor no seu momento?")).toBe(true);
   });
 
-  test("sem trava no turno, a pergunta passa (pitch de um plano só não é afetado)", () => {
+  test("sem trava no turno, a pergunta de escolha passa (o pitch de dois planos precisa dela)", () => {
     blocoIntroduzSegundoPlano("t2", "O Anual fica em 12x de R$ 315");
-    expect(blocoPerguntaEscolhaDeCardapio("t2", "Qual desses planos encaixa melhor?")).toBe(false);
+    blocoIntroduzSegundoPlano("t2", "Tem também o Semestral, 12x de R$ 197");
+    expect(blocoPerguntaEscolhaDeCardapio("t2", "Algum desses encaixa pro seu momento?")).toBe(false);
   });
 
   test("a pergunta da forma de pagamento nunca é derrubada", () => {
     blocoIntroduzSegundoPlano("t2", "O Anual fica em 12x de R$ 315");
     blocoIntroduzSegundoPlano("t2", "E o Semestral por 12x de R$ 197");
+    blocoIntroduzSegundoPlano("t2", "E o Trimestral por 12x de R$ 98,35");
     expect(blocoPerguntaEscolhaDeCardapio("t2", "Cartão ou o pix/boleto parcelado sem precisar de limite?")).toBe(false);
     expect(blocoPerguntaEscolhaDeCardapio("t2", "Quer que eu já te passe o link?")).toBe(false);
   });
