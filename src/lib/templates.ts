@@ -30,10 +30,16 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência de recuperação: Conexão (janela aberta) ---
   // Leads que já conversaram mas pararam de responder
+  // Os quatro toques abrem de formas DIFERENTES de propósito: quando todos começavam com
+  // "Oi [Nome]," o lead reconhecia o padrão de cobrança automática já na primeira linha
+  // (conv 6675, dois toques no mesmo dia e com a mesma abertura).
   conexao_followup_1: "Oi [Nome], lembrei de você{{ e da sua preparação pra [concurso]}}. Ficou alguma dúvida do que a gente conversou, ou foi mais questão de tempo?",
+  // Toque 2 (novo): não cobra resposta, entrega uma ideia. Quebra a sequência de perguntas.
+  conexao_followup_valor:
+    "Uma coisa que eu vejo direto em quem estuda sozinho{{ pro [concurso]}}: a pessoa não estuda pouco, estuda sem ordem. Revisa o que já sabe e adia o que mais cai. É exatamente isso que eu organizo no primeiro plano que monto pra você.",
   conexao_followup_2:
-    "Oi [Nome], deixa eu te perguntar direto: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
-  conexao_followup_3: "Oi [Nome], se ainda fizer sentido pra você, consigo te mostrar o próximo passo de forma bem tranquila. Quer?",
+    "Deixa eu te perguntar direto, [Nome]: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
+  conexao_followup_3: "Se ainda fizer sentido pra você, [Nome], consigo te mostrar o próximo passo de forma bem tranquila. Quer?",
   conexao_encerramento:
     "Oi [Nome], vou te dar um espaço, sem pressão nenhuma. Se ficou alguma dúvida do que a gente conversou, ou se mais pra frente você quiser retomar, é só me chamar que eu te ajudo.",
 

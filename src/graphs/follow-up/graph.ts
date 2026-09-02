@@ -119,17 +119,21 @@ export async function classificar(state: FollowUpStateType) {
 
 // Sequência de recuperação para leads em Conexão (já conversaram mas pararam de responder)
 const SEQUENCIA_RECUPERACAO_CONEXAO = [
-  "conexao_followup_1",
-  "conexao_followup_2",
-  "conexao_followup_3",
+  "conexao_followup_1",     // t1: mesmo dia — ficou dúvida ou foi questão de tempo?
+  "conexao_followup_valor", // t2: dia seguinte — entrega uma ideia, não cobra resposta
+  "conexao_followup_2",     // t3: +2 dias — o que travou: valor, tempo ou dúvida?
+  "conexao_followup_3",     // t4: +3 dias — o próximo passo, sem pressão
 ] as const;
 
-// Toque 1 dispara no delay INICIAL da etapa (1h, ver STEPS_RASTREADOS). Depois: toque 2 "espremido" pra dentro
-// da janela grátis (ideal 24h + clamp da janela); toque 3 no Dia 2 (pago); encerramento Dia 4.
-const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 48 * 60 * 60 * 1000] as const;
+// Toque 1 dispara no delay INICIAL da etapa (3h, ver lib/delays-followup.ts). Depois, UM POR DIA e
+// espaçando: +1 dia, +2 dias, +3 dias, encerramento +3 dias. Antes eram [24h, 24h, 48h] e o
+// agendarMaximizandoJanela puxava o toque 2 pra dentro da janela grátis, o que colocava DOIS
+// toques no mesmo dia (conv 6675: 08h21 e 19h33). Aqui o espaçamento vale mais que a economia do
+// template — por isso esta sequência agenda com proximoHorarioComercial, sem "espremer".
+const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 2 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
 
 // Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
-const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida"] as const;
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida", "conexao_duvida"] as const;
 
 // Sequência pós-preço (viu o pitch e sumiu — está em "Aguardando Pagamento" sem "link enviado"):
 // cutucada de reforço → versão enxuta 6 meses → parcelado → garantia → prova social (D+7) →
@@ -282,7 +286,12 @@ async function agenteFollowup(state: FollowUpStateType) {
   // Remove o marcador "retomar:" após usá-lo, pra o acknowledge do combinado não repetir a cada toque.
   if (temRetomarAgendado) descricaoAtualizada = descricaoAtualizada.replace(/[^\S\n]*retomar:[^\n]*\n?/i, "").trimEnd();
   const delayProximo = delays[contador] ?? 24 * 60 * 60 * 1000;
-  const proxima = agendarMaximizandoJanela(new Date(), delayProximo, msRestantes, { minGapMs: MIN_GAP_JANELA_MS });
+  // Pós-preço continua "espremendo" pra dentro da janela grátis (a cadência é curta e o áudio do
+  // Walker SÓ pode ser enviado dentro dela). A Conexão, não: ali o espaçamento em dias vale mais
+  // que economizar o template pago — espremer punha dois toques no mesmo dia (conv 6675).
+  const proxima = isPosPreco
+    ? agendarMaximizandoJanela(new Date(), delayProximo, msRestantes, { minGapMs: MIN_GAP_JANELA_MS })
+    : proximoHorarioComercial(new Date(), delayProximo);
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,
     due_date: proxima.toISOString(),
