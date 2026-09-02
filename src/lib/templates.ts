@@ -25,8 +25,12 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
   olhinho_followup: "👀",
+  // ⚠️ ATENÇÃO: este é o texto REAL aprovado na Meta, e ele é muito mais frio que o resto do
+  // roteiro ("vou encerrar seu atendimento para organizar as prioridades"). É o fallback de
+  // encerramento de VÁRIAS sequências, então é o que o lead lê quando a janela está fechada.
+  // Enquanto um substituto não for aprovado, o registro precisa refletir a realidade.
   encerramento_02:
-    "Oi [Nome], não quero te encher, então vou deixar a porta aberta por aqui. Se em algum momento fizer sentido organizar seus estudos com um direcionamento, é só me dar um sinal que eu te ajudo, no seu tempo.",
+    "Como você não respondeu, vou encerrar seu atendimento por aqui para organizar as prioridades.\nSe decidir começar sua preparação de forma estratégica, me chama aqui, ok?",
 
   // --- Sequência de recuperação: Conexão (janela aberta) ---
   // Leads que já conversaram mas pararam de responder
@@ -44,7 +48,13 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
     "Oi [Nome], vou te dar um espaço, sem pressão nenhuma. Se ficou alguma dúvida do que a gente conversou, ou se mais pra frente você quiser retomar, é só me chamar que eu te ajudo.",
 
   // --- Sequência de recuperação: Conexão (janela fechada — Meta templates) ---
-  conexao_duvida: "Ficou alguma dúvida sobre o que conversamos? Pode me chamar aqui sem compromisso",
+  // ⚠️ Os textos abaixo espelham o que está APROVADO na Meta (conferido via
+  // /inboxes/{id}.message_templates em 02/09). Eles são usados como FALLBACK fora da janela de
+  // 24h: quem entrega a mensagem é a Meta, e este texto serve para o histórico do Chatwoot
+  // registrar o que o lead de fato leu. Se mudar o template na Meta, mude aqui também.
+  conexao_duvida: "Ficou alguma dúvida sobre o que falamos?",
+  conexao_1: "Oi [Nome], lembrei de você. Ficou alguma dúvida do que a gente conversou, ou foi mais questão de tempo?",
+  conexao_2: "deixa eu te perguntar: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
 
   // --- Sequência pós-preço: Conexão (janela aberta) ---
@@ -81,6 +91,8 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Retomada agendada: o lead combinou um retorno numa data (card tem "retomar: ...") ---
   // Reconhece o combinado (não contradiz nem fala de link fantasma) — corrige o caso "Confirmar o quê?".
+  encerramento: "Olá [Nome], antes de eu encerrar por aqui: ficou com dúvida em alguma coisa? Se ainda fizer sentido, é só me dar um sinal.",
+
   retomada_agendada:
     "Oi [Nome], como a gente tinha combinado, tô passando aqui pra retomar. Ficou alguma dúvida sobre a mentoria{{ pro [concurso]}}, ou quer que eu já te ajude a dar o próximo passo?",
 
@@ -101,7 +113,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência de lembrete: Aguardando Pagamento (janela fechada — Meta templates) ---
   lembrete_acesso:
-    "Quando você confirmar o pagamento, te envio todos os acessos na hora pra começar ainda hoje",
+    "Quando você confirmar, te envio todos os acessos na hora pra começar ainda hoje.",
   lembrete_urgencia_meta:
     "Oi, sei que a correria toma conta. Se quiser finalizar quando der, é só me chamar que eu te ajudo sem complicação. O que ficou pendente?",
   // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
