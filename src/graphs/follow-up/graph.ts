@@ -118,22 +118,31 @@ export async function classificar(state: FollowUpStateType) {
 // prompt do agente principal e com o gate de material.
 
 // Sequência de recuperação para leads em Conexão (já conversaram mas pararam de responder)
+// ⚠️ A ORDEM É DITADA PELA JANELA DE 24h. O toque de VALOR é o único com personalização que não
+// tem template Meta equivalente, então ele PRECISA sair dentro da janela gratuita — e o único
+// toque garantidamente dentro dela é o primeiro (+3h da última mensagem do lead; a janela só
+// fecha em +24h). Do segundo em diante a cadência espaça por dias e já cai fora da janela, onde
+// só o template aprovado pela Meta chega ao lead.
 const SEQUENCIA_RECUPERACAO_CONEXAO = [
-  "conexao_followup_1",     // t1: mesmo dia — ficou dúvida ou foi questão de tempo?
-  "conexao_followup_valor", // t2: dia seguinte — entrega uma ideia, não cobra resposta
+  "conexao_followup_valor", // t1: +3h, DENTRO da janela — entrega uma ideia, não cobra resposta
+  "conexao_followup_1",     // t2: +1 dia — ficou dúvida ou foi questão de tempo?
   "conexao_followup_2",     // t3: +2 dias — o que travou: valor, tempo ou dúvida?
   "conexao_followup_3",     // t4: +3 dias — o próximo passo, sem pressão
 ] as const;
 
-// Toque 1 dispara no delay INICIAL da etapa (3h, ver lib/delays-followup.ts). Depois, UM POR DIA e
-// espaçando: +1 dia, +2 dias, +3 dias, encerramento +3 dias. Antes eram [24h, 24h, 48h] e o
+// Toque 1 dispara no delay INICIAL da etapa (3h, ver lib/delays-followup.ts) e é o único que cai
+// dentro da janela gratuita. Depois, UM POR DIA e espaçando: +1 dia, +2 dias, +3 dias,
+// encerramento +3 dias. Antes eram [24h, 24h, 48h] e o
 // agendarMaximizandoJanela puxava o toque 2 pra dentro da janela grátis, o que colocava DOIS
 // toques no mesmo dia (conv 6675: 08h21 e 19h33). Aqui o espaçamento vale mais que a economia do
 // template — por isso esta sequência agenda com proximoHorarioComercial, sem "espremer".
 const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 2 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
 
 // Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
-const TEMPLATE_FALLBACK_CONEXAO = ["conexao_1", "conexao_2", "conexao_duvida", "conexao_duvida"] as const;
+// O t1 quase nunca usa o seu (sai a +3h, dentro da janela); quando usar, vai o conexao_duvida,
+// que é o único destes com texto local — conexao_1 e conexao_2 estão aprovados na Meta mas não
+// têm o texto em CONTEUDO_TEMPLATES, então o registro da conversa não reflete o que o lead leu.
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_1", "conexao_2", "conexao_duvida"] as const;
 
 // Sequência pós-preço (viu o pitch e sumiu — está em "Aguardando Pagamento" sem "link enviado"):
 // cutucada de reforço → versão enxuta 6 meses → parcelado → garantia → prova social (D+7) →
