@@ -25,12 +25,12 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
   olhinho_followup: "👀",
-  // ⏳ AGUARDANDO SYNC DO CHATWOOT. Aprovado na Meta em 02/09 para substituir o encerramento_02,
+  // Fallback de encerramento de VÁRIAS sequências — a ÚLTIMA mensagem que o lead recebe quando a
+  // janela de 24h já fechou. Aprovado na Meta e sincronizado no Chatwoot em 02/09, substituindo o
+  // encerramento_02,
   // cujo texto aprovado é burocrático e destoa do roteiro ("Como você não respondeu, vou encerrar
   // seu atendimento por aqui para organizar as prioridades") — e ninguém via, porque o CRM exibia
-  // o texto local. O enviarTemplate passa o NOME pelo Chatwoot, que só repassa à Meta templates
-  // da sua lista sincronizada; enquanto o _03 não aparecer lá, trocar o uso quebraria os
-  // encerramentos. Assim que sincronizar, é só apontar os 3 usos em follow-up/graph.ts para cá.
+  // o texto local.
   encerramento_03:
     "Vou deixar a porta aberta por aqui. Se em algum momento fizer sentido organizar seus estudos com um direcionamento, é só me dar um sinal que eu te ajudo, no seu tempo.",
   // Mantido só para leitura de histórico antigo — NÃO usar em sequência nova.

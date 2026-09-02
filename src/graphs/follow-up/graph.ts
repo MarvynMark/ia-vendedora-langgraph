@@ -256,7 +256,7 @@ async function agenteFollowup(state: FollowUpStateType) {
   // Personaliza com concurso/dificuldade do formulário (só chega ao lead na janela aberta —
   // fora dela usa o template Meta puro; ver textoEnviar abaixo). campos já buscado acima.
   const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsgEfetivo] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
-  const templateFallback = temRetomarAgendado ? "conexao_duvida" : (fallbacks[contador] ?? "encerramento_02");
+  const templateFallback = temRetomarAgendado ? "conexao_duvida" : (fallbacks[contador] ?? "encerramento_03");
   // Fora da janela o lead recebe o template Meta (só {{1}}=nome). O texto REGISTRADO no Chatwoot
   // precisa refletir isso: substitui o nome e remove os segmentos {{ }} de concurso que o template
   // Meta não envia. Sem isso o registro mostrava "[Nome]" cru (ou vazio, quando a chave não existia).
@@ -355,7 +355,7 @@ async function agenteLembrete(state: FollowUpStateType) {
   }
   const nomeMsg = seqLembrete[contador]!;
   const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
-  const templateFallback = fallbackLembrete[contador] ?? "encerramento_02";
+  const templateFallback = fallbackLembrete[contador] ?? "encerramento_03";
   // Fora da janela o registro no Chatwoot deve refletir o template Meta ({{1}}=nome), não o
   // "[Nome]" cru — substitui o nome (e remove segmentos {{ }} caso existam).
   const textoFallback = CONTEUDO_TEMPLATES[templateFallback] ?? CONTEUDO_TEMPLATES[nomeMsg] ?? "";
@@ -497,7 +497,7 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   // Contador >= 3: todas as mensagens enviadas → enviar encerramento e mover para Nutrir
   if (contador >= SEQUENCIA_RECUPERACAO_PM.length) {
     logger.info("follow-up", "Sequência Primeira mensagem esgotada — enviando encerramento");
-    const conteudoEnc = substituirNome(CONTEUDO_TEMPLATES["encerramento_02"] ?? "", state.title);
+    const conteudoEnc = substituirNome(CONTEUDO_TEMPLATES["encerramento_03"] ?? "", state.title);
     try {
       if (dentroJanela && conteudoEnc) {
         await enviarMensagem(state.accountId, state.conversationId, conteudoEnc);
