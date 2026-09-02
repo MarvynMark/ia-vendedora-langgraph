@@ -25,10 +25,15 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // --- Compartilhados por outras sequências (lembrete/conexão/pós-preço) ---
   ta_ai: "Olá, tá por ai?",
   olhinho_followup: "👀",
-  // ⚠️ ATENÇÃO: este é o texto REAL aprovado na Meta, e ele é muito mais frio que o resto do
-  // roteiro ("vou encerrar seu atendimento para organizar as prioridades"). É o fallback de
-  // encerramento de VÁRIAS sequências, então é o que o lead lê quando a janela está fechada.
-  // Enquanto um substituto não for aprovado, o registro precisa refletir a realidade.
+  // ⏳ AGUARDANDO SYNC DO CHATWOOT. Aprovado na Meta em 02/09 para substituir o encerramento_02,
+  // cujo texto aprovado é burocrático e destoa do roteiro ("Como você não respondeu, vou encerrar
+  // seu atendimento por aqui para organizar as prioridades") — e ninguém via, porque o CRM exibia
+  // o texto local. O enviarTemplate passa o NOME pelo Chatwoot, que só repassa à Meta templates
+  // da sua lista sincronizada; enquanto o _03 não aparecer lá, trocar o uso quebraria os
+  // encerramentos. Assim que sincronizar, é só apontar os 3 usos em follow-up/graph.ts para cá.
+  encerramento_03:
+    "Vou deixar a porta aberta por aqui. Se em algum momento fizer sentido organizar seus estudos com um direcionamento, é só me dar um sinal que eu te ajudo, no seu tempo.",
+  // Mantido só para leitura de histórico antigo — NÃO usar em sequência nova.
   encerramento_02:
     "Como você não respondeu, vou encerrar seu atendimento por aqui para organizar as prioridades.\nSe decidir começar sua preparação de forma estratégica, me chama aqui, ok?",
 
@@ -55,7 +60,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   conexao_duvida: "Ficou alguma dúvida sobre o que falamos?",
   conexao_1: "Oi [Nome], lembrei de você. Ficou alguma dúvida do que a gente conversou, ou foi mais questão de tempo?",
   conexao_2: "deixa eu te perguntar: o que mais te travou até agora, foi o valor, o tempo ou ficou alguma dúvida sobre a mentoria?",
-  // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
+  // fallbacks: olhinho_followup + encerramento_03 (já definidos acima)
 
   // --- Sequência pós-preço: Conexão (janela aberta) ---
   // Acionada quando lead viu o pitch de preço e sumiu (description contém "status: proposta_apresentada")
@@ -87,7 +92,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
 
   // --- Sequência pós-preço: Conexão (janela fechada — Meta templates) ---
   pos_preco_duvida: "Ficou alguma dúvida sobre o investimento? Me conta aqui que a gente resolve",
-  // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
+  // fallbacks: olhinho_followup + encerramento_03 (já definidos acima)
 
   // --- Retomada agendada: o lead combinou um retorno numa data (card tem "retomar: ...") ---
   // Reconhece o combinado (não contradiz nem fala de link fantasma) — corrige o caso "Confirmar o quê?".
@@ -116,7 +121,7 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
     "Quando você confirmar, te envio todos os acessos na hora pra começar ainda hoje.",
   lembrete_urgencia_meta:
     "Oi, sei que a correria toma conta. Se quiser finalizar quando der, é só me chamar que eu te ajudo sem complicação. O que ficou pendente?",
-  // fallbacks: olhinho_followup + encerramento_02 (já definidos acima)
+  // fallbacks: olhinho_followup + encerramento_03 (já definidos acima)
 
   // --- Nutrir (esteira de longo prazo, SEMPRE fora da janela de 24h → só template Meta aprovado) ---
   // Leads que estavam no funil e esfriaram. Consultivo, sem pressão. {{1}} = primeiro nome.
@@ -175,7 +180,8 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   lembrete_urgencia_meta: { language: "pt_BR", bodyVars: 0 },
   pos_preco_duvida: { language: "pt_BR", bodyVars: 0 },
   pos_preco_urgencia: { language: "pt_BR", bodyVars: 0 },
-  encerramento_02: { language: "pt_BR", bodyVars: 0 },
+  encerramento_03: { language: "pt_BR", bodyVars: 0 },
+  encerramento_02: { language: "pt_BR", bodyVars: 0 }, // legado — substituído pelo _03
 
   // Nutrir — todos com {{1}} = primeiro nome. Aprovar na Meta (pt_BR).
   nutrir_reengajamento: { language: "pt_BR", bodyVars: 1 },
