@@ -8,6 +8,7 @@
 export type PlanoId =
   | "anual_completo"
   | "anual"
+  | "semestral_premium"
   | "semestral"
   | "trimestral"
   | "medico_semestral"
@@ -29,6 +30,9 @@ const PLANOS: Plano[] = [
   { id: "medico_semestral", rotulo: "Médico Legista Semestral", valores: ["3.997", "394", "413"],     nome: /m[ée]dic[oa] legista/i },
   { id: "anual_completo",   rotulo: "Anual Completo",           valores: ["3.997", "394", "413,38"],  nome: /anual completo/i },
   { id: "anual",            rotulo: "Anual",                    valores: ["3.197", "315", "330"],     nome: /\banual\b/i },
+  // Semestral Premium: 6 meses COM a Premium do Estratégia. Testado antes do Semestral puro
+  // porque "premium" e "completo" precisam ganhar do rótulo genérico "semestral".
+  { id: "semestral_premium", rotulo: "Semestral Premium",       valores: ["2.497", "246"],            nome: /semestral premium|premium semestral|perito criminal premium/i },
   { id: "semestral",        rotulo: "Semestral",                valores: ["1.997", "197", "206"],     nome: /semestral/i },
   { id: "trimestral",       rotulo: "Trimestral",               valores: ["997", "98,35", "103,11"],  nome: /trimestral/i },
 ];

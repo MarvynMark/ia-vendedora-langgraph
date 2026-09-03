@@ -148,25 +148,26 @@ const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_1", "conexao_2", "
 // cutucada de reforço → versão enxuta 6 meses → parcelado → garantia → prova social (D+7) →
 // última chamada consultiva (D+14). Cadência mais longa e espaçada porque o pós-preço é o
 // maior vazamento do funil e a recuperação antes morria em 24-48h (diagnóstico).
+// Quem viu o preço e sumiu recebia 10,4 mensagens da IA (diagnóstico de agosto). Insistir com
+// quem parou de responder não recupera, queima: a cadência caiu para QUATRO toques, espaçando.
 const SEQUENCIA_POS_PRECO = [
-  "pos_preco_garantia",      // t1: a GARANTIA de 7 dias (saiu do pitch — é o argumento que resolve a hesitação)
-  "pos_preco_audio_walker",  // t2: ÁUDIO do Walker (dentro da janela 24h) — conexão + abre o Semestral
-  "recuperacao_enxuta",      // t3: reforça o Semestral em texto (se o áudio não fechou)
-  "pos_preco_followup_2",    // t4: parcelado sem limite
-  "pos_preco_prova_social",  // t5: prova social (~D+7)
-  "pos_preco_ultima_chamada",// t6: última chamada consultiva (~D+14)
+  "pos_preco_garantia",      // t1: +1h — a garantia de 7 dias, o argumento que resolve a hesitação
+  "pos_preco_audio_walker",  // t2: +1 dia — ÁUDIO do Walker (só dentro da janela de 24h)
+  "pos_preco_followup_2",    // t3: +4 dias — o parcelado sem limite
+  "pos_preco_prova_social",  // t4: +10 dias — alguém com a mesma dúvida que entrou
 ] as const;
 
 // Marcador do toque de áudio (não é um template de texto — enviado por enviarAudioPorUrl).
 const TOQUE_AUDIO_POSPRECO = "pos_preco_audio_walker";
 
-// Pós-preço: t1(entrada)→t2 3h (áudio no mesmo dia, dentro da janela grátis), t2→t3 e t3→t4 dia
-// seguinte, t4→t5 ~D+7 (prova social), t5→t6 ~D+14 (última chamada), t6→encerramento +3d.
-const DELAYS_POS_PRECO_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 5 * 24 * 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
+// t1 sai no delay inicial da etapa (1h, ver lib/delays-followup.ts). Depois: áudio no dia
+// seguinte, parcelado em +4 dias, prova social em +10, encerramento +10. Espaçado de propósito —
+// a cadência antiga somava 10 toques e o lead que sumiu não volta por insistência.
+const DELAYS_POS_PRECO_MS = [24 * 60 * 60 * 1000, 4 * 24 * 60 * 60 * 1000, 10 * 24 * 60 * 60 * 1000, 10 * 24 * 60 * 60 * 1000] as const;
 // Fallbacks pagos (fora da janela 24h), por posição. O áudio (t2) não pode ser template Meta →
 // fora da janela cai em recuperacao_enxuta (abre o Semestral em texto). Toques novos (prova
 // social/última chamada) também caem em fallback aprovado (duvida/urgencia).
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_duvida", "pos_preco_urgencia"] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_urgencia"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");

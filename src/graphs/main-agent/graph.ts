@@ -12,7 +12,8 @@ import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atu
 import { temPrecoDePlano } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
-import { descobertaMaterialFeita, materialDeclaradoPeloLead, PERGUNTA_DESCOBERTA_MATERIAL } from "../../lib/gate-material.ts";
+import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
+import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
@@ -443,6 +444,48 @@ async function executarAgente(state: MainAgentStateType) {
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = PERGUNTA_DESCOBERTA_MATERIAL;
+    }
+
+    // GATE DE SITUAÇÃO — o preço também espera o lead ter CONTADO a situação dele. Em agosto o
+    // lead escrevia 34 caracteres em média antes de ouvir o valor: a IA vendia mentoria de R$ 4 mil
+    // para quem ela não conhecia, e sem dor articulada o pitch cai no vazio. Exige duas falas
+    // substantivas; monossílabo de cortesia não conta.
+    if (
+      temPrecoDePlano(outputFinal) &&
+      !precoJaApresentado &&
+      !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }) &&
+      !situacaoDescoberta(historicoComTurnoAtual)
+    ) {
+      logger.warn("main-agent", "Preço bloqueado: o lead ainda não contou a situação dele", {
+        idConversa: state.idConversa,
+      });
+      outputFinal = PERGUNTA_DESCOBERTA_SITUACAO;
+    }
+
+    // TRAVA DO ECO — não deixa uma fala substantiva do lead receber "Claro!" de volta.
+    // Aqui NÃO dá pra substituir o texto (ele iria direto pro WhatsApp): reinvocamos o agente UMA
+    // vez com a instrução de reescrita. Se a segunda tentativa também ignorar o lead, mandamos a
+    // primeira mesmo assim — melhor uma resposta fraca que silêncio.
+    if (!mensagemOriginal.startsWith("[SISTEMA:") && respostaIgnoraOLead(mensagemOriginal, outputFinal)) {
+      logger.warn("main-agent", "Resposta ignorou a fala do lead — reescrevendo", {
+        idConversa: state.idConversa,
+        falaDoLead: mensagemOriginal.slice(0, 120),
+        primeiraResposta: outputFinal.slice(0, 120),
+      });
+      try {
+        const retry = await agent.invoke(
+          { messages: [...messages, new AIMessage(outputFinal), new HumanMessage(instrucaoReescrita(mensagemOriginal))] },
+          langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
+        );
+        const novas = (retry.messages ?? []).slice(messages.length + 2);
+        const { output: reescrito } = montarOutputDoTurno(novas as never);
+        if (reescrito.trim()) {
+          outputFinal = reescrito;
+          logger.info("main-agent", "Reescrita aplicada", { nova: reescrito.slice(0, 120) });
+        }
+      } catch (e) {
+        logger.warn("main-agent", "Falha ao reescrever — mantendo a resposta original:", e);
+      }
     }
 
     // GUARD DETERMINÍSTICO — mover pra "Aguardando Pagamento" ao apresentar o preço.

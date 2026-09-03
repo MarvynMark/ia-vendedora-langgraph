@@ -3,6 +3,8 @@ import {
   descobertaMaterialFeita,
   classificarRespostaMaterial,
   materialDeclaradoPeloLead,
+  falaSubstantiva,
+  situacaoDescoberta,
 } from "../../src/lib/gate-material.ts";
 import { ehMedicoLead, ehMedicoPorFormacao } from "../../src/lib/medico.ts";
 
@@ -104,5 +106,30 @@ describe("ehMedicoLead", () => {
   test("sem nenhuma fonte → não é médico", () => {
     expect(ehMedicoLead({})).toBe(false);
     expect(ehMedicoLead({ dadosFormulario: "Formação: Química" })).toBe(false);
+  });
+});
+
+describe("gate de situação — o preço espera o lead contar a rotina", () => {
+  test("monossílabo de cortesia não é fala substantiva", () => {
+    expect(falaSubstantiva("sim")).toBe(false);
+    expect(falaSubstantiva("Sim, pode sim, obrigado!")).toBe(false);
+    expect(falaSubstantiva("ok blz")).toBe(false);
+  });
+
+  test("fala com contexto é substantiva", () => {
+    expect(falaSubstantiva("Trabalho 12h e só consigo estudar de madrugada")).toBe(true);
+    expect(falaSubstantiva("Estava cursando biomedicina mas parei pq engravidei")).toBe(true);
+  });
+
+  test("exige DUAS falas substantivas (o piso de qualificação)", () => {
+    const uma = [{ type: "human", content: "Trabalho 12h e só consigo estudar de madrugada" }];
+    expect(situacaoDescoberta(uma)).toBe(false);
+    const duas = [...uma, { type: "human", content: "sim" }, { type: "human", content: "Já tentei cronograma mas nunca consigo seguir" }];
+    expect(situacaoDescoberta(duas)).toBe(true);
+  });
+
+  test("conversa só de monossílabos nunca libera o preço", () => {
+    const h = [{ type: "human", content: "sim" }, { type: "human", content: "ok" }, { type: "human", content: "pode sim" }];
+    expect(situacaoDescoberta(h)).toBe(false);
   });
 });

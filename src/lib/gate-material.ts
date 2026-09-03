@@ -17,6 +17,15 @@ const RE_PERGUNTA_MATERIAL =
 
 // Texto da pergunta que substitui o preço quando o gate bloqueia. Mesma formulação do prompt,
 // para o lead não ver duas versões diferentes da mesma pergunta.
+/**
+ * Segunda descoberta: a SITUAÇÃO de estudo. Em agosto o lead escreveu 34 caracteres em média
+ * antes de ouvir o preço — a IA vendia para quem não conhecia. Esta pergunta pede uma cena, não
+ * um rótulo, porque rótulo se responde com uma palavra e não dá o que espelhar depois.
+ */
+export const PERGUNTA_DESCOBERTA_SITUACAO =
+  "Antes de eu te falar de plano, me conta uma coisa: como tá tua rotina de estudo hoje, na prática? " +
+  "Pergunto porque eu acompanho cada mentorado de perto, então preciso entender teu caso pra saber o que faz sentido.";
+
 export const PERGUNTA_DESCOBERTA_MATERIAL =
   "Antes de te indicar o plano certo, me conta uma coisa: pra estudar as matérias você já tem " +
   "algum material ou curso organizado (tipo Estratégia, Gran, um cursinho), ou ainda tá sem isso?";
@@ -25,6 +34,23 @@ export const PERGUNTA_DESCOBERTA_MATERIAL =
 export interface MensagemHistorico {
   type: string;
   content: string;
+}
+
+/** Uma fala é "substantiva" quando traz contexto, não um monossílabo de cortesia. */
+const MIN_CHARS_SUBSTANTIVO = 40;
+export function falaSubstantiva(texto: string): boolean {
+  const t = (texto ?? "").trim();
+  if (t.length < MIN_CHARS_SUBSTANTIVO) return false;
+  // "sim, pode sim, obrigado" é longo mas não diz nada
+  return !/^((sim|não|nao|ok|blz|beleza|certo|entendi|obrigad[oa]|claro|pode ser|t[áa] bom|isso)[\s,.!]*)+$/i.test(t);
+}
+
+/**
+ * O lead já CONTOU a situação dele? Exige pelo menos duas falas substantivas — é o piso de
+ * qualificação: sem isso o pitch cai no vazio, porque não há dor articulada para ancorar.
+ */
+export function situacaoDescoberta(historico: MensagemHistorico[]): boolean {
+  return historico.filter((m) => m.type === "human" && falaSubstantiva(m.content ?? "")).length >= 2;
 }
 
 /**
