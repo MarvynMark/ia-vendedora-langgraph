@@ -293,24 +293,56 @@ export async function formatarSsml(texto: string): Promise<string> {
   }
 }
 
-export async function formatarTexto(texto: string): Promise<string> {
-  try {
-    const model = new ChatOpenAI({
-      modelName: env.OPENAI_MODEL_MINI,
-      openAIApiKey: env.OPENAI_API_KEY,
-      temperature: 0.3,
-    });
+// Linha que é só um item de lista (emoji, marcador ou "1." no início) — listas NUNCA são
+// quebradas em bolhas separadas: a introdução e todos os itens ficam no mesmo bloco.
+const RE_ITEM_LISTA = /^\s*([-*•✅🎁🔹▪️]|\d+[.)])\s+/u;
 
-    const resposta = await model.invoke([
-      { role: "system", content: PROMPT_FORMATAR_TEXTO },
-      { role: "user", content: texto },
-    ]);
+/**
+ * Formata a resposta do agente para o WhatsApp e a divide em blocos (bolhas).
+ *
+ * ⚠️ ISTO ERA UMA CHAMADA DE LLM E CAUSOU O PIOR BUG DE PRODUÇÃO ATÉ AQUI. O texto do agente ia
+ * como mensagem `user` para um segundo modelo, e quando esse texto era uma PERGUNTA aberta o
+ * modelo a RESPONDIA em vez de formatá-la. Nas convs 6941 e 6943 o agente gerou 58 caracteres
+ * ("Me conta como foi tua última semana de estudo, na prática.") e o lead recebeu dez mensagens
+ * em que a IA narrava a própria semana estudando Python, Pandas e machine learning — o Pedro
+ * teve de desligar a IA nas duas.
+ *
+ * As regras de formatação são triviais e não precisam de modelo nenhum. Determinístico: sem
+ * alucinação possível, sem custo, sem latência, e testável.
+ */
+export function formatarTexto(texto: string): string {
+  const original = texto ?? "";
+  if (!original.trim()) return original;
 
-    return resposta.content as string;
-  } catch (e) {
-    logger.error("response-formatter", "Erro ao formatar texto:", e);
-    return texto;
+  // 1) Markdown → WhatsApp: negrito ** -> * e fora os # de cabeçalho.
+  let t = original.replace(/\*\*/g, "*").replace(/^#{1,6}\s*/gm, "");
+
+  // 2) Blocos: o que o agente já separou com linha em branco é respeitado como veio.
+  const blocosOriginais = t.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+
+  const blocos: string[] = [];
+  for (const bloco of blocosOriginais) {
+    const linhas = bloco.split("\n").map((l) => l.trim()).filter(Boolean);
+    // Bloco que contém lista fica inteiro: introdução + todos os itens numa bolha só.
+    if (linhas.some((l) => RE_ITEM_LISTA.test(l))) {
+      blocos.push(linhas.join("\n"));
+      continue;
+    }
+    // Sem lista: quebra por fim de frase, agrupando até 2 frases por bolha.
+    const frases = linhas
+      .join(" ")
+      .split(/(?<=[.!?])\s+(?=[A-ZÀ-Ú0-9])/u)
+      .map((f) => f.trim())
+      .filter(Boolean);
+    for (let i = 0; i < frases.length; i += 2) {
+      blocos.push(frases.slice(i, i + 2).join(" "));
+    }
   }
+
+  // 3) Teto de 10 bolhas: o excedente vai junto na última, nunca é descartado.
+  const limitados = blocos.length <= 10 ? blocos : [...blocos.slice(0, 9), blocos.slice(9).join(" ")];
+
+  return limitados.join("\n\n");
 }
 
 export function dividirMensagem(texto: string): string[] {

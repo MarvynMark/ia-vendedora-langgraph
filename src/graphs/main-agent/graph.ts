@@ -565,7 +565,7 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     type: "ai", content: state.outputAgente,
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
-  const formatado = await formatarTextoFn(state.outputAgente);
+  const formatado = formatarTextoFn(state.outputAgente); // determinístico desde o bug das convs 6941/6943
   // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu do
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
@@ -630,7 +630,7 @@ async function formatarTextoNo(state: MainAgentStateType) {
     } catch (e) {
       logger.error("main-agent", "atualizarPresenca erro:", e);
     }
-    const respostaFormatada = await formatarTextoFn(state.outputAgente);
+    const respostaFormatada = formatarTextoFn(state.outputAgente);
     return { respostaFormatada };
   } catch (e) {
     logger.error("main-agent", "formatarTextoNo erro:", e);

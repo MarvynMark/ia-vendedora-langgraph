@@ -37,26 +37,17 @@ describe("formatarSsml", () => {
 });
 
 describe("formatarTexto", () => {
-  test("returns model response on success", async () => {
-    mockInvoke.mockResolvedValueOnce({ content: "texto formatado sem emojis" });
-    const result = await formatarTexto("texto com 🎉 emoji");
-    expect(result).toBe("texto formatado sem emojis");
+  // Deixou de ser uma chamada de LLM: nas convs 6941/6943 o modelo RESPONDIA a pergunta do
+  // agente em vez de formatá-la, e o lead recebia dez mensagens inventadas. Agora é função pura
+  // e síncrona — não chama modelo nenhum. Cobertura completa em response-formatter-deterministico.
+  test("não chama modelo nenhum", () => {
+    const antes = mockInvoke.mock.calls.length;
+    formatarTexto("Me conta como foi tua última semana de estudo, na prática.");
+    expect(mockInvoke.mock.calls.length).toBe(antes);
   });
 
-  test("returns original text on error", async () => {
-    mockInvoke.mockRejectedValueOnce(new Error("Network error"));
-    const result = await formatarTexto("fallback text");
-    expect(result).toBe("fallback text");
-  });
-
-  test("calls model with system prompt and user text", async () => {
-    mockInvoke.mockResolvedValueOnce({ content: "clean text" });
-    await formatarTexto("raw input");
-    const calls = mockInvoke.mock.calls;
-    const lastCall = calls[calls.length - 1] as [Array<{ role: string; content: string }>];
-    const msgs = lastCall[0];
-    expect(msgs[0].role).toBe("system");
-    expect(msgs[1].role).toBe("user");
-    expect(msgs[1].content).toBe("raw input");
+  test("devolve a pergunta intacta, sem responder", () => {
+    const p = "Me conta como foi tua última semana de estudo, na prática.";
+    expect(formatarTexto(p)).toBe(p);
   });
 });

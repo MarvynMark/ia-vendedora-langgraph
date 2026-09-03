@@ -4,40 +4,27 @@ import { describe, test, expect, mock, beforeEach } from "bun:test";
 const mockEnviarArquivo = mock(async () => ({ id: 1 }));
 const mockEnviarMensagem = mock(async () => ({ id: 2 }));
 const mockSalvarMensagem = mock(async () => {});
-const mockFormatarTexto = mock(async (t: string) => t);
+// formatarTexto é SÍNCRONO desde que deixou de ser LLM (bug das convs 6941/6943).
+const mockFormatarTexto = mock((t: string) => t);
 const mockMarcarComoLida = mock(async () => {});
 const mockAtualizarPresenca = mock(async () => {});
 
 const mockNoOp = mock(async () => {});
+// Preserva o módulo REAL e troca só o que o teste precisa observar. Um mock com a lista de
+// exports escrita à mão quebra toda vez que o grafo passa a importar mais uma função de lá.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   enviarArquivo: mockEnviarArquivo,
   enviarMensagem: mockEnviarMensagem,
   marcarComoLida: mockMarcarComoLida,
   atualizarPresenca: mockAtualizarPresenca,
-  buscarMensagemPorId: mock(async () => null),
-  adicionarEtiquetas: mockNoOp,
-  atualizarContato: mockNoOp,
-  atualizarAtributosConversa: mockNoOp,
-  buscarConversa: mock(async () => ({ labels: [] })),
-  removerEtiquetas: mockNoOp,
-  listarMensagens: mock(async () => ({ payload: [] })),
-  atualizarKanbanTask: mockNoOp,
-  moverKanbanTask: mockNoOp,
-  buscarKanbanBoard: mock(async () => ({ id: 1, board_steps: [] })),
-  // O grafo (e as tools de mídia que ele importa) usam estes — sem eles o import quebra
   pausaComDigitando: mockNoOp,
   calcularDelayDigitando: () => 0,
-  limparTextosMidia: () => {},
-  obterTextosMidia: () => [],
-  registrarTextoMidia: () => {},
-  registrarTextoMidiaNaoEnviado: () => {},
-  registrarSaidasRecentes: () => {},
-  saidasRecentes: () => [],
-  blocoDuplicaMidia: () => false,
-  blocoNarraEnvioMidia: () => false,
-  blocoNarraAcaoInterna: () => false,
-  blocoTemFraseProibida: () => false,
-  blocoEhNomeDeTool: () => false,
+  atualizarKanbanTask: mockNoOp,
+  buscarMensagemPorId: mock(async () => null),
+  listarMensagens: mock(async () => ({ payload: [] })),
+  buscarKanbanBoard: mock(async () => ({ id: 1, board_steps: [] })),
 }));
 
 mock.module("../../src/db/memoria.ts", () => ({
