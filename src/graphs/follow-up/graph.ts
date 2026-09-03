@@ -7,6 +7,7 @@ import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../li
 import { ehMedicoPorFormacao } from "../../lib/medico.ts";
 import { buscarCamposFormulario } from "../../db/formulario.ts";
 import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
+import { delayInicialMs } from "../../lib/delays-followup.ts";
 import { AUDIO_WALKER_POSPRECO_URL, enviarAudioPorUrl } from "../../tools/enviar-audio-walker.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
@@ -481,7 +482,10 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
       const stepConexao = state.funilSteps.find(s => /conex/i.test(s.name));
       if (stepConexao) {
         logger.info("follow-up", `Lead engajou mas preso em Primeira mensagem — movendo para Conexão (step ${stepConexao.id})`);
-        await atualizarKanbanTask(state.accountId, state.taskId, { board_step_id: stepConexao.id });
+        await atualizarKanbanTask(state.accountId, state.taskId, {
+          board_step_id: stepConexao.id,
+          due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepConexao.name)).toISOString(),
+        });
       } else {
         logger.info("follow-up", "Lead já respondeu — encerrando (Conexão não encontrada no funil)");
       }
@@ -685,7 +689,10 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
       logger.info("follow-up", "Lead já enviou mensagem — pulando template inicial, movendo para Primeira mensagem");
       const stepPM = state.funilSteps.find(s => s.name.toLowerCase().includes("primeira mensagem"));
       if (stepPM) {
-        await atualizarKanbanTask(state.accountId, state.taskId, { board_step_id: stepPM.id });
+        await atualizarKanbanTask(state.accountId, state.taskId, {
+          board_step_id: stepPM.id,
+          due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepPM.name)).toISOString(),
+        });
       }
       return { respostaAgente: "" };
     }
@@ -714,8 +721,16 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
   // Mover card para "Primeira mensagem"
   const stepPM = state.funilSteps.find(s => s.name.toLowerCase().includes("primeira mensagem"));
   if (stepPM) {
-    await atualizarKanbanTask(state.accountId, state.taskId, { board_step_id: stepPM.id });
-    logger.info("follow-up", `Card movido para "Primeira mensagem" (step ${stepPM.id})`);
+    // O due_date PRECISA ser recalculado aqui. Sem isso o card entra em "Primeira mensagem"
+    // carregando o prazo que acabou de vencer (foi ele que disparou este template), e o ciclo
+    // seguinte do cron o vê como overdue e manda o follow-up de recuperação no mesmo minuto —
+    // conv 6900: a abertura e o "me dá um oi rapidinho" saíram as duas às 08h54.
+    const proximaPM = proximoHorarioComercial(new Date(), delayInicialMs(stepPM.name));
+    await atualizarKanbanTask(state.accountId, state.taskId, {
+      board_step_id: stepPM.id,
+      due_date: proximaPM.toISOString(),
+    });
+    logger.info("follow-up", `Card movido para "Primeira mensagem" (step ${stepPM.id}) — próximo toque ${proximaPM.toISOString()}`);
   } else {
     logger.warn("follow-up", "Etapa 'Primeira mensagem' não encontrada no funil");
   }

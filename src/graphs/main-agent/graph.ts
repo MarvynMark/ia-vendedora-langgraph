@@ -11,6 +11,8 @@ import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { temPrecoDePlano } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
+import { delayInicialMs } from "../../lib/delays-followup.ts";
+import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
 import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
@@ -201,9 +203,14 @@ export async function moverParaAguardandoPagamento(
   // pagar) da sequência PÓS-PREÇO (viu o preço e sumiu — a que leva o áudio do Walker).
   const status = linkEnviado ? "link enviado" : "em negociação";
   try {
+    // Reagendar é obrigatório ao mudar de etapa: sem isso o card entra na nova cadência com o
+    // prazo antigo (quase sempre vencido) e o cron dispara o primeiro toque no ciclo seguinte —
+    // foi o que pôs a abertura e o follow-up no mesmo minuto na conv 6900.
+    const descricaoNova = comStatusNaDescricao(String(tarefa["description"] ?? ""), status);
     await atualizarKanbanTask(idConta, taskId as number, {
       board_step_id: stepPagamento.id,
-      description: comStatusNaDescricao(String(tarefa["description"] ?? ""), status),
+      description: descricaoNova,
+      due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepPagamento.name, descricaoNova)).toISOString(),
     });
     tarefa["board_step_id"] = stepPagamento.id; // reflete no turno atual
     logger.info("main-agent", `Card ${taskId} movido p/ Aguardando Pagamento (preço apresentado; estava em step ${stepAtual})`);
@@ -270,7 +277,10 @@ async function executarAgente(state: MainAgentStateType) {
     const taskId = (tarefa as Record<string, unknown>)["id"];
     if (stepConexao && taskId) {
       try {
-        await atualizarKanbanTask(state.idConta, taskId as number, { board_step_id: stepConexao.id });
+        await atualizarKanbanTask(state.idConta, taskId as number, {
+          board_step_id: stepConexao.id,
+          due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepConexao.name)).toISOString(),
+        });
         (tarefa as Record<string, unknown>)["board_step_id"] = stepConexao.id; // reflete no turno atual
         logger.info("main-agent", `Card ${taskId} movido p/ Conexão (lead engajou; estava em step ${stepAtualCard})`);
       } catch (e) {
