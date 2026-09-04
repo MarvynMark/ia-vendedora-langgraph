@@ -273,6 +273,32 @@ const PROMPT_FORMATAR_TEXTO = `# PAPEL
 </formato-resposta>
 `;
 
+/**
+ * O SSML preservou o conteúdo do texto, ou o modelo RESPONDEU em vez de converter?
+ *
+ * Compara as palavras longas da entrada com as da saída. Números ficam de fora de propósito:
+ * convertê-los para a forma falada ("394" → "trezentos e noventa e quatro") é justamente o
+ * trabalho do formatador. O corte é generoso — uma conversão legítima mantém quase todas as
+ * palavras, já uma resposta do modelo ("desculpe, não posso...") não mantém quase nenhuma.
+ */
+export function ssmlPreservaOTexto(original: string, ssml: string): boolean {
+  const palavras = [...new Set((original.toLowerCase().match(/[a-zà-ú]{5,}/gu) ?? []))];
+  if (palavras.length < 3) return true; // curto demais pra julgar
+  const saida = ssml.toLowerCase();
+  const mantidas = palavras.filter((p) => saida.includes(p)).length;
+  return mantidas / palavras.length >= 0.5;
+}
+
+/**
+ * ⚠️ Este formatador tem a MESMA forma do bug que derrubou as convs 6941/6943/6907: o texto do
+ * agente vai como `user` para um segundo modelo, que pode RESPONDÊ-LO em vez de convertê-lo.
+ * Na 6907 o agente escreveu "Me conta como foi tua última semana de estudo" e o lead recebeu
+ * "Desculpe, mas não posso compartilhar informações pessoais ou experiências."
+ *
+ * Aqui o LLM não dá pra remover — converter números para a forma falada é o motivo dele existir.
+ * Então validamos a saída: se ela não preserva o conteúdo da entrada, foi o modelo respondendo, e
+ * caímos no texto original, que o TTS lê bem, só sem a otimização.
+ */
 export async function formatarSsml(texto: string): Promise<string> {
   try {
     const model = new ChatOpenAI({
@@ -286,7 +312,15 @@ export async function formatarSsml(texto: string): Promise<string> {
       { role: "user", content: texto },
     ]);
 
-    return resposta.content as string;
+    const ssml = resposta.content as string;
+    if (!ssmlPreservaOTexto(texto, ssml)) {
+      logger.error("response-formatter", "SSML descartado: o formatador respondeu em vez de converter", {
+        original: texto.slice(0, 160),
+        devolvido: ssml.slice(0, 160),
+      });
+      return texto;
+    }
+    return ssml;
   } catch (e) {
     logger.error("response-formatter", "Erro ao formatar SSML:", e);
     return texto;
