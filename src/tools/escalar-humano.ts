@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { removerEtiquetas, enviarMensagem } from "../services/chatwoot.ts";
+import { removerEtiquetas, enviarMensagem, avisarGrupo } from "../services/chatwoot.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -35,14 +35,13 @@ export function criarToolEscalarHumano(contexto: ContextoEscalarHumano) {
         logger.warn("tool:escalar-humano", "Erro ao criar nota privada:", e);
       }
 
-      // 3. Alerta no grupo interno (conversa de alertas).
+      // 3. Alerta no grupo do COMERCIAL (é aviso sobre lead, não sobre venda nem edital).
+      //    Ganhou o deep link que só o Alertar_gestor tinha: sem ele, quem lê no WhatsApp tem que
+      //    caçar a conversa pelo nome.
       try {
-        const mensagemAlerta = `Assistente desabilitado para o usuario ${nomeDisplay} (${contexto.telefone}).\n\n*Ultima mensagem*:\n\n"${contexto.ultimaMensagem}"\n\n*Resumo da conversa*:\n\n"${input.resumoConversa}"`;
-        await enviarMensagem(
-          env.CHATWOOT_ACCOUNT_ID,
-          env.CHATWOOT_ALERT_CONVERSATION_ID,
-          mensagemAlerta,
-        );
+        const link = `${env.CHATWOOT_BASE_URL}/app/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${contexto.idConversa}`;
+        const mensagemAlerta = `🔔 *IA pausada* — ${nomeDisplay} (${contexto.telefone})\n\n*Ultima mensagem*:\n\n"${contexto.ultimaMensagem}"\n\n*Resumo da conversa*:\n\n"${input.resumoConversa}"\n\n👉 ${link}`;
+        await avisarGrupo(env.CHATWOOT_COMERCIAL_CONVERSATION_ID, mensagemAlerta);
       } catch (e) {
         logger.warn("tool:escalar-humano", "Erro ao enviar alerta (escalação já executada):", e);
       }

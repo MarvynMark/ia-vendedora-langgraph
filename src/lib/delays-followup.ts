@@ -29,8 +29,14 @@ export const DELAY_INICIAL = {
   padrao: 1 * DIA,
 } as const;
 
-/** "link enviado" na descrição do card é o que separa o lembrete do pós-preço. */
-const RE_LINK_ENVIADO = /link\s*enviado/i;
+/**
+ * "link enviado" na descrição do card é o que separa o lembrete do pós-preço.
+ *
+ * Exportado porque é um marcador com dono: quem o escreve é o guard determinístico do grafo
+ * (moverParaAguardandoPagamento), que enxerga o texto que REALMENTE saiu para o lead. O LLM não
+ * pode escrevê-lo — ver a sanitização em tools/atualizar-tarefa.ts.
+ */
+export const RE_LINK_ENVIADO = /link\s*enviado/i;
 
 /**
  * Delay do primeiro toque, pelo nome da etapa. A descrição do card só importa em "Aguardando

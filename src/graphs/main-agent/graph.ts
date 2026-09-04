@@ -8,14 +8,16 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask } from "../../services/chatwoot.ts";
-import { temPrecoDePlano } from "../../lib/planos.ts";
+import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
+import { temPrecoDePlano, temLinkDePagamento } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
-import { delayInicialMs } from "../../lib/delays-followup.ts";
+import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
 import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
+import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
+import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
@@ -195,10 +197,16 @@ export async function moverParaAguardandoPagamento(
   linkEnviado: boolean,
 ): Promise<void> {
   const stepAtual = Number(tarefa["board_step_id"] ?? 0);
-  if (!STEPS_ANTES_DO_PAGAMENTO.includes(stepAtual)) return;
   const stepPagamento = etapas.find(s => /aguardando\s*pagamento/i.test(s.name));
   const taskId = tarefa["id"];
   if (!stepPagamento || !taskId) return;
+  // Card JÁ em Aguardando Pagamento: a única atualização que ainda faz sentido é promover o
+  // status para "link enviado" quando o link realmente saiu neste turno — é o que troca a
+  // cadência pós-preço (1h) pela de lembrete (20min). Como o marcador saiu das mãos do LLM
+  // (ver a sanitização em tools/atualizar-tarefa.ts), sem esta porta ninguém o escreveria.
+  const jaEmPagamento = stepAtual === stepPagamento.id;
+  if (!STEPS_ANTES_DO_PAGAMENTO.includes(stepAtual) && !jaEmPagamento) return;
+  if (jaEmPagamento && (!linkEnviado || RE_LINK_ENVIADO.test(String(tarefa["description"] ?? "")))) return;
   // "link enviado" é o que separa, no follow-up, a sequência de LEMBRETE (link na mão, falta
   // pagar) da sequência PÓS-PREÇO (viu o preço e sumiu — a que leva o áudio do Walker).
   const status = linkEnviado ? "link enviado" : "em negociação";
@@ -212,10 +220,46 @@ export async function moverParaAguardandoPagamento(
       description: descricaoNova,
       due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepPagamento.name, descricaoNova)).toISOString(),
     });
-    tarefa["board_step_id"] = stepPagamento.id; // reflete no turno atual
-    logger.info("main-agent", `Card ${taskId} movido p/ Aguardando Pagamento (preço apresentado; estava em step ${stepAtual})`);
+    // reflete no turno atual
+    tarefa["board_step_id"] = stepPagamento.id;
+    tarefa["description"] = descricaoNova;
+    logger.info("main-agent", `Card ${taskId} em Aguardando Pagamento com status "${status}" (preço apresentado; estava em step ${stepAtual})`);
   } catch (e) {
     logger.warn("main-agent", "Falha ao mover card p/ Aguardando Pagamento (guard determinístico):", e);
+  }
+}
+
+// Desfaz a ida prematura para "Aguardando Pagamento". O prompt manda o LLM mover o card ANTES de
+// enviar o preço, então quando um gate bloqueia o preço depois disso (na conv 6987 o gate de
+// material trocou o pitch pela pergunta de descoberta) o card fica numa etapa que a conversa
+// nunca alcançou — e a lead entra na cadência de recuperação de quem viu o valor e sumiu.
+//
+// Só desfaz o que ESTE turno fez: um card que já estava em Aguardando Pagamento antes pode estar
+// em negociação legítima ou ter sido movido à mão pela equipe.
+export async function desfazerPagamentoPrematuro(
+  idConta: string,
+  tarefa: Record<string, unknown>,
+  etapas: Array<{ id: number; name: string }>,
+  stepAntesDoTurno: number,
+): Promise<void> {
+  const stepPagamento = etapas.find(s => /aguardando\s*pagamento/i.test(s.name));
+  const stepConexao = etapas.find(s => /conex/i.test(s.name));
+  const taskId = tarefa["id"];
+  if (!stepPagamento || !stepConexao || !taskId) return;
+  if (Number(tarefa["board_step_id"] ?? 0) !== stepPagamento.id) return;
+  if (stepAntesDoTurno === stepPagamento.id) return;
+  try {
+    const descricaoNova = comStatusNaDescricao(String(tarefa["description"] ?? ""), "qualificando");
+    await atualizarKanbanTask(idConta, taskId as number, {
+      board_step_id: stepConexao.id,
+      description: descricaoNova,
+      due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepConexao.name, descricaoNova)).toISOString(),
+    });
+    tarefa["board_step_id"] = stepConexao.id;
+    tarefa["description"] = descricaoNova;
+    logger.warn("main-agent", `Card ${taskId} voltou para Conexão: foi movido p/ Aguardando Pagamento neste turno mas nenhum preço saiu`);
+  } catch (e) {
+    logger.warn("main-agent", "Falha ao desfazer ida prematura p/ Aguardando Pagamento:", e);
   }
 }
 
@@ -347,6 +391,10 @@ async function executarAgente(state: MainAgentStateType) {
     ...mensagensHistorico,
     new HumanMessage(userMessage),
   ];
+
+  // Etapa do card ANTES de o agente rodar (já com o guard de Conexão aplicado). Serve ao
+  // desfazerPagamentoPrematuro: só voltamos atrás no que este turno mexeu.
+  const stepAntesDoTurno = Number((tarefa as Record<string, unknown>)["board_step_id"] ?? 0);
 
   logger.info("main-agent", ">>> Chamando LLM", {
     historicoLen: mensagensHistorico.length,
@@ -505,15 +553,67 @@ async function executarAgente(state: MainAgentStateType) {
       }
     }
 
+    // AVISO DE OBJEÇÃO — quando o lead trava (preço, adiamento ou forma de pagamento), o grupo do
+    // comercial é avisado pra um humano poder entrar antes de o lead sumir. Uma vez por TIPO por
+    // conversa. Não interfere na resposta: o try/catch é próprio justamente pra um alerta que
+    // falha nunca segurar o que o lead vai receber.
+    try {
+      const tipoObjecao = classificarObjecao(mensagemOriginal);
+      if (tipoObjecao) {
+        const chave = chaveObjecao(state.idConversa, tipoObjecao);
+        let primeiraVez = true;
+        try {
+          primeiraVez = await reivindicarAlerta(chave, state.telefone, tipoObjecao);
+        } catch (e) {
+          // Mesma escolha do Alertar_gestor: falha na trava avisa mesmo assim. Repetir um alerta
+          // incomoda menos que perder o único aviso de um lead travando.
+          logger.warn("main-agent", "Erro ao checar trava do alerta de objeção, enviando assim mesmo:", e);
+        }
+        if (primeiraVez) {
+          const link = `${env.CHATWOOT_BASE_URL}/app/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${state.idConversa}`;
+          try {
+            await avisarGrupo(
+              env.CHATWOOT_COMERCIAL_CONVERSATION_ID,
+              montarAlertaObjecao({
+                tipo: tipoObjecao,
+                nome: state.nome,
+                telefone: state.telefone,
+                fala: mensagemOriginal,
+                link,
+              }),
+            );
+            logger.info("main-agent", "Comercial avisado: lead esbarrou em objeção", {
+              idConversa: state.idConversa,
+              tipo: tipoObjecao,
+            });
+          } catch (e) {
+            await liberarAlerta(chave).catch(() => {});
+            logger.warn("main-agent", "Erro ao avisar o comercial sobre a objeção:", e);
+          }
+        }
+      }
+    } catch (e) {
+      logger.warn("main-agent", "Falha no aviso de objeção (ignorada):", e);
+    }
+
     // GUARD DETERMINÍSTICO — mover pra "Aguardando Pagamento" ao apresentar o preço.
     // Mesmo modo de falha do guard de Conexão acima: o prompt manda mover o card no pitch e o LLM
     // dropa o Atualizar_tarefa. Consequência cara: a SEQUENCIA_POS_PRECO (que leva o áudio de
     // recuperação do Walker em t+3h) só roda para cards em "Aguardando Pagamento", e só 13 dos 61
     // leads que ouviram o preço desde 17/08 chegaram lá — o áudio disparou 1 vez em 8 dias.
     // Só AVANÇA: não toca em cards já em Aguardando Pagamento(8), Ganho(9) ou Perdido(11).
-    if (temPrecoDePlano(outputFinal)) {
-      const linkEnviado = /peritowalker\.com\.br\/(mentoria|medicolegista)/i.test(outputFinal);
+    // O link pode ter saído no texto que acompanhou uma mídia (mensagem_antes), que a tool já
+    // enviou ao lead e não está em outputFinal — por isso a checagem olha o turno inteiro.
+    const turnoEnviado = [textoJaEnviado, outputFinal].filter(Boolean).join("\n");
+    // O LINK sozinho também conta. Na conv 6890 a lead voltou com "Gostaria de contratar a
+    // mentoria" e a IA mandou o link do Anual SEM escrever um único valor: com o gatilho só no
+    // preço, o guard não rodaria e o "link enviado" (que roteia para a cadência de lembrete,
+    // 20min) ficaria sem ninguém para escrevê-lo, agora que o LLM não pode mais escrevê-lo.
+    const linkEnviado = temLinkDePagamento(turnoEnviado);
+    if (temPrecoDePlano(turnoEnviado) || linkEnviado) {
       await moverParaAguardandoPagamento(state.idConta, tarefa as Record<string, unknown>, etapas, linkEnviado);
+    } else if (!precoJaApresentado) {
+      await desfazerPagamentoPrematuro(state.idConta, tarefa as Record<string, unknown>, etapas, stepAntesDoTurno);
     }
 
     return { outputAgente: outputFinal };

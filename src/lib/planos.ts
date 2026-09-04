@@ -59,6 +59,20 @@ export function temPrecoDePlano(texto: string): boolean {
   return reValor().test(texto ?? "");
 }
 
+// Links de checkout da seção "# PRODUTOS E LINKS" do prompt.
+const RE_LINK_PAGAMENTO = /peritowalker\.com\.br\/(mentoria|medicolegista)/i;
+
+/**
+ * A resposta contém um link de checkout? O guard de Kanban precisa reconhecê-lo mesmo quando a IA
+ * não escreve valor nenhum: na conv 6890 a lead voltou com "Gostaria de contratar a mentoria" e
+ * recebeu só o link do Anual, sem um único R$. Quem tem o link na mão está em abandono de
+ * checkout (lembrete, 20min), não em pós-preço (1h) — e é o marcador "link enviado" que separa
+ * as duas cadências.
+ */
+export function temLinkDePagamento(texto: string): boolean {
+  return RE_LINK_PAGAMENTO.test(texto ?? "");
+}
+
 /**
  * Planos cujo preço aparece no texto, na ordem em que aparecem (sem repetição).
  *

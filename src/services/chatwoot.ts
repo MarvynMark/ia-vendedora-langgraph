@@ -70,6 +70,19 @@ export async function reabrirConversa(
   }, 3, 300);
 }
 
+/**
+ * Manda um aviso para um grupo interno de WhatsApp e garante que a conversa fique aberta.
+ *
+ * A ordem enviar→reabrir não é estética: o Baileys enfileira a mensagem e entrega ao reabrir, então
+ * inverter faz o aviso falhar (ver a nota em routes/pagamento.ts). Os monitores e o alerta de venda
+ * já faziam isso na mão; as tools de escalação e de lead quente não reabriam, e o aviso sumia da
+ * caixa quando alguém resolvia a conversa do grupo.
+ */
+export async function avisarGrupo(conversationId: string | number, texto: string) {
+  await enviarMensagem(env.CHATWOOT_ACCOUNT_ID, conversationId, texto);
+  await reabrirConversa(env.CHATWOOT_ACCOUNT_ID, conversationId);
+}
+
 export async function enviarArquivo(
   accountId: string | number,
   conversationId: string | number,

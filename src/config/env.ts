@@ -29,8 +29,17 @@ export const env = {
   CHATWOOT_API_TOKEN: process.env["CHATWOOT_API_TOKEN"]!,
   CHATWOOT_ACCOUNT_ID: process.env["CHATWOOT_ACCOUNT_ID"]!,
   CHATWOOT_INBOX_ID: Number(process.env["CHATWOOT_INBOX_ID"]!),
+  // ⚠️ Declarada e obrigatória, mas NUNCA lida fora deste arquivo: todo o roteiro de alerta é por
+  // conversation_id. Fica só porque removê-la exige mexer no Coolify.
   CHATWOOT_ALERT_INBOX_ID: process.env["CHATWOOT_ALERT_INBOX_ID"]!,
+  // Grupo da mentoria — venda aprovada, monitor de edital e monitor de notícias.
   CHATWOOT_ALERT_CONVERSATION_ID: process.env["CHATWOOT_ALERT_CONVERSATION_ID"]!,
+  // Grupo do comercial ("Lead - Comercial - Vestigium") — tudo que é sobre LEAD: IA pausada,
+  // lead quente e objeção. Opcional DE PROPÓSITO: se entrasse em `obrigatorias`, um deploy antes
+  // de configurar a variável no Coolify derrubaria o app no boot. Sem ela, o pior caso é o alerta
+  // continuar caindo no grupo antigo.
+  CHATWOOT_COMERCIAL_CONVERSATION_ID:
+    process.env["CHATWOOT_COMERCIAL_CONVERSATION_ID"] ?? process.env["CHATWOOT_ALERT_CONVERSATION_ID"]!,
 
   ELEVENLABS_API_KEY: process.env["ELEVENLABS_API_KEY"]!,
   ELEVENLABS_VOICE_ID: process.env["ELEVENLABS_VOICE_ID"]!,

@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarMensagem } from "../services/chatwoot.ts";
+import { enviarMensagem, avisarGrupo } from "../services/chatwoot.ts";
 import { reivindicarAlertaGestor, liberarAlertaGestor } from "../db/alertas.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
@@ -50,7 +50,7 @@ export function criarToolAlertarGestor(contexto: ContextoAlertarGestor) {
       try {
         const link = `${env.CHATWOOT_BASE_URL}/app/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${contexto.idConversa}`;
         const alerta = `⭐ *Lead quente* — ${nomeDisplay} (${contexto.telefone})\n\n${input.motivo}\n\n*Última mensagem*:\n"${contexto.ultimaMensagem}"\n\n👉 ${link}`;
-        await enviarMensagem(env.CHATWOOT_ACCOUNT_ID, env.CHATWOOT_ALERT_CONVERSATION_ID, alerta);
+        await avisarGrupo(env.CHATWOOT_COMERCIAL_CONVERSATION_ID, alerta);
       } catch (e) {
         // Libera a trava pra falha de rede não queimar a única chance de avisar a equipe.
         await liberarAlertaGestor(contexto.idConversa).catch(() => {});

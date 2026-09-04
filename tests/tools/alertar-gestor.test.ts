@@ -5,17 +5,29 @@ import { describe, test, expect, mock, beforeEach } from "bun:test";
 // só pode sair UMA vez por conversa.
 const calls: Array<{ conta: unknown; conversa: unknown; texto: string; opts?: { private?: boolean } }> = [];
 let falharEnvioGrupo = false;
+// mock.module VAZA entre arquivos no bun: substituir o módulo inteiro faz os outros testes que
+// importam chatwoot.ts falharem ao CARREGAR ("Export named X not found"). Preservamos o módulo
+// real e trocamos só o que este arquivo precisa observar.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   enviarMensagem: async (conta: unknown, conversa: unknown, texto: string, opts?: { private?: boolean }) => {
     if (falharEnvioGrupo && !opts?.private) throw new Error("falha de rede");
     calls.push({ conta, conversa, texto, opts });
+  },
+  // avisarGrupo = enviarMensagem + reabrirConversa; aqui só o destino e o texto importam.
+  avisarGrupo: async (conversa: unknown, texto: string) => {
+    if (falharEnvioGrupo) throw new Error("falha de rede");
+    calls.push({ conta: undefined, conversa, texto });
   },
 }));
 
 // Trava de dedup em memória, no lugar do Postgres.
 const reivindicadas = new Set<string>();
 const liberadas: string[] = [];
+const alertasReal = await import("../../src/db/alertas.ts");
 mock.module("../../src/db/alertas.ts", () => ({
+  ...alertasReal,
   reivindicarAlertaGestor: async (idConversa: string) => {
     if (reivindicadas.has(idConversa)) return false;
     reivindicadas.add(idConversa);
@@ -57,7 +69,7 @@ describe("Alertar_gestor", () => {
 
     // 2ª chamada: alerta no grupo interno (CHATWOOT_ALERT_CONVERSATION_ID), sem private
     const alerta = calls[1]!;
-    expect(alerta.conversa).toBe(env.CHATWOOT_ALERT_CONVERSATION_ID);
+    expect(alerta.conversa).toBe(env.CHATWOOT_COMERCIAL_CONVERSATION_ID);
     expect(alerta.opts?.private).toBeUndefined();
     expect(alerta.texto).toContain("Ana");
     expect(alerta.texto).toContain("+5511999999999");
@@ -87,7 +99,7 @@ describe("Alertar_gestor", () => {
     await criar("200").invoke({ motivo: "mandou o comprovante" });
 
     expect(calls.length).toBe(2);
-    expect(calls[1]!.conversa).toBe(env.CHATWOOT_ALERT_CONVERSATION_ID);
+    expect(calls[1]!.conversa).toBe(env.CHATWOOT_COMERCIAL_CONVERSATION_ID);
   });
 
   test("falha no envio ao grupo libera a trava pra não queimar a única chance", async () => {

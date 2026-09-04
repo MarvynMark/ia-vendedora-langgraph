@@ -10,4 +10,5 @@ process.env["ELEVENLABS_VOICE_ID"] = "test-voice";
 process.env["CHATWOOT_INBOX_ID"] = "11";
 process.env["CHATWOOT_ALERT_INBOX_ID"] = "27";
 process.env["CHATWOOT_ALERT_CONVERSATION_ID"] = "15";
+process.env["CHATWOOT_COMERCIAL_CONVERSATION_ID"] = "77";
 process.env["PROFISSIONAIS_CALENDAR_IDS"] = '{"dra-ana-costa":"cal-ana","dr-ricardo-lima":"cal-ricardo","dra-beatriz-souza":"cal-beatriz","dr-felipe-torres":"cal-felipe"}';

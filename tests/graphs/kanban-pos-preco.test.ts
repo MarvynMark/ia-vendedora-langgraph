@@ -34,7 +34,7 @@ mock.module("../../src/db/checkpointer.ts", () => ({
   encerrarCheckpointer: mockNoOp,
 }));
 
-const { comStatusNaDescricao, moverParaAguardandoPagamento } = await import(
+const { comStatusNaDescricao, moverParaAguardandoPagamento, desfazerPagamentoPrematuro } = await import(
   "../../src/graphs/main-agent/graph.ts"
 );
 
@@ -96,12 +96,65 @@ describe("moverParaAguardandoPagamento", () => {
     }
   });
 
-  test("NÃO regride: card em Ganho, Perdido ou já em Aguardando Pagamento fica onde está", async () => {
+  test("NÃO regride: card em Ganho, Perdido ou já em Aguardando Pagamento sem link fica onde está", async () => {
     for (const step of [8, 9, 11]) {
       mockAtualizarKanbanTask.mockClear();
       await moverParaAguardandoPagamento("1", { id: 1, board_step_id: step, description: "" }, ETAPAS, false);
       expect(mockAtualizarKanbanTask).not.toHaveBeenCalled();
     }
+  });
+
+  // O marcador "link enviado" saiu das mãos do LLM (tools/atualizar-tarefa.ts), então este guard
+  // é o único que ainda pode escrevê-lo — inclusive num card que o próprio LLM já pôs no step 8.
+  test("card já em Aguardando Pagamento é promovido a 'link enviado' quando o link sai", async () => {
+    const tarefa: Record<string, unknown> = { id: 57, board_step_id: 8, description: comStatusNaDescricao(DESCRICAO, "em negociação") };
+    await moverParaAguardandoPagamento("1", tarefa, ETAPAS, true);
+    expect(mockAtualizarKanbanTask).toHaveBeenCalledTimes(1);
+    const [, , dados] = mockAtualizarKanbanTask.mock.calls[0] as unknown as [string, number, { board_step_id: number; description: string }];
+    expect(dados.board_step_id).toBe(8);
+    expect(dados.description).toContain("Descrição: link enviado");
+    expect(String(tarefa["description"])).toContain("link enviado");
+  });
+
+  test("card já em Aguardando Pagamento que JÁ tem o marcador não é reescrito", async () => {
+    const tarefa: Record<string, unknown> = { id: 58, board_step_id: 8, description: comStatusNaDescricao(DESCRICAO, "link enviado") };
+    await moverParaAguardandoPagamento("1", tarefa, ETAPAS, true);
+    expect(mockAtualizarKanbanTask).not.toHaveBeenCalled();
+  });
+});
+
+// Conv 6987: o prompt manda mover o card ANTES de enviar o preço, o gate de material bloqueou o
+// pitch depois disso, e a lead ficou em "Aguardando Pagamento" sem nunca ter visto um valor —
+// entrando na cadência de recuperação de quem viu o preço e sumiu.
+describe("desfazerPagamentoPrematuro", () => {
+  beforeEach(() => mockAtualizarKanbanTask.mockClear());
+
+  test("card movido p/ Aguardando Pagamento NESTE turno, sem preço, volta pra Conexão", async () => {
+    const tarefa: Record<string, unknown> = { id: 60, board_step_id: 8, description: comStatusNaDescricao(DESCRICAO, "em negociação") };
+    await desfazerPagamentoPrematuro("1", tarefa, ETAPAS, 10);
+    expect(mockAtualizarKanbanTask).toHaveBeenCalledTimes(1);
+    const [, , dados] = mockAtualizarKanbanTask.mock.calls[0] as unknown as [string, number, { board_step_id: number; description: string }];
+    expect(dados.board_step_id).toBe(10);
+    expect(dados.description).toContain("Descrição: qualificando");
+    expect(tarefa["board_step_id"]).toBe(10);
+  });
+
+  test("card que JÁ estava em Aguardando Pagamento antes do turno não é mexido", async () => {
+    await desfazerPagamentoPrematuro("1", { id: 61, board_step_id: 8, description: "" }, ETAPAS, 8);
+    expect(mockAtualizarKanbanTask).not.toHaveBeenCalled();
+  });
+
+  test("card em qualquer outra etapa não é mexido", async () => {
+    for (const step of [1, 7, 10, 9, 11]) {
+      mockAtualizarKanbanTask.mockClear();
+      await desfazerPagamentoPrematuro("1", { id: 62, board_step_id: step, description: "" }, ETAPAS, 10);
+      expect(mockAtualizarKanbanTask).not.toHaveBeenCalled();
+    }
+  });
+
+  test("falha da API não propaga", async () => {
+    mockAtualizarKanbanTask.mockImplementationOnce(async () => { throw new Error("500"); });
+    await desfazerPagamentoPrematuro("1", { id: 63, board_step_id: 8, description: "" }, ETAPAS, 10);
   });
 
   test("board sem a etapa 'Aguardando Pagamento' → não faz nada (em vez de quebrar)", async () => {

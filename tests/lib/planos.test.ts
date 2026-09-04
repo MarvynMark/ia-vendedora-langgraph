@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { temPrecoDePlano, planosCitados } from "../../src/lib/planos.ts";
+import { temPrecoDePlano, planosCitados, temLinkDePagamento } from "../../src/lib/planos.ts";
 
 describe("temPrecoDePlano", () => {
   test("reconhece o valor no cartão e à vista", () => {
@@ -64,5 +64,24 @@ describe("planosCitados", () => {
   test("o salário do cargo e o preço avulso da Premium não contam como plano", () => {
     expect(planosCitados("um cargo de R$ 15 a 20 mil por mês")).toEqual([]);
     expect(planosCitados("a Premium sozinha sai quase R$ 2.000")).toEqual([]);
+  });
+});
+
+// Conv 6890: a lead voltou com "Gostaria de contratar a mentoria" e a IA mandou o link do Anual
+// sem escrever um único valor. Sem reconhecer o link, o guard de Kanban não rodaria e o card
+// ficaria sem o marcador "link enviado" — que é o que roteia para a cadência de lembrete (20min)
+// em vez da pós-preço (1h).
+describe("temLinkDePagamento", () => {
+  test("reconhece o link de checkout, inclusive dentro de markdown", () => {
+    expect(temLinkDePagamento("Aqui está o link: https://peritowalker.com.br/mentoriaperitoanual.")).toBe(true);
+    expect(temLinkDePagamento("[https://peritowalker.com.br/mentoriaperitoanual](https://peritowalker.com.br/mentoriaperitoanual)")).toBe(true);
+    expect(temLinkDePagamento("https://peritowalker.com.br/medicolegista")).toBe(true);
+    expect(temLinkDePagamento("https://peritowalker.com.br/mentoriaperitoanualparcelado")).toBe(true);
+  });
+
+  test("não confunde com o e-book nem com texto sem link", () => {
+    expect(temLinkDePagamento("https://www.csiacademy.com.br/ebooks")).toBe(false);
+    expect(temLinkDePagamento("Fica em 12x de R$ 315 no cartão.")).toBe(false);
+    expect(temLinkDePagamento("")).toBe(false);
   });
 });
