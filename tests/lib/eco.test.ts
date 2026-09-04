@@ -47,3 +47,35 @@ describe("respostaIgnoraOLead", () => {
     expect(i.toLowerCase()).toContain("assertiva");
   });
 });
+
+// conv 6948 — o lead mandou 5 mensagens picadas e recebeu 7 bolhas, com "Entendo, Joel." e
+// "Entendi, Joel." dizendo a mesma coisa. O debounce funcionou (agrupou as 5); quem falhou foi
+// esta trava: o eco tinha saído no texto que acompanhou o áudio (mensagem_antes, enviado pela
+// tool), e sobrou em outputFinal só o resto. Avaliando o resto isolado, a trava disparou e a
+// reescrita repetiu o que o lead já tinha lido.
+describe("trava do eco com mídia no mesmo turno (conv 6948)", () => {
+  const FALA_PICADA =
+    "To estudando bem pouco Outro ponto, estou fazendo o curso de ciência da computação Estou no 2 anos Quero estudar antes Na área";
+  const TEXTO_DO_AUDIO =
+    "Entendo, Joel. Estudar antes é uma ótima estratégia, principalmente quando se está no começo do curso. Isso te dá uma base sólida pra quando o edital sair.";
+  const RESTO = "Posso te mandar um vídeo rapidinho de como é a mentoria por dentro?";
+
+  test("o texto residual sozinho parece ignorar o lead", () => {
+    expect(respostaIgnoraOLead(FALA_PICADA, RESTO)).toBe(true);
+  });
+
+  test("o turno completo (mensagem_antes + resto) não dispara a trava", () => {
+    const turnoCompleto = [TEXTO_DO_AUDIO, RESTO].join(" ");
+    expect(respostaIgnoraOLead(FALA_PICADA, turnoCompleto)).toBe(false);
+  });
+
+  test("a instrução de reescrita avisa o que já foi enviado", () => {
+    const instr = instrucaoReescrita(FALA_PICADA, TEXTO_DO_AUDIO);
+    expect(instr).toContain("não repita");
+    expect(instr).toContain("Estudar antes é uma ótima estratégia");
+  });
+
+  test("sem mídia no turno, a instrução segue como antes", () => {
+    expect(instrucaoReescrita(FALA_PICADA)).not.toContain("não repita");
+  });
+});

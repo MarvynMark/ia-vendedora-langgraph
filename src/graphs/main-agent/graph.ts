@@ -476,15 +476,22 @@ async function executarAgente(state: MainAgentStateType) {
     // Aqui NÃO dá pra substituir o texto (ele iria direto pro WhatsApp): reinvocamos o agente UMA
     // vez com a instrução de reescrita. Se a segunda tentativa também ignorar o lead, mandamos a
     // primeira mesmo assim — melhor uma resposta fraca que silêncio.
-    if (!mensagemOriginal.startsWith("[SISTEMA:") && respostaIgnoraOLead(mensagemOriginal, outputFinal)) {
+    // O texto que acompanhou uma mídia (mensagem_antes) JÁ foi enviado ao lead pela tool — é parte
+    // da resposta deste turno, mesmo não estando em outputFinal. Avaliar só o texto residual fazia a
+    // trava disparar mesmo quando o eco tinha saído junto do áudio, e a reescrita então repetia o que
+    // o lead acabara de ler: "Entendo, Joel..." seguido de "Entendi, Joel..." (conv 6948, 7 bolhas).
+    const textoJaEnviado = mensagensAntes.join(" ").trim();
+    const turnoCompleto = [textoJaEnviado, outputFinal].filter(Boolean).join(" ");
+    if (!mensagemOriginal.startsWith("[SISTEMA:") && respostaIgnoraOLead(mensagemOriginal, turnoCompleto)) {
       logger.warn("main-agent", "Resposta ignorou a fala do lead — reescrevendo", {
         idConversa: state.idConversa,
         falaDoLead: mensagemOriginal.slice(0, 120),
         primeiraResposta: outputFinal.slice(0, 120),
+        textoJaEnviado: textoJaEnviado.slice(0, 120),
       });
       try {
         const retry = await agent.invoke(
-          { messages: [...messages, new AIMessage(outputFinal), new HumanMessage(instrucaoReescrita(mensagemOriginal))] },
+          { messages: [...messages, new AIMessage(outputFinal), new HumanMessage(instrucaoReescrita(mensagemOriginal, textoJaEnviado))] },
           langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
         );
         const novas = (retry.messages ?? []).slice(messages.length + 2);

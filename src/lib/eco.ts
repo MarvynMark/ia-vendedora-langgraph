@@ -61,13 +61,19 @@ export function respostaIgnoraOLead(falaDoLead: string, resposta: string): boole
 }
 
 /** Instrução devolvida ao agente quando a trava dispara. */
-export function instrucaoReescrita(falaDoLead: string): string {
+export function instrucaoReescrita(falaDoLead: string, jaEnviado = ""): string {
   const p = palavrasDeConteudo(falaDoLead).slice(0, 4);
+  // O que as tools de mídia já mandaram neste turno JÁ chegou no WhatsApp. A reescrita entra DEPOIS
+  // dele, então precisa saber disso — senão o lead lê "Entendo, Joel" seguido de "Entendi, Joel"
+  // dizendo a mesma coisa (conv 6948).
+  const contexto = jaEnviado.trim()
+    ? ` Você já mandou isto ao lead agora há pouco, não repita nem recomece a saudação: "${jaEnviado.trim().slice(0, 300)}".`
+    : "";
   return (
     "[SISTEMA: sua resposta ignorou o que o lead acabou de dizer. Ele escreveu algo com conteúdo real" +
     (p.length ? ` (falou de: ${p.join(", ")})` : "") +
     ". Reescreva devolvendo o fato mais concreto da fala dele — a pessoa, a data, o obstáculo, a " +
     "rotina — com a palavra dele, e só então siga. Não responda com 'claro', 'tranquilo' ou " +
-    "'perfeito' sozinhos.]"
+    "'perfeito' sozinhos." + contexto + "]"
   );
 }
