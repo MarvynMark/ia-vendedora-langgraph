@@ -65,3 +65,21 @@ bun run meta 2026-08-01 2026-08-31 --dia
 ```
 
 Se o token expirar, o script avisa com a mensagem de erro da própria Meta em vez de falhar seco.
+
+## Skill `meta-ads-vestigium`
+
+Existe uma skill que encapsula a operação da conta — subir anúncios, escolher criativo e
+analisar desempenho — com as armadilhas da API já mapeadas:
+
+```bash
+S=~/.claude/skills/meta-ads-vestigium/scripts
+
+bun run $S/analisar-criativos.ts acervo 15     # top publicações do @peritowalker p/ impulsionar
+bun run $S/analisar-criativos.ts ativos 30     # desempenho dos anúncios no ar
+bun run $S/analisar-criativos.ts publicos 90   # custo por lead por público
+bun run $S/subir-anuncios.ts <adset_id> <media_id>:<NOME> ...   # sobe PAUSADO
+```
+
+Ela documenta o formato de criativo que funciona para promover post existente do Instagram
+(descoberto por tentativa e erro), a contagem correta de leads (a Meta triplica o mesmo lead
+em três chaves), e o comportamento do rate limit — que devolve leitura vazia em vez de erro.
