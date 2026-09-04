@@ -48,6 +48,24 @@ const app = new Elysia()
 
 logger.info("server", `Vestigium Agent rodando em http://localhost:${env.PORT}`);
 
+// O fallback de CHATWOOT_COMERCIAL_CONVERSATION_ID evita derrubar o app quando a variável não foi
+// configurada — mas manda os avisos de lead pro grupo da mentoria em silêncio, e foi exatamente o
+// que aconteceu no deploy de 04/09. Agora o boot diz, alto, onde os avisos vão cair.
+if (!process.env["CHATWOOT_COMERCIAL_CONVERSATION_ID"]) {
+  logger.warn(
+    "server",
+    `⚠️ CHATWOOT_COMERCIAL_CONVERSATION_ID não configurada — os avisos de LEAD (IA pausada, lead ` +
+      `quente, objeção) vão cair no grupo da mentoria (conversa ${env.CHATWOOT_ALERT_CONVERSATION_ID}), ` +
+      `não no grupo do comercial.`,
+  );
+} else {
+  logger.info(
+    "server",
+    `Avisos de lead → conversa ${env.CHATWOOT_COMERCIAL_CONVERSATION_ID} (comercial); ` +
+      `venda/edital/notícias → conversa ${env.CHATWOOT_ALERT_CONVERSATION_ID} (mentoria).`,
+  );
+}
+
 // Job: verificar leads aguardando template (a cada 60 segundos)
 setInterval(async () => {
   try {
