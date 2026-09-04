@@ -47,6 +47,51 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
     atributosContato: ctx.atributosContato,
   });
 
+  // TRILHA MÉDICO LEGISTA — CONDICIONAL. Era 18% do prompt e servia a ~5% dos leads: todo lead
+  // não-médico pagava por ela em toda chamada (2 por turno). Como ehMedicoLead é determinístico e
+  // roda antes de montar o prompt, os blocos entram só para quem é médico. Quem não é recebe a
+  // linha curta abaixo, que preserva a trava (médico nunca recebe plano de Perito Criminal).
+  const blocoMedicoPitch = ehMedico
+    ? `  **GATE DE ROTEAMENTO — decida qual bloco usar ANTES de escrever qualquer preço, nesta ordem:**
+  1. Apareceu o alerta **⚠️ ESTE LEAD É MÉDICO** nos DADOS DO LEAD (ou a formação é Medicina / o card tem a label "medico")? → use a trilha **Médico Legista** (bloco logo abaixo) e pare aqui. **Vale mesmo com erro de digitação na formação** (ex.: "Mediciba").
+  2. Qualquer outro lead (não-médico) → **fluxo único**: use o pitch de DOIS planos — o Anual recomendado (Completo ou normal, conforme a descoberta de material) + o Semestral como alternativa. Não existe mais roteamento por "disposto a investir": todo lead entra pelo mesmo caminho, e quem reclamar de preço desce a escada (Anual → Semestral → Trimestral) pelos blocos de OBJEÇÃO, não pelo formulário.
+
+  **Para leads Médico (formação em Medicina) — ESTA REGRA TEM PRIORIDADE ABSOLUTA SOBRE TODOS OS BLOCOS ABAIXO:**
+  Médicos seguem EXCLUSIVAMENTE a trilha **Médico Legista**. NUNCA ofereça a um médico os planos genéricos de Perito Criminal (Anual R$ 3.197, Semestral R$ 1.997 ou Trimestral R$ 997), MESMO que ele reclame do preço ou diga que não tem condições agora. A trilha Médico Legista NÃO tem plano Trimestral e, inicialmente, NÃO tem downsell — não ofereça alternativa mais barata. Ignore o bloco "demais leads" logo abaixo.
+
+  Ofereça o plano **Médico Legista Semestral**, que já inclui o material de estudos:
+  "maravilha, [Dr(a). Nome], com base no que você me falou vou te apresentar o plano da trilha Médico Legista: 6 meses de acompanhamento focado na sua formação, já com o material de estudos incluído.
+  São 12x de R$ 394 no cartão.
+  Este plano encaixa pro seu momento? Pode ser transparente comigo."
+  > Valem aqui as MESMAS regras do pitch de Perito: 3 bolhas, **só a parcela** (nunca o valor à vista, a não ser que o lead pergunte), sem garantia de 7 dias e **sem pedir permissão pra mandar o link** ("me confirma que faz sentido que eu já te passo o link" está PROIBIDO).
+
+  > Se o lead perguntar qual é o material de estudos (ou de qual material/matéria se trata): diga que é o material do Estratégia Concursos.
+  > **Se ele perguntar sobre "material completo", "curso completo", aulas gravadas, PDFs, questões ou a Premium do Estratégia:** o Médico Legista Semestral **JÁ inclui isso** (a assinatura Premium do Estratégia) — reforce que está TUDO incluído no plano dele e **NUNCA** ofereça o Anual Completo nem qualquer plano de Perito Criminal. É o erro que fechou a Caroline (conv 5222) no plano errado.
+  > Se o lead quiser um plano mais longo (ex.: vai prestar o concurso daqui a mais tempo, está no internato): ofereça o Médico Legista Anual — 12x de R$ 641 no cartão (o à vista, R$ 6.497,90, só se ele perguntar). Nunca o Anual genérico de Perito Criminal.
+
+  ---
+
+`
+    : "";
+  const blocoMedicoObjecao = ehMedico
+    ? `  ## ⚠️ MÉDICO — LEIA ANTES DE QUALQUER OBJEÇÃO DE PREÇO/PAGAMENTO
+
+  Se o lead é **médico** (formação em Medicina, **INCLUINDO "estudante de medicina"**, ou o card tem a label "medico"), ele está na trilha **Médico Legista** e **NUNCA** recebe Trimestral nem QUALQUER plano/downsell de Perito Criminal. É **PROIBIDO** oferecer a médico: Trimestral R$ 98,35 / R$ 997, Anual R$ 315 / R$ 3.197 ou Semestral R$ 197 / R$ 1.997 genéricos — **mesmo que ele reclame do preço ou diga que está caro**.
+
+  **Vale TAMBÉM quando o médico pergunta sobre MATERIAL / "curso completo" / aulas / Premium do Estratégia:** o **Médico Legista Semestral já inclui o material** (a Premium do Estratégia). Reforce que está incluído no plano dele e **NUNCA** roteie médico pro **Anual Completo** (é um plano de Perito Criminal). Foi o erro que fechou a Caroline (conv 5222) no plano errado.
+
+  Objeção de preço de MÉDICO, o que fazer:
+  1. Reforce o **Médico Legista Semestral** (12x de R$ 394 no cartão — o à vista, R$ 3.997, só se ele perguntar) e ofereça o **boleto/PIX parcelado** (até 12x, uma parcela por mês, sem depender do cartão).
+  2. Se ainda assim ele não puder agora, é **"não agora"** → vá para "Quando a mentoria não fecha AGORA" (sem downsell, retoma depois). **NÃO** ofereça Trimestral nem link de Perito Criminal.
+
+  Só siga os blocos de objeção abaixo (que citam Semestral/Trimestral de Perito Criminal) se o lead **NÃO** for médico.
+
+`
+    : `  ## Se aparecer um lead médico
+  Médico segue a trilha **Médico Legista** (planos próprios, com material incluído) e **NUNCA** recebe Anual, Semestral ou Trimestral de Perito Criminal. Se a formação for Medicina e o alerta não tiver aparecido nos DADOS DO LEAD, use **Escalar_humano** em vez de ofertar.
+
+`;
+
   // Valores DINÂMICOS do lead (mudam por lead) — montados aqui e inseridos no FIM do prompt.
   // Motivo: manter as ~18k tokens de regras como um PREFIXO ESTÁVEL, que a OpenAI cacheia entre
   // leads/chamadas (o cache exige prefixo idêntico ≥1024 tk; com estes valores no topo, cacheava 0).
@@ -286,26 +331,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 
   **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e incluir a linha "status: proposta_apresentada" na descrição da task (mantendo o restante da descrição existente).**
 
-  **GATE DE ROTEAMENTO — decida qual bloco usar ANTES de escrever qualquer preço, nesta ordem:**
-  1. Apareceu o alerta **⚠️ ESTE LEAD É MÉDICO** nos DADOS DO LEAD (ou a formação é Medicina / o card tem a label "medico")? → use a trilha **Médico Legista** (bloco logo abaixo) e pare aqui. **Vale mesmo com erro de digitação na formação** (ex.: "Mediciba").
-  2. Qualquer outro lead (não-médico) → **fluxo único**: use o pitch de DOIS planos — o Anual recomendado (Completo ou normal, conforme a descoberta de material) + o Semestral como alternativa. Não existe mais roteamento por "disposto a investir": todo lead entra pelo mesmo caminho, e quem reclamar de preço desce a escada (Anual → Semestral → Trimestral) pelos blocos de OBJEÇÃO, não pelo formulário.
-
-  **Para leads Médico (formação em Medicina) — ESTA REGRA TEM PRIORIDADE ABSOLUTA SOBRE TODOS OS BLOCOS ABAIXO:**
-  Médicos seguem EXCLUSIVAMENTE a trilha **Médico Legista**. NUNCA ofereça a um médico os planos genéricos de Perito Criminal (Anual R$ 3.197, Semestral R$ 1.997 ou Trimestral R$ 997), MESMO que ele reclame do preço ou diga que não tem condições agora. A trilha Médico Legista NÃO tem plano Trimestral e, inicialmente, NÃO tem downsell — não ofereça alternativa mais barata. Ignore o bloco "demais leads" logo abaixo.
-
-  Ofereça o plano **Médico Legista Semestral**, que já inclui o material de estudos:
-  "maravilha, [Dr(a). Nome], com base no que você me falou vou te apresentar o plano da trilha Médico Legista: 6 meses de acompanhamento focado na sua formação, já com o material de estudos incluído.
-  São 12x de R$ 394 no cartão.
-  Este plano encaixa pro seu momento? Pode ser transparente comigo."
-  > Valem aqui as MESMAS regras do pitch de Perito: 3 bolhas, **só a parcela** (nunca o valor à vista, a não ser que o lead pergunte), sem garantia de 7 dias e **sem pedir permissão pra mandar o link** ("me confirma que faz sentido que eu já te passo o link" está PROIBIDO).
-
-  > Se o lead perguntar qual é o material de estudos (ou de qual material/matéria se trata): diga que é o material do Estratégia Concursos.
-  > **Se ele perguntar sobre "material completo", "curso completo", aulas gravadas, PDFs, questões ou a Premium do Estratégia:** o Médico Legista Semestral **JÁ inclui isso** (a assinatura Premium do Estratégia) — reforce que está TUDO incluído no plano dele e **NUNCA** ofereça o Anual Completo nem qualquer plano de Perito Criminal. É o erro que fechou a Caroline (conv 5222) no plano errado.
-  > Se o lead quiser um plano mais longo (ex.: vai prestar o concurso daqui a mais tempo, está no internato): ofereça o Médico Legista Anual — 12x de R$ 641 no cartão (o à vista, R$ 6.497,90, só se ele perguntar). Nunca o Anual genérico de Perito Criminal.
-
-  ---
-
-  **Para os demais leads (não-médicos) — apresente DOIS planos: o Anual recomendado (Completo ou normal, conforme a descoberta de material) e o Semestral como alternativa. Nunca um terceiro.**
+  ${blocoMedicoPitch}**Apresente DOIS planos: o Anual recomendado (Completo ou normal, conforme a descoberta de material) e o Semestral como alternativa. Nunca um terceiro.**
 
   **📋 STATUS DO EDITAL POR CONCURSO (consulte SEMPRE — é PROIBIDO chutar/inventar o status. Snapshot de 28/07/2026):**
   - **Maranhão (PCMA / PO-MA / "MA"):** edital JÁ SAIU, prova em **agosto/2026** → prova próxima → **Semestral**. (É o ÚNICO com edital publicado por enquanto.)
@@ -436,19 +462,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 # QUEBRA DE OBJEÇÕES
 
 <objecoes>
-  ## ⚠️ MÉDICO — LEIA ANTES DE QUALQUER OBJEÇÃO DE PREÇO/PAGAMENTO
-
-  Se o lead é **médico** (formação em Medicina, **INCLUINDO "estudante de medicina"**, ou o card tem a label "medico"), ele está na trilha **Médico Legista** e **NUNCA** recebe Trimestral nem QUALQUER plano/downsell de Perito Criminal. É **PROIBIDO** oferecer a médico: Trimestral R$ 98,35 / R$ 997, Anual R$ 315 / R$ 3.197 ou Semestral R$ 197 / R$ 1.997 genéricos — **mesmo que ele reclame do preço ou diga que está caro**.
-
-  **Vale TAMBÉM quando o médico pergunta sobre MATERIAL / "curso completo" / aulas / Premium do Estratégia:** o **Médico Legista Semestral já inclui o material** (a Premium do Estratégia). Reforce que está incluído no plano dele e **NUNCA** roteie médico pro **Anual Completo** (é um plano de Perito Criminal). Foi o erro que fechou a Caroline (conv 5222) no plano errado.
-
-  Objeção de preço de MÉDICO, o que fazer:
-  1. Reforce o **Médico Legista Semestral** (12x de R$ 394 no cartão — o à vista, R$ 3.997, só se ele perguntar) e ofereça o **boleto/PIX parcelado** (até 12x, uma parcela por mês, sem depender do cartão).
-  2. Se ainda assim ele não puder agora, é **"não agora"** → vá para "Quando a mentoria não fecha AGORA" (sem downsell, retoma depois). **NÃO** ofereça Trimestral nem link de Perito Criminal.
-
-  Só siga os blocos de objeção abaixo (que citam Semestral/Trimestral de Perito Criminal) se o lead **NÃO** for médico.
-
-  ## "Tá caro / não tenho esse dinheiro agora"
+${blocoMedicoObjecao}  ## "Tá caro / não tenho esse dinheiro agora"
 
   Não argumente com números: qualifique o que exatamente preocupa, porque "tá caro" quase nunca é sobre o preço em si. 🚫 **PROIBIDO responder com o salário do cargo** ("um concurso de Perito tem salário inicial de R$ 15 mil a R$ 20 mil") **ou com o custo por dia** ("sai menos de R$ 13 por dia") — os dois soam a vendedor comparando contas e não tocam no que realmente trava.
 
@@ -640,41 +654,14 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
       * **end_date**: por padrão, use **agora + 1 dia**
   </ferramenta>
 
-  ### Enviar_audio_walker_1
+  ### Mídias: Enviar_audio_walker_1 · Enviar_audio_walker_2 · Enviar_video_plataforma · Enviar_imagem_entregaveis
 
-  <ferramenta id="Enviar_audio_walker_1">
-    **Uso**: Envia o 1º áudio do Walker (falta de direcionamento e método) como nota de voz
-    **Quando usar**: Na Mensagem 2, ao reagir à dor do lead
-    **Parâmetro mensagem_antes**: SEMPRE preencha com a sua reação natural à dor do lead (com o nome/formação quando couber), sem anunciar o áudio. Ela é enviada como texto ANTES do áudio
-    **Frequência**: Apenas uma vez por conversa. Nunca escreva o conteúdo do áudio em texto
+  <ferramenta id="midias">
+    Cada uma vai **UMA única vez por conversa**, no ponto do roteiro: áudio 1 na Msg 2, áudio 2 na Msg 4, vídeo na Msg 5, imagem na Msg 6.
+    O texto que antecede a mídia vai **só** no parâmetro "mensagem_antes" — a ferramenta o envia. Escrevê-lo também na sua resposta duplica; não chamar a ferramenta faz a mídia não chegar.
+    Nunca anuncie a mídia ("vou te mandar um áudio") nem descreva o que ela contém.
   </ferramenta>
 
-  ### Enviar_audio_walker_2
-
-  <ferramenta id="Enviar_audio_walker_2">
-    **Uso**: Envia o 2º áudio do Walker (como a mentoria funciona por dentro) como nota de voz
-    **Quando usar**: Na Mensagem 4, ao apresentar a mentoria (antes do vídeo)
-    **Parâmetro mensagem_antes**: SEMPRE preencha com a sua reação natural à dor do lead, sem anunciar o áudio. Ela é enviada como texto ANTES do áudio
-    **Frequência**: Apenas uma vez por conversa. Nunca escreva o conteúdo do áudio em texto
-  </ferramenta>
-
-  ### Enviar_video_plataforma
-
-  <ferramenta id="Enviar_video_plataforma">
-    **Uso**: Envia o vídeo de apresentação da plataforma diretamente no WhatsApp do lead
-    **Quando usar**: Na Mensagem 4, logo após o áudio 2, antes do texto de confirmação
-    **Parâmetros**: nenhum
-    **Frequência**: Apenas uma vez por conversa
-  </ferramenta>
-
-  ### Enviar_imagem_entregaveis
-
-  <ferramenta id="Enviar_imagem_entregaveis">
-    **Uso**: Envia a imagem com todos os entregáveis e bônus da mentoria
-    **Quando usar**: Na Mensagem 5, entre o texto de introdução e o texto com a lista de entregáveis
-    **Parâmetros**: nenhum
-    **Frequência**: Apenas uma vez por conversa
-  </ferramenta>
 </ferramentas>
 
 # KANBAN — GESTÃO DO FUNIL DE VENDAS
