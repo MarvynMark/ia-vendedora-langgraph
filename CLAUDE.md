@@ -46,6 +46,7 @@ Follow-up types are classified by Kanban step:
 - **Concurrency control**: Message queue (`db/fila.ts`) + conversation lock (`db/lock.ts`) with TTL + debounce prevent race conditions
 - **Response pipeline**: Agent output → SSML formatting → ElevenLabs TTS → audio message (falls back to text on audio failure)
 - **Checkpointing**: `@langchain/langgraph-checkpoint-postgres` persists agent state across requests
+- **RAG de objeções**: rare objections live in `rag_documentos` (tipo `objecao`), not in the prompt — only their safety lock stays inline. The agent fetches the full script on demand via `Buscar_contexto_similar`. Re-seed with `bun run src/scripts/ingerir-roteiros-objecao.ts` (idempotent; keyed on `metadata.origem = "roteiro_prompt"`, leaves the real-conversation docs untouched).
 - **Prompts**: System prompts in `prompt.ts`/`prompts.ts`. Only `{{ }}` → `${}` substitutions were made from original n8n workflows.
 
 ### HTTP Routes
