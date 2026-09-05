@@ -739,6 +739,33 @@ export async function verificarLeadRespondeuUltimo(
   return ultima.message_type === 0;
 }
 
+/**
+ * Minutos desde a última mensagem DO LEAD (incoming). `null` quando ele nunca falou.
+ *
+ * O lembrete de abandono de checkout sai 20 minutos depois do link, o que só faz sentido contra
+ * SILÊNCIO. Na conv 6890 a lead recebeu o link, respondeu "Combinado!" um minuto depois e levou
+ * "travou alguma coisa na hora de finalizar?" 22 minutos mais tarde — cobrando quem tinha acabado
+ * de dizer que ia fazer.
+ */
+export async function minutosDesdeUltimaMensagemLead(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<number | null> {
+  const data = await listarMensagens(accountId, conversationId) as { payload?: Array<{ message_type: number; created_at: number }> };
+  return minutosDesdeUltimaIncoming(data.payload ?? []);
+}
+
+/** A parte pura da função acima — testável sem rede (mesma ideia de routes/webhook-filtros.ts). */
+export function minutosDesdeUltimaIncoming(
+  mensagens: Array<{ message_type: number; created_at: number }>,
+  agoraSeg: number = Date.now() / 1000,
+): number | null {
+  const doLead = mensagens.filter((m) => m.message_type === 0);
+  if (doLead.length === 0) return null;
+  const maisRecente = Math.max(...doLead.map((m) => m.created_at));
+  return (agoraSeg - maisRecente) / 60;
+}
+
 // Conteúdo da última mensagem ENVIADA pelo agente (outgoing, type 1) na conversa.
 // Usado para evitar reenviar um follow-up idêntico ao último (ex.: template de fallback
 // repetido em posições consecutivas fora da janela de 24h). Retorna "" se não houver.

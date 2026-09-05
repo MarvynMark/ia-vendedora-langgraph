@@ -1,7 +1,7 @@
 import { StateGraph, END } from "@langchain/langgraph";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, minutosDesdeUltimaMensagemLead, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../lib/nome.ts";
 import { ehMedicoPorFormacao } from "../../lib/medico.ts";
@@ -319,8 +319,38 @@ const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 6
 // Fallback pago (fora da janela 24h), por posição do contador.
 const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "recuperacao_enxuta", "lembrete_2"] as const;
 
+// Silêncio mínimo antes do lembrete de checkout. O toque 1 sai 20min depois do link, prazo curto
+// de propósito (abandono de carrinho se resolve rápido) — mas 20min de RELÓGIO não são 20min de
+// silêncio. Quem acabou de responder não abandonou nada.
+const MIN_SILENCIO_LEMBRETE_MIN = 60;
+
 async function agenteLembrete(state: FollowUpStateType) {
   logger.info("follow-up", "executando lembrete pré-configurado...");
+
+  // Guarda de sinal de vida — o agenteFollowup (Conexão) já tinha a dele, este não. Na conv 6890
+  // a lead recebeu o link 19:12, respondeu "Combinado!" 19:13 e levou "travou alguma coisa na hora
+  // de finalizar?" às 19:36. Só o `respondeuUltimo` não a salvaria: quem falou por último foi a IA
+  // (um "🚀"), por isso a régua aqui é o silêncio do LEAD, não de quem falou por último.
+  try {
+    const [respondeuUltimo, minutosLead] = await Promise.all([
+      verificarLeadRespondeuUltimo(state.accountId, state.conversationId),
+      minutosDesdeUltimaMensagemLead(state.accountId, state.conversationId),
+    ]);
+    const falouAgoraPouco = minutosLead !== null && minutosLead < MIN_SILENCIO_LEMBRETE_MIN;
+    if (respondeuUltimo || falouAgoraPouco) {
+      const proxima = proximoHorarioComercial(new Date(), 2 * 60 * 60 * 1000);
+      logger.info("follow-up", "Lead deu sinal de vida — lembrete adiado", {
+        respondeuUltimo,
+        minutosDesdeAFalaDoLead: minutosLead === null ? null : Math.round(minutosLead),
+        proxima: proxima.toISOString(),
+      });
+      await atualizarKanbanTask(state.accountId, state.taskId, { due_date: proxima.toISOString() });
+      return { respostaAgente: "" };
+    }
+  } catch (e) {
+    // Falha de leitura não pode impedir o lembrete: pior ficar sem o toque que travar a cadência.
+    logger.warn("follow-up", "Erro ao checar sinal de vida do lead (seguindo com o lembrete):", e);
+  }
 
   const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
   const dentroJanela = msRestantes > 0;

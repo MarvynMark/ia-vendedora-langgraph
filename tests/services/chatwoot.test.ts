@@ -31,6 +31,7 @@ import {
   registrarTextoMidiaNaoEnviado,
   registrarSaidasRecentes,
   saidasRecentes,
+  minutosDesdeUltimaIncoming,
 } from "../../src/services/chatwoot.ts";
 
 describe("chatwoot service", () => {
@@ -617,5 +618,43 @@ describe("chatwoot service", () => {
     test("conversa sem registro devolve lista vazia", () => {
       expect(saidasRecentes("c-inexistente")).toEqual([]);
     });
+  });
+});
+
+// Conv 6890: link 19:12, "Combinado!" 19:13, cobrança "travou na hora de finalizar?" 19:36. O
+// lembrete de 20min é contra SILÊNCIO — 20min de relógio não são 20min de silêncio.
+// Testado na forma PURA: outro arquivo da suíte troca listarMensagens por um stub vazio no
+// processo inteiro, e a versão que vai à rede fica refém disso.
+describe("minutosDesdeUltimaIncoming", () => {
+  const AGORA = 1_000_000;
+
+  test("null quando o lead nunca falou", () => {
+    expect(minutosDesdeUltimaIncoming([{ message_type: 1, created_at: AGORA }], AGORA)).toBeNull();
+    expect(minutosDesdeUltimaIncoming([], AGORA)).toBeNull();
+  });
+
+  test("mede a partir da fala DO LEAD, ignorando as da IA depois dela", () => {
+    // "Combinado!" há 22min e o "🚀" da IA 1s atrás — a régua é o lead, não quem falou por último
+    const msgs = [
+      { message_type: 0, created_at: AGORA - 22 * 60 },
+      { message_type: 1, created_at: AGORA - 1 },
+    ];
+    expect(minutosDesdeUltimaIncoming(msgs, AGORA)).toBe(22);
+  });
+
+  test("usa a fala mais recente do lead", () => {
+    const msgs = [
+      { message_type: 0, created_at: AGORA - 300 * 60 },
+      { message_type: 0, created_at: AGORA - 5 * 60 },
+    ];
+    expect(minutosDesdeUltimaIncoming(msgs, AGORA)).toBe(5);
+  });
+
+  test("independe da ordem em que o Chatwoot devolve", () => {
+    const msgs = [
+      { message_type: 0, created_at: AGORA - 5 * 60 },
+      { message_type: 0, created_at: AGORA - 300 * 60 },
+    ];
+    expect(minutosDesdeUltimaIncoming(msgs, AGORA)).toBe(5);
   });
 });
