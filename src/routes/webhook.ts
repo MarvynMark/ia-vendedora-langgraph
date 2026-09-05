@@ -4,7 +4,7 @@ import type { ChatwootWebhookPayload } from "../types/chatwoot.ts";
 import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
-import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao } from "./webhook-filtros.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera } from "./webhook-filtros.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
 import { limparHistorico } from "../db/memoria.ts";
@@ -24,7 +24,6 @@ import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 
-const GRUPO_ESPERA_KEYWORDS = ["grupo de espera", "grupo de espero", "acesso ao grupo", "entrar no grupo"];
 
 
 const webhookPayloadSchema = z.object({
@@ -120,9 +119,9 @@ export const webhookRouter = new Elysia()
       sender: parsed.data.sender.name,
     });
 
-    // Automação fixa: resposta do grupo de espera (funciona para qualquer conversa)
-    const contentLower = content.toLowerCase();
-    if (GRUPO_ESPERA_KEYWORDS.some(kw => contentLower.includes(kw))) {
+    // Automação fixa: link do grupo de espera (funciona para qualquer conversa). Só para quem
+    // PEDE o grupo — citar o grupo não é pedir (ver pedeGrupoDeEspera em webhook-filtros.ts).
+    if (pedeGrupoDeEspera(content)) {
       logger.info("webhook", "Pedido de grupo de espera detectado");
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
