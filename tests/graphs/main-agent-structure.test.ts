@@ -71,7 +71,10 @@ describe("main agent prompt", () => {
     expect(prompt.length).toBeGreaterThan(30000);
     // Teto atualizado: o prompt cresceu com Anual Completo, ganchos do formulário e regras de médico
     // (~72k). Mantém um limite de sanidade contra crescimento descontrolado.
-    expect(prompt.length).toBeLessThan(90000);
+    // 90k → 92k: a bifurcação do FECHAMENTO (escolheu → link / hesitou → "o que pesa") custou 635
+    // caracteres LÍQUIDOS, já descontada a fusão com o antigo bloco ⚡, que virou duplicata dela.
+    // São ~160 tokens por chamada contra ~20k de input — o teto é sanidade, não orçamento.
+    expect(prompt.length).toBeLessThan(92000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
