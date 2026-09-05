@@ -9,6 +9,11 @@
 //
 // O gate garante que a PERGUNTA aconteça; a escolha do plano continua com o LLM lendo a resposta
 // no histórico. Médicos passam direto: a trilha Médico Legista já inclui o material.
+//
+// ⚠️ O gatilho é a OFERTA, não só o preço. Na conv 6890 a lead voltou com "Gostaria de contratar a
+// mentoria" e recebeu direto o link do Anual puro, sem a IA escrever um único R$ — os dois gates
+// passaram por baixo, e uma iniciante que não sabia por onde começar levou o plano SEM material
+// quando o roteiro mandava o Anual Completo. Ver `temLinkDePagamento` em lib/planos.ts.
 
 // A pergunta de descoberta como o prompt a formula ("você já tem um material/conteúdo organizado
 // (tipo Estratégia, Gran, apostila) ou ainda tá sem isso?") e suas paráfrases prováveis.
@@ -51,6 +56,25 @@ export function falaSubstantiva(texto: string): boolean {
  */
 export function situacaoDescoberta(historico: MensagemHistorico[]): boolean {
   return historico.filter((m) => m.type === "human" && falaSubstantiva(m.content ?? "")).length >= 2;
+}
+
+// Fragmento distintivo de PERGUNTA_DESCOBERTA_SITUACAO — reconhece a pergunta já enviada, mesmo
+// se o LLM tiver parafraseado o resto da frase.
+const RE_PERGUNTA_SITUACAO = /rotina de estudo (hoje|agora)|como (t[áa]|est[áa]) (a )?(tua|sua) rotina de estudo/i;
+
+/**
+ * VÁLVULA ANTI-LOOP. `situacaoDescoberta` só destrava com DUAS falas de 40+ caracteres, e nem
+ * todo comprador escreve assim: quem responde "não tenho" e "quero sim" nunca chega lá, e o gate
+ * devolveria a mesma pergunta a cada turno, para sempre. Se a pergunta já foi feita e o lead
+ * respondeu alguma coisa, considera-se cumprida — perguntar de novo é o comportamento robótico
+ * que o roteiro proíbe, e o custo de deixar passar é menor que o de travar quem quer comprar.
+ */
+export function descobertaSituacaoFeita(historico: MensagemHistorico[]): boolean {
+  const iPergunta = historico.findIndex(
+    (m) => m.type === "ai" && RE_PERGUNTA_SITUACAO.test(m.content ?? ""),
+  );
+  if (iPergunta < 0) return false;
+  return historico.slice(iPergunta + 1).some((m) => m.type === "human" && (m.content ?? "").trim() !== "");
 }
 
 /**

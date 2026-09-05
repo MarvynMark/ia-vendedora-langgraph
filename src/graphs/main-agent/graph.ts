@@ -14,7 +14,7 @@ import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurno
 import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
-import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
+import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
 import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
 import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
@@ -487,35 +487,44 @@ async function executarAgente(state: MainAgentStateType) {
     // direto: a trilha Médico Legista já inclui o material.
     let outputFinal = output;
     const historicoComTurnoAtual = [...historico, { type: "human", content: mensagemOriginal }];
-    // O gate vale só para o PRIMEIRO preço da conversa. Se o lead já ouviu um valor antes (inclusive
-    // nas conversas que já estavam em andamento no deploy), perguntar de material agora sairia do
-    // nada — e travaria uma resposta legítima do tipo "quanto era mesmo?".
-    const precoJaApresentado = historico.some((m) => m.type === "ai" && temPrecoDePlano(m.content ?? ""));
+    // O que os gates seguram é a OFERTA, não só o número. Enquanto o gatilho era só o preço, um
+    // lead quente que pedia pra contratar recebia o LINK direto, sem um único R$ no texto, e
+    // passava por baixo dos dois gates (conv 6890: iniciante sem material levou o Anual puro
+    // quando o roteiro mandava o Anual Completo). Link é oferta fechada — mais comprometedor que
+    // o preço, porque já define o plano.
+    const ofertaNoTurno = (texto: string) => temPrecoDePlano(texto) || temLinkDePagamento(texto);
+    // Os gates valem só para a PRIMEIRA oferta da conversa. Se o lead já ouviu um valor ou já
+    // recebeu um link antes (inclusive nas conversas em andamento no deploy), perguntar de
+    // material agora sairia do nada — e travaria um legítimo "quanto era mesmo?".
+    const ofertaJaApresentada = historico.some((m) => m.type === "ai" && ofertaNoTurno(m.content ?? ""));
+    const ehMedico = ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato });
     if (
-      temPrecoDePlano(outputFinal) &&
-      !precoJaApresentado &&
-      !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }) &&
+      ofertaNoTurno(outputFinal) &&
+      !ofertaJaApresentada &&
+      !ehMedico &&
       !descobertaMaterialFeita(historicoComTurnoAtual) &&
       materialDeclaradoPeloLead(historicoComTurnoAtual) === null
     ) {
-      logger.warn("main-agent", "Preço bloqueado: descoberta de material ainda não foi feita", {
+      logger.warn("main-agent", "Oferta bloqueada: descoberta de material ainda não foi feita", {
         idConversa: state.idConversa,
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = PERGUNTA_DESCOBERTA_MATERIAL;
     }
 
-    // GATE DE SITUAÇÃO — o preço também espera o lead ter CONTADO a situação dele. Em agosto o
+    // GATE DE SITUAÇÃO — a oferta também espera o lead ter CONTADO a situação dele. Em agosto o
     // lead escrevia 34 caracteres em média antes de ouvir o valor: a IA vendia mentoria de R$ 4 mil
     // para quem ela não conhecia, e sem dor articulada o pitch cai no vazio. Exige duas falas
-    // substantivas; monossílabo de cortesia não conta.
+    // substantivas; monossílabo de cortesia não conta. `descobertaSituacaoFeita` é a válvula que
+    // impede o gate de repetir a mesma pergunta para sempre a quem responde curto.
     if (
-      temPrecoDePlano(outputFinal) &&
-      !precoJaApresentado &&
-      !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }) &&
-      !situacaoDescoberta(historicoComTurnoAtual)
+      ofertaNoTurno(outputFinal) &&
+      !ofertaJaApresentada &&
+      !ehMedico &&
+      !situacaoDescoberta(historicoComTurnoAtual) &&
+      !descobertaSituacaoFeita(historicoComTurnoAtual)
     ) {
-      logger.warn("main-agent", "Preço bloqueado: o lead ainda não contou a situação dele", {
+      logger.warn("main-agent", "Oferta bloqueada: o lead ainda não contou a situação dele", {
         idConversa: state.idConversa,
       });
       outputFinal = PERGUNTA_DESCOBERTA_SITUACAO;
@@ -652,7 +661,7 @@ async function executarAgente(state: MainAgentStateType) {
     const linkEnviado = temLinkDePagamento(turnoEnviado);
     if (temPrecoDePlano(turnoEnviado) || linkEnviado) {
       await moverParaAguardandoPagamento(state.idConta, tarefa as Record<string, unknown>, etapas, linkEnviado);
-    } else if (!precoJaApresentado) {
+    } else if (!ofertaJaApresentada) {
       await desfazerPagamentoPrematuro(state.idConta, tarefa as Record<string, unknown>, etapas, stepAntesDoTurno);
     }
 

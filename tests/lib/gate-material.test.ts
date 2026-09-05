@@ -1,11 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import {
-  descobertaMaterialFeita,
-  classificarRespostaMaterial,
-  materialDeclaradoPeloLead,
-  falaSubstantiva,
-  situacaoDescoberta,
-} from "../../src/lib/gate-material.ts";
+import { descobertaMaterialFeita, classificarRespostaMaterial, materialDeclaradoPeloLead, falaSubstantiva, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_SITUACAO } from "../../src/lib/gate-material.ts";
 import { ehMedicoLead, ehMedicoPorFormacao } from "../../src/lib/medico.ts";
 
 const ai = (content: string) => ({ type: "ai", content });
@@ -131,5 +125,34 @@ describe("gate de situação — o preço espera o lead contar a rotina", () => 
   test("conversa só de monossílabos nunca libera o preço", () => {
     const h = [{ type: "human", content: "sim" }, { type: "human", content: "ok" }, { type: "human", content: "pode sim" }];
     expect(situacaoDescoberta(h)).toBe(false);
+  });
+});
+
+// Válvula anti-loop: situacaoDescoberta só destrava com DUAS falas de 40+ caracteres. Quem compra
+// respondendo curto ("não tenho", "quero sim") nunca chegaria lá, e o gate devolveria a mesma
+// pergunta a cada turno, para sempre.
+describe("descobertaSituacaoFeita", () => {
+  const perguntou = { type: "ai", content: PERGUNTA_DESCOBERTA_SITUACAO };
+
+  test("falso quando a pergunta nunca foi feita", () => {
+    expect(descobertaSituacaoFeita([{ type: "human", content: "oi" }])).toBe(false);
+  });
+
+  test("falso quando perguntou e o lead ainda não respondeu", () => {
+    expect(descobertaSituacaoFeita([{ type: "human", content: "oi" }, perguntou])).toBe(false);
+  });
+
+  test("verdadeiro assim que o lead responde qualquer coisa depois da pergunta", () => {
+    expect(descobertaSituacaoFeita([perguntou, { type: "human", content: "corrida" }])).toBe(true);
+  });
+
+  test("reconhece a pergunta parafraseada pelo LLM", () => {
+    const parafrase = { type: "ai", content: "Me conta, como tá a sua rotina de estudo hoje?" };
+    expect(descobertaSituacaoFeita([parafrase, { type: "human", content: "puxada" }])).toBe(true);
+  });
+
+  test("não confunde com outra pergunta qualquer da IA", () => {
+    const outra = { type: "ai", content: "Você já teve algum acompanhamento assim?" };
+    expect(descobertaSituacaoFeita([outra, { type: "human", content: "não" }])).toBe(false);
   });
 });
