@@ -21,20 +21,32 @@ interface Plano {
   valores: string[];
   /** Casa o NOME do plano escrito no texto — desempata valores compartilhados. */
   nome: RegExp;
+  /** Caminho do link de CARTÃO (à vista no PIX ou 12x), depois de peritowalker.com.br/. */
+  slug: string;
+  /** Caminho do link de BOLETO/PIX PARCELADO. `null` = esse plano só tem cartão. */
+  slugParcelado: string | null;
 }
 
 // Ordem importa na detecção por nome: "anual completo" tem que ser testado antes de "anual",
 // e os planos de médico antes dos genéricos (o rótulo "semestral" aparece nos dois).
 const PLANOS: Plano[] = [
-  { id: "medico_anual",     rotulo: "Médico Legista Anual",     valores: ["6.497", "641"],            nome: /m[ée]dic[oa] legista\s+anual|legista anual/i },
-  { id: "medico_semestral", rotulo: "Médico Legista Semestral", valores: ["3.997", "394", "413"],     nome: /m[ée]dic[oa] legista/i },
-  { id: "anual_completo",   rotulo: "Anual Completo",           valores: ["3.997", "394", "413,38"],  nome: /anual completo/i },
-  { id: "anual",            rotulo: "Anual",                    valores: ["3.197", "315", "330"],     nome: /\banual\b/i },
+  { id: "medico_anual",     rotulo: "Médico Legista Anual",     valores: ["6.497", "641"],            nome: /m[ée]dic[oa] legista\s+anual|legista anual/i,
+    slug: "mentorialegistaanual",          slugParcelado: null },
+  { id: "medico_semestral", rotulo: "Médico Legista Semestral", valores: ["3.997", "394", "413"],     nome: /m[ée]dic[oa] legista/i,
+    slug: "medicolegista",                 slugParcelado: "medicolegistaparcelado" },
+  { id: "anual_completo",   rotulo: "Anual Completo",           valores: ["3.997", "394", "413,38"],  nome: /anual completo/i,
+    slug: "mentoriaperitoanualpremium",    slugParcelado: "mentoriaperitoanualpremiumparcelado" },
+  { id: "anual",            rotulo: "Anual",                    valores: ["3.197", "315", "330"],     nome: /\banual\b/i,
+    slug: "mentoriaperitoanual",           slugParcelado: "mentoriaperitoanualparcelado" },
   // Semestral Premium: 6 meses COM a Premium do Estratégia. Testado antes do Semestral puro
   // porque "premium" e "completo" precisam ganhar do rótulo genérico "semestral".
-  { id: "semestral_premium", rotulo: "Semestral Premium",       valores: ["2.497", "246"],            nome: /semestral premium|premium semestral|perito criminal premium/i },
-  { id: "semestral",        rotulo: "Semestral",                valores: ["1.997", "197", "206"],     nome: /semestral/i },
-  { id: "trimestral",       rotulo: "Trimestral",               valores: ["997", "98,35", "103,11"],  nome: /trimestral/i },
+  // ⚠️ É o ÚNICO plano de Perito sem link de parcelado — ver conferirFormaDePagamento.
+  { id: "semestral_premium", rotulo: "Semestral Premium",       valores: ["2.497", "246"],            nome: /semestral premium|premium semestral|perito criminal premium/i,
+    slug: "mentoriaperitosemestralpremium", slugParcelado: null },
+  { id: "semestral",        rotulo: "Semestral",                valores: ["1.997", "197", "206"],     nome: /semestral/i,
+    slug: "mentoriaperito",                slugParcelado: "mentoriaperitoparcelado" },
+  { id: "trimestral",       rotulo: "Trimestral",               valores: ["997", "98,35", "103,11"],  nome: /trimestral/i,
+    slug: "mentoriaperitotrimestral",      slugParcelado: "mentoriaperitotrimestralparcelado" },
 ];
 
 export const ROTULO_PLANO: Record<PlanoId, string> = Object.fromEntries(
@@ -104,4 +116,63 @@ export function planosCitados(texto: string, preferir?: PlanoId | null): PlanoId
     if (!achados.includes(escolhido.id)) achados.push(escolhido.id);
   }
   return achados;
+}
+
+// --- Conferência da forma de pagamento (conv 7021) ---
+//
+// A Julia disse "não vou ter esse limite no cartão", a IA prometeu boleto/PIX parcelado e mandou
+// `[Semestral Premium Parcelado](https://peritowalker.com.br/mentoriaperitosemestralpremium)` —
+// que é o link do CARTÃO, rotulado como parcelado. Ela abre, não consegue pagar e some.
+//
+// A tabela de links já estava certa no prompt (o Semestral Premium é o único plano de Perito sem
+// parcelado), mas tabela em prompt é sugestão. Aqui vira conferência determinística.
+
+/** O texto promete parcelado/boleto/PIX parcelado, ou pagar sem depender do cartão? */
+const RE_PROMESSA_PARCELADO = /parcelad|boleto|sem (depender de |precisar de )?limite|sem limite/i;
+
+export interface ConferenciaPagamento {
+  /** Texto com as URLs trocadas pela versão parcelada, quando ela existe. */
+  texto: string;
+  /** Trocas feitas — para log. */
+  corrigidos: Array<{ plano: PlanoId; de: string; para: string }>;
+  /** Planos oferecidos como parcelado que NÃO têm link de parcelado. Precisa de decisão humana. */
+  semParcelado: PlanoId[];
+}
+
+/**
+ * Quando a resposta promete parcelado mas carrega o link de cartão:
+ * - o plano TEM link de parcelado → troca a URL (determinístico, pela tabela acima);
+ * - o plano NÃO tem (Semestral Premium, Médico Legista Anual) → devolve em `semParcelado`,
+ *   porque a saída certa é uma decisão comercial, não uma reescrita.
+ * Sem promessa de parcelado no texto, não mexe em nada.
+ */
+export function conferirFormaDePagamento(texto: string): ConferenciaPagamento {
+  const original = texto ?? "";
+  const vazio: ConferenciaPagamento = { texto: original, corrigidos: [], semParcelado: [] };
+  if (!original || !RE_PROMESSA_PARCELADO.test(original)) return vazio;
+
+  const slugsNoTexto = [...original.matchAll(/peritowalker\.com\.br\/([a-z0-9]+)/gi)]
+    .map((m) => m[1]!.toLowerCase());
+  if (slugsNoTexto.length === 0) return vazio;
+
+  let saida = original;
+  const corrigidos: ConferenciaPagamento["corrigidos"] = [];
+  const semParcelado: PlanoId[] = [];
+
+  for (const slug of new Set(slugsNoTexto)) {
+    // Já é um link de parcelado? Nada a fazer.
+    if (PLANOS.some((p) => p.slugParcelado === slug)) continue;
+    const plano = PLANOS.find((p) => p.slug === slug);
+    if (!plano) continue;
+    if (!plano.slugParcelado) {
+      semParcelado.push(plano.id);
+      continue;
+    }
+    // O lookahead impede que "mentoriaperito" (Semestral) case dentro de "mentoriaperitoanual".
+    const re = new RegExp(`(peritowalker\\.com\\.br/)${slug}(?![a-z0-9])`, "gi");
+    saida = saida.replace(re, `$1${plano.slugParcelado}`);
+    corrigidos.push({ plano: plano.id, de: slug, para: plano.slugParcelado });
+  }
+
+  return { texto: saida, corrigidos, semParcelado };
 }

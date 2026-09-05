@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { temPrecoDePlano, planosCitados, temLinkDePagamento } from "../../src/lib/planos.ts";
+import { temPrecoDePlano, planosCitados, temLinkDePagamento, conferirFormaDePagamento } from "../../src/lib/planos.ts";
 
 describe("temPrecoDePlano", () => {
   test("reconhece o valor no cartão e à vista", () => {
@@ -83,5 +83,57 @@ describe("temLinkDePagamento", () => {
     expect(temLinkDePagamento("https://www.csiacademy.com.br/ebooks")).toBe(false);
     expect(temLinkDePagamento("Fica em 12x de R$ 315 no cartão.")).toBe(false);
     expect(temLinkDePagamento("")).toBe(false);
+  });
+});
+
+// Conv 7021: lead sem limite no cartão, a IA prometeu boleto/PIX parcelado e mandou o link do
+// CARTÃO rotulado "Parcelado". A lead abre, não consegue pagar e some.
+describe("conferirFormaDePagamento", () => {
+  const PROMESSA = "Dá pra fazer no boleto ou no PIX parcelado, em até 12x, sem depender de limite no cartão.";
+
+  test("troca o link de cartão pelo de parcelado quando o plano tem os dois", () => {
+    const r = conferirFormaDePagamento(`${PROMESSA} https://peritowalker.com.br/mentoriaperitoanual`);
+    expect(r.texto).toContain("peritowalker.com.br/mentoriaperitoanualparcelado");
+    expect(r.corrigidos[0]?.plano).toBe("anual");
+    expect(r.semParcelado).toEqual([]);
+  });
+
+  test("não confunde o Semestral com os planos cujo slug o contém", () => {
+    const r = conferirFormaDePagamento(`${PROMESSA} https://peritowalker.com.br/mentoriaperito`);
+    expect(r.texto).toContain("peritowalker.com.br/mentoriaperitoparcelado");
+    expect(r.corrigidos[0]?.plano).toBe("semestral");
+  });
+
+  test("corrige dentro de markdown, label e URL", () => {
+    const r = conferirFormaDePagamento(
+      `${PROMESSA} [Anual Completo](https://peritowalker.com.br/mentoriaperitoanualpremium)`,
+    );
+    expect(r.texto).toContain("mentoriaperitoanualpremiumparcelado");
+    expect(r.texto).not.toMatch(/mentoriaperitoanualpremium(?!parcelado)/);
+  });
+
+  test("Semestral Premium não tem parcelado — sinaliza em vez de inventar URL", () => {
+    const r = conferirFormaDePagamento(`${PROMESSA} https://peritowalker.com.br/mentoriaperitosemestralpremium`);
+    expect(r.semParcelado).toEqual(["semestral_premium"]);
+    expect(r.corrigidos).toEqual([]);
+    expect(r.texto).toContain("mentoriaperitosemestralpremium"); // não inventa link
+  });
+
+  test("link que JÁ é o de parcelado passa intacto", () => {
+    const r = conferirFormaDePagamento(`${PROMESSA} https://peritowalker.com.br/mentoriaperitoparcelado`);
+    expect(r.corrigidos).toEqual([]);
+    expect(r.semParcelado).toEqual([]);
+  });
+
+  test("sem promessa de parcelado, não mexe em nada", () => {
+    const cartao = "Fica em 12x de R$ 315 no cartão. https://peritowalker.com.br/mentoriaperitoanual";
+    const r = conferirFormaDePagamento(cartao);
+    expect(r.texto).toBe(cartao);
+    expect(r.corrigidos).toEqual([]);
+  });
+
+  test("texto vazio ou sem link não quebra", () => {
+    expect(conferirFormaDePagamento("").texto).toBe("");
+    expect(conferirFormaDePagamento(PROMESSA).corrigidos).toEqual([]);
   });
 });

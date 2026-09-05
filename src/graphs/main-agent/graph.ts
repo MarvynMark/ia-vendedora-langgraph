@@ -9,7 +9,7 @@ import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } fro
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
 import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
-import { temPrecoDePlano, temLinkDePagamento } from "../../lib/planos.ts";
+import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
 import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
@@ -672,7 +672,26 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     type: "ai", content: state.outputAgente,
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
-  const formatado = formatarTextoFn(state.outputAgente); // determinístico desde o bug das convs 6941/6943
+  let formatado = formatarTextoFn(state.outputAgente); // determinístico desde o bug das convs 6941/6943
+  // CONFERÊNCIA DA FORMA DE PAGAMENTO — quando a resposta promete boleto/PIX parcelado, o link
+  // tem que ser o do parcelado. Na conv 7021 a lead disse que não tinha limite no cartão e
+  // recebeu o link do CARTÃO rotulado "Parcelado". Ver lib/planos.ts.
+  const conferencia = conferirFormaDePagamento(formatado);
+  if (conferencia.corrigidos.length > 0) {
+    logger.warn("main-agent", "Link de cartão corrigido para o de parcelado", {
+      idConversa: state.idConversa,
+      corrigidos: conferencia.corrigidos,
+    });
+    formatado = conferencia.texto;
+  }
+  if (conferencia.semParcelado.length > 0) {
+    // Não dá pra reescrever: esses planos não têm link de parcelado. O lead está recebendo um
+    // link que ele não consegue pagar — a equipe precisa entrar.
+    logger.error("main-agent", "PARCELADO PROMETIDO PARA PLANO QUE SÓ TEM CARTÃO — lead vai travar no checkout", {
+      idConversa: state.idConversa,
+      planos: conferencia.semParcelado.map((p) => ROTULO_PLANO[p]),
+    });
+  }
   // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu do
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
