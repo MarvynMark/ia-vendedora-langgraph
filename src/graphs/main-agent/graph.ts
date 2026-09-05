@@ -22,6 +22,7 @@ import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases, agruparAteLimite, MAX_BOLHAS_POR_TURNO } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
+import { escalarParaHumano } from "../../tools/escalar-humano.ts";
 import { enviarVideoPlataforma } from "../../tools/enviar-video.ts";
 import { enviarImagemEntregaveis } from "../../tools/enviar-imagem-entregaveis.ts";
 import { enviarAudioWalker } from "../../tools/enviar-audio-walker.ts";
@@ -596,6 +597,45 @@ async function executarAgente(state: MainAgentStateType) {
       logger.warn("main-agent", "Falha no aviso de objeção (ignorada):", e);
     }
 
+    // GATE DE FORMA DE PAGAMENTO — quando a resposta promete boleto/PIX parcelado, o link tem
+    // que ser o do parcelado. Na conv 7021 a lead disse "não vou ter esse limite no cartão" e
+    // recebeu o link do CARTÃO rotulado "Parcelado": ela abre, não consegue pagar e some.
+    // Roda ANTES do guard de Kanban de propósito — se escalarmos, nenhum link foi enviado e o
+    // card não pode ser marcado como "link enviado".
+    const conferencia = conferirFormaDePagamento(outputFinal);
+    if (conferencia.corrigidos.length > 0) {
+      logger.warn("main-agent", "Link de cartão trocado pelo de parcelado", {
+        idConversa: state.idConversa,
+        corrigidos: conferencia.corrigidos,
+      });
+      outputFinal = conferencia.texto;
+    }
+    if (conferencia.semParcelado.length > 0) {
+      // Esses planos não têm link de parcelado e inventar URL não é opção. Qualquer coisa que
+      // saísse daqui seria uma promessa que não dá pra cumprir, então o turno inteiro é
+      // descartado e um humano assume — escalação SILENCIOSA, o lead não é avisado.
+      const rotulos = conferencia.semParcelado.map((p) => ROTULO_PLANO[p]).join(", ");
+      logger.error("main-agent", "Parcelado prometido para plano que só tem cartão — escalando", {
+        idConversa: state.idConversa,
+        planos: rotulos,
+        outputDescartado: outputFinal.slice(0, 200),
+      });
+      await escalarParaHumano(
+        {
+          telefone: state.telefone,
+          nome: state.nome,
+          idConta: state.idConta,
+          idConversa: state.idConversa,
+          idInbox: state.idInbox,
+          ultimaMensagem: mensagemOriginal,
+        },
+        `O lead precisa de boleto/PIX parcelado e o plano em jogo (${rotulos}) só tem link de cartão. ` +
+          `A IA ia mandar o link do cartão rotulado como parcelado — o lead não conseguiria pagar. ` +
+          `Atendimento pausado antes do envio: defina com ele a forma de pagamento e mande o link certo.`,
+      );
+      return { outputAgente: "" };
+    }
+
     // GUARD DETERMINÍSTICO — mover pra "Aguardando Pagamento" ao apresentar o preço.
     // Mesmo modo de falha do guard de Conexão acima: o prompt manda mover o card no pitch e o LLM
     // dropa o Atualizar_tarefa. Consequência cara: a SEQUENCIA_POS_PRECO (que leva o áudio de
@@ -672,26 +712,7 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     type: "ai", content: state.outputAgente,
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
-  let formatado = formatarTextoFn(state.outputAgente); // determinístico desde o bug das convs 6941/6943
-  // CONFERÊNCIA DA FORMA DE PAGAMENTO — quando a resposta promete boleto/PIX parcelado, o link
-  // tem que ser o do parcelado. Na conv 7021 a lead disse que não tinha limite no cartão e
-  // recebeu o link do CARTÃO rotulado "Parcelado". Ver lib/planos.ts.
-  const conferencia = conferirFormaDePagamento(formatado);
-  if (conferencia.corrigidos.length > 0) {
-    logger.warn("main-agent", "Link de cartão corrigido para o de parcelado", {
-      idConversa: state.idConversa,
-      corrigidos: conferencia.corrigidos,
-    });
-    formatado = conferencia.texto;
-  }
-  if (conferencia.semParcelado.length > 0) {
-    // Não dá pra reescrever: esses planos não têm link de parcelado. O lead está recebendo um
-    // link que ele não consegue pagar — a equipe precisa entrar.
-    logger.error("main-agent", "PARCELADO PROMETIDO PARA PLANO QUE SÓ TEM CARTÃO — lead vai travar no checkout", {
-      idConversa: state.idConversa,
-      planos: conferencia.semParcelado.map((p) => ROTULO_PLANO[p]),
-    });
-  }
+  const formatado = formatarTextoFn(state.outputAgente); // determinístico desde o bug das convs 6941/6943
   // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu do
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
