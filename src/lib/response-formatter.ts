@@ -395,3 +395,35 @@ export function dividirEmFrases(texto: string): string[] {
     .map((f) => f.trim())
     .filter(Boolean);
 }
+
+/**
+ * Teto de bolhas por turno.
+ *
+ * O prompt tem tetos ("no MÁXIMO 5 BOLHAS" no pitch e no fechamento) e chega a pedir que o LLM
+ * CONTE as bolhas que vai gerar ("Duas frases, não três") — ou seja, pede que ele simule de
+ * cabeça o comportamento de dividirEmFrases. É frágil por construção e não segurou: na conv 7021
+ * o modelo escreveu UM parágrafo e o divisor virou OITO bolhas seguidas, sem a lead responder.
+ *
+ * Aqui o teto vira código. Nada é DESCARTADO: enquanto passar do teto, funde o PAR VIZINHO mais
+ * curto. Assim as bolhas curtas de preâmbulo ("Entendo, Julia.") grudam umas nas outras primeiro,
+ * e as frases longas — que carregam o preço, a pergunta e o link — tendem a sobreviver sozinhas.
+ */
+export const MAX_BOLHAS_POR_TURNO = 5;
+
+export function agruparAteLimite(frases: string[], max = MAX_BOLHAS_POR_TURNO): string[] {
+  if (max < 1 || frases.length <= max) return frases;
+  const bolhas = [...frases];
+  while (bolhas.length > max) {
+    let melhor = 0;
+    let menor = Infinity;
+    for (let i = 0; i < bolhas.length - 1; i++) {
+      const custo = bolhas[i]!.length + bolhas[i + 1]!.length;
+      if (custo < menor) {
+        menor = custo;
+        melhor = i;
+      }
+    }
+    bolhas.splice(melhor, 2, `${bolhas[melhor]} ${bolhas[melhor + 1]}`);
+  }
+  return bolhas;
+}

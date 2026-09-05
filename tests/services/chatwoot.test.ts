@@ -440,6 +440,32 @@ describe("chatwoot service", () => {
       expect(blocoTemFraseProibida("Tenha uma excelente tarde também!")).toBe(false);
     });
 
+    // Conv 7021: o pitch saiu em 8 bolhas para um teto de 5, e três delas eram só preâmbulo.
+    test("filtra a bolha que ANUNCIA o próximo passo em vez de dá-lo", () => {
+      expect(blocoTemFraseProibida("Vou te mostrar os planos que fazem sentido pro teu momento.")).toBe(true);
+      expect(blocoTemFraseProibida("Vou deixar tudo pronto para você.")).toBe(true);
+      expect(blocoTemFraseProibida("Vou te passar o link pra garantir seu acesso à mentoria.")).toBe(true);
+    });
+
+    test("NÃO filtra o anúncio de link que carrega resposta de verdade", () => {
+      // Resposta prescrita no prompt para "quanto fica em 3x?" — tem conteúdo, tem que passar
+      expect(blocoTemFraseProibida("Vou te passar o link de pagamento — nele você consegue simular exatamente quantas parcelas quiser e ver o valor de cada uma.")).toBe(false);
+      // A bolha que REALMENTE entrega o link passa
+      expect(blocoTemFraseProibida("Aqui está o link pra garantir teu acesso: https://peritowalker.com.br/mentoriaperitoanual")).toBe(false);
+    });
+
+    test("filtra o elogio à escolha e o acolhimento isolado", () => {
+      expect(blocoTemFraseProibida("O Semestral Premium é uma excelente escolha.")).toBe(true);
+      expect(blocoTemFraseProibida("Entendo, Julia.")).toBe(true);
+      expect(blocoTemFraseProibida("Combinado, Gabriela!")).toBe(true);
+      expect(blocoTemFraseProibida("Claro!")).toBe(true);
+    });
+
+    test("NÃO filtra a frase que começa com acolhimento mas traz conteúdo", () => {
+      expect(blocoTemFraseProibida("Entendo, Julia, e é justamente por isso que o plano diário resolve teu problema de tempo.")).toBe(false);
+      expect(blocoTemFraseProibida("Claro que dá pra parcelar no boleto sem depender do cartão.")).toBe(false);
+    });
+
     test("filtra o jargão interno de venda vazado (blocoVazaJargaoInterno)", () => {
       // O fragmento literal do prompt que vazou na conv 5577
       expect(blocoVazaJargaoInterno("Isso derruba a barreira sem rebaixar a âncora")).toBe(true);

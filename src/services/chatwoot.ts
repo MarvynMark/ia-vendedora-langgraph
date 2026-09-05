@@ -510,13 +510,36 @@ export function blocoTemFraseProibida(bloco: string): boolean {
   ];
   if (proibidas.some((re) => re.test(b))) return true;
 
+  // ANÚNCIO DO PRÓXIMO PASSO — a bolha que narra o que a IA vai fazer, em vez de fazer. Cada uma
+  // gasta uma bolha do teto sem entregar nada, e o próprio roteiro já as bane ("é PROIBIDO
+  // anunciar o link antes de mandá-lo"). Na conv 7021 saíram duas: "Vou te mostrar os planos que
+  // fazem sentido pro teu momento." logo antes do pitch e "Vou deixar tudo pronto para você."
+  // logo antes do fechamento. Regexes estreitos de propósito: a resposta legítima de
+  // "quanto fica em 3x?" ("Vou te passar o link de pagamento — nele você consegue simular...")
+  // traz conteúdo real e precisa passar, por isso a família do link exige frase curta e sem URL.
+  const anunciaProximoPasso =
+    /^vou (te |lhe )?mostrar (os |o |as |a )?(plano|op[çc][ãa]o|valor)/.test(b) ||
+    /^vou deixar tudo (pronto|certo|preparado)/.test(b) ||
+    (/^vou (te |lhe )?(passar|mandar|enviar|gerar).{0,20}\blink\b/.test(b) &&
+      !/peritowalker\.com\.br/.test(b) &&
+      b.split(/\s+/).length <= 12);
+  if (anunciaProximoPasso) return true;
+
+  // "é uma excelente escolha" e parentes: elogio à decisão do lead, sem conteúdo. Vira bolha
+  // sozinha logo depois de ele escolher o plano (conv 7021) e só atrasa o link.
+  if (/\b(excelente|[óo]tima|[óo]timo|boa|perfeita|[ée] a melhor) escolha\b/.test(b)) return true;
+
   // BOLHA DE PURA VALIDAÇÃO ("Ótimo, Analyce!", "Perfeito!", "Maravilha, João"). O prompt proíbe
   // desde sempre, mas o LLM abre respostas com ela e o lead recebe uma bolha vazia de conteúdo
   // (conv 6671). Só derruba quando a frase é SÓ isso: "Maravilha, o plano que faz sentido..."
   // carrega conteúdo e passa. O "de nada" entra aqui pelo mesmo motivo — encerra o turno sem
   // próximo passo, que é o fecho morto que o roteiro bane.
+  // Os verbos de acolhimento ("Entendo, Julia.", "Claro!", "Combinado, Gabriela!") entram pela
+  // mesma porta: isolados numa bolha eles são exatamente o "Claro!" que a REGRA DO ECO chama de
+  // resposta vazia. Se a resposta INTEIRA virar isso, a salvaguarda de enviarTextoComHistorico
+  // relaxa este filtro e manda assim mesmo — ninguém fica em silêncio.
   const soValidacao =
-    /^(que )?(bom|[óo]timo|perfeito|maravilha|show|boa|legal|isso|massa|top|de nada|imagina|disponha)\b/.test(b) &&
+    /^(que )?(bom|[óo]timo|perfeito|maravilha|show|boa|legal|isso|massa|top|de nada|imagina|disponha|entendo|entendi|claro|tranquil[oa]|beleza|certo|combinado)\b/.test(b) &&
     b.split(/\s+/).length <= 4;
   return soValidacao;
 }

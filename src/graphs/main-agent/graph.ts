@@ -20,7 +20,7 @@ import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
 import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
-import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases } from "../../lib/response-formatter.ts";
+import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases, agruparAteLimite, MAX_BOLHAS_POR_TURNO } from "../../lib/response-formatter.ts";
 import { criarToolsAgenteVestigium } from "../../tools/factory.ts";
 import { enviarVideoPlataforma } from "../../tools/enviar-video.ts";
 import { enviarImagemEntregaveis } from "../../tools/enviar-imagem-entregaveis.ts";
@@ -689,6 +689,13 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
       logger.warn("main-agent", "Só fecho passivo sobrou após o filtro — enviando a última frase pra não ficar em silêncio");
       frases = [semFechoPassivo[semFechoPassivo.length - 1]!];
     }
+  }
+  // TETO DE BOLHAS — o último passo antes do envio. Os tetos do prompt eram honra: o modelo
+  // escrevia um parágrafo e o divisor por ponto final o transformava em 8 bolhas seguidas
+  // (conv 7021). Aqui nada se perde, só se funde. Ver agruparAteLimite.
+  if (frases.length > MAX_BOLHAS_POR_TURNO) {
+    logger.info("main-agent", `Teto de bolhas: ${frases.length} frases fundidas em ${MAX_BOLHAS_POR_TURNO}`, { idConversa: state.idConversa });
+    frases = agruparAteLimite(frases);
   }
   for (const frase of frases) {
     // "Digitando" com delay proporcional ao tamanho ANTES de cada mensagem, simulando digitação

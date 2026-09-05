@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { formatarTexto, ssmlPreservaOTexto } from "../../src/lib/response-formatter.ts";
+import { formatarTexto, ssmlPreservaOTexto, agruparAteLimite, MAX_BOLHAS_POR_TURNO } from "../../src/lib/response-formatter.ts";
 
 // Regressão das convs 6941 e 6943: o agente gerou 58 caracteres e o lead recebeu dez mensagens
 // em que a IA narrava a própria semana de estudos. A causa era o formatador ser um LLM que
@@ -90,5 +90,58 @@ describe("ssmlPreservaOTexto", () => {
 
   test("não julga texto curto demais", () => {
     expect(ssmlPreservaOTexto("Boa!", "<speak>qualquer coisa</speak>")).toBe(true);
+  });
+});
+
+// Conv 7021: o modelo escreveu UM parágrafo e dividirEmFrases o transformou em 8 bolhas
+// seguidas, para um teto de 5 que só existia no prompt. O teto agora é código, e funde em vez
+// de descartar — a cauda (preço, pergunta, CTA, link) tem que continuar uma por bolha.
+describe("agruparAteLimite", () => {
+  const PITCH = [
+    "Entendo, Julia.",
+    "Mesmo sem a data do edital, começar agora te coloca na frente.",
+    "Vou te mostrar os planos que fazem sentido pro teu momento.",
+    "Maravilha, o plano que faz sentido é o Anual Completo, que já vem com a Premium do Estratégia.",
+    "Fica em 12x de R$ 394 no cartão.",
+    "Tem também o Semestral Premium, mesma coisa em 6 meses, em 12x de R$ 246 no cartão.",
+    "Qual desses encaixa melhor pro seu momento, o Anual Completo ou o Semestral Premium?",
+    "Pode ser transparente comigo.",
+  ];
+
+  test("respeita o teto de 5 bolhas", () => {
+    expect(agruparAteLimite(PITCH).length).toBe(5);
+  });
+
+  test("não descarta nada — todo o texto continua presente", () => {
+    const juntas = agruparAteLimite(PITCH).join(" ");
+    for (const frase of PITCH) expect(juntas).toContain(frase);
+  });
+
+  test("funde as bolhas curtas primeiro e deixa as longas sozinhas", () => {
+    const bolhas = agruparAteLimite(PITCH);
+    // "Entendo, Julia." é a mais curta: some dentro de uma bolha maior, nunca fica sozinha
+    expect(bolhas).not.toContain("Entendo, Julia.");
+    expect(bolhas[0]).toContain("Entendo, Julia.");
+    // a frase mais longa do pitch sobrevive como bolha própria, com conteúdo
+    expect(bolhas[2]).toBe(PITCH[3]);
+    // e a pergunta cai junto do "pode ser transparente comigo" — que é exatamente o que o
+    // prompt tentava conseguir pedindo ao modelo "duas frases, não três"
+    expect(bolhas[4]).toBe(`${PITCH[6]} ${PITCH[7]}`);
+    // e a ordem do texto nunca muda
+    expect(bolhas.join(" ")).toBe(PITCH.join(" "));
+  });
+
+  test("abaixo do teto passa intacto", () => {
+    const tres = PITCH.slice(0, 3);
+    expect(agruparAteLimite(tres)).toEqual(tres);
+    expect(agruparAteLimite([])).toEqual([]);
+  });
+
+  test("teto de 1 junta tudo numa bolha só", () => {
+    expect(agruparAteLimite(PITCH, 1)).toEqual([PITCH.join(" ")]);
+  });
+
+  test("MAX_BOLHAS_POR_TURNO é o teto que o roteiro usa no pitch e no fechamento", () => {
+    expect(MAX_BOLHAS_POR_TURNO).toBe(5);
   });
 });
