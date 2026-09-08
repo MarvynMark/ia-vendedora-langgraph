@@ -16,6 +16,7 @@ import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
 import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
+import { negaElegibilidadePorGraduacao, RESPOSTA_ELEGIBILIDADE } from "../../lib/elegibilidade.ts";
 import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
 import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
 import { montarOutputDoTurno } from "./output.ts";
@@ -510,6 +511,18 @@ async function executarAgente(state: MainAgentStateType) {
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = PERGUNTA_DESCOBERTA_MATERIAL;
+    }
+
+    // TRAVA DE ELEGIBILIDADE — a IA não manda embora quem ainda está cursando. O diploma é
+    // exigido na POSSE, não para prestar. Aqui não dá pra só descartar a bolha como nos outros
+    // filtros: a pergunta do lead ("já posso prestar?") ficaria sem resposta, então o turno é
+    // substituído pela resposta correta. Ver lib/elegibilidade.ts (conv 7197).
+    if (negaElegibilidadePorGraduacao(outputFinal)) {
+      logger.error("main-agent", "Resposta negava elegibilidade por graduação incompleta — substituída", {
+        idConversa: state.idConversa,
+        outputBloqueado: outputFinal.slice(0, 220),
+      });
+      outputFinal = RESPOSTA_ELEGIBILIDADE;
     }
 
     // GATE DE SITUAÇÃO — a oferta também espera o lead ter CONTADO a situação dele. Em agosto o
