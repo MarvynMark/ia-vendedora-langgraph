@@ -6,7 +6,7 @@ import { atualizarKanbanTask, buscarConversa } from "../services/chatwoot.ts";
 import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
 import { delayInicialMs } from "../lib/delays-followup.ts";
 import { primeiroNomeSaudacao } from "../lib/nome.ts";
-import { iaEstaPausada } from "../lib/pausa-pitch.ts";
+import { iaEstaPausada } from "../lib/pausa-ia.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 
