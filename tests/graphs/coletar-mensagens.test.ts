@@ -24,7 +24,11 @@ mock.module("../../src/db/checkpointer.ts", () => ({
   encerrarCheckpointer: mock(async () => {}),
 }));
 
+// Preserva o módulo real: mock.module VAZA entre arquivos no bun, e substituir chatwoot.ts
+// inteiro derruba quem importa qualquer outro export dele.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   enviarMensagem: mock(async () => {}),
   enviarArquivo: mock(async () => {}),
   marcarComoLida: mock(async () => {}),

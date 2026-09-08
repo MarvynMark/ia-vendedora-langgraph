@@ -8,7 +8,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
+import { buscarMensagemPorId, enviarMensagem, removerEtiquetas, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
 import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
 import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
@@ -17,6 +17,8 @@ import { ehMedicoLead } from "../../lib/medico.ts";
 import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
 import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
+import { PONTE_PITCH_HUMANO, montarAlertaPitch, montarNotaPitch } from "../../lib/pausa-pitch.ts";
+import { primeiroConcurso } from "../../lib/nome.ts";
 import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
@@ -563,12 +565,76 @@ async function executarAgente(state: MainAgentStateType) {
       }
     }
 
+    // PAUSA NO PITCH — a conversa de dinheiro é humana.
+    //
+    // Roda DEPOIS dos gates de material e de situação de propósito: eles é que garantem que só
+    // chega aqui lead qualificado. Quando a IA está prestes a dizer um valor ou mandar um link,
+    // trocamos a resposta por uma ponte curta, tiramos a label agente-on (a IA emudece nesta
+    // conversa) e chamamos um atendente no grupo do comercial.
+    //
+    // Vale inclusive quando o lead já tinha ouvido preço antes: a partir daqui, quem fala de
+    // dinheiro é uma pessoa.
+    let pausouNoPitch = false;
+    if (ofertaNoTurno(outputFinal)) {
+      logger.warn("main-agent", "Pitch alcançado — pausando a IA e chamando um atendente", {
+        idConversa: state.idConversa,
+        ofertaBloqueada: outputFinal.slice(0, 160),
+      });
+      pausouNoPitch = true;
+      outputFinal = PONTE_PITCH_HUMANO;
+
+      // 1. Cala a IA nesta conversa. É o que impede o próximo turno de responder por cima do
+      //    atendente — o webhook do Chatwoot só processa quem tem agente-on.
+      try {
+        await removerEtiquetas(state.idConta, state.idConversa, ["agente-on"]);
+      } catch (e) {
+        logger.error("main-agent", "Erro ao pausar a IA no pitch:", e);
+      }
+
+      // 2. Nota privada no histórico do lead, pra quem abrir a conversa saber o que houve.
+      try {
+        await enviarMensagem(state.idConta, state.idConversa, montarNotaPitch(mensagemOriginal), { private: true });
+      } catch (e) {
+        logger.warn("main-agent", "Erro ao criar nota privada do pitch:", e);
+      }
+
+      // 3. Chama o atendente no grupo. Uma vez por conversa: se a trava falhar, avisa mesmo
+      //    assim — perder o chamado de um lead pronto pra comprar é pior que repetir um alerta.
+      const chave = `pitch:${state.idConversa}`;
+      let primeiraVez = true;
+      try {
+        primeiraVez = await reivindicarAlerta(chave, state.telefone, "pitch");
+      } catch (e) {
+        logger.warn("main-agent", "Erro ao checar trava do alerta de pitch, avisando assim mesmo:", e);
+      }
+      if (primeiraVez) {
+        try {
+          await avisarGrupo(
+            env.CHATWOOT_COMERCIAL_CONVERSATION_ID,
+            montarAlertaPitch({
+              nome: state.nome,
+              telefone: state.telefone,
+              fala: mensagemOriginal,
+              concurso: primeiroConcurso((state.atributosContato?.["concurso_interesse"] as string | undefined) ?? ""),
+              material: materialDeclaradoPeloLead(historicoComTurnoAtual) ?? undefined,
+              link: `${env.CHATWOOT_BASE_URL}/app/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${state.idConversa}`,
+            }),
+          );
+        } catch (e) {
+          await liberarAlerta(chave).catch(() => {});
+          logger.error("main-agent", "Erro ao chamar atendente para o pitch:", e);
+        }
+      }
+    }
+
     // AVISO DE OBJEÇÃO — quando o lead trava (preço, adiamento ou forma de pagamento), o grupo do
     // comercial é avisado pra um humano poder entrar antes de o lead sumir. Uma vez por TIPO por
     // conversa. Não interfere na resposta: o try/catch é próprio justamente pra um alerta que
     // falha nunca segurar o que o lead vai receber.
     try {
-      const tipoObjecao = classificarObjecao(mensagemOriginal);
+      // Se a pausa do pitch já chamou um atendente neste turno, o aviso de objeção seria um
+      // segundo alerta sobre o mesmo lead, no mesmo minuto — e o do pitch é o mais urgente.
+      const tipoObjecao = pausouNoPitch ? null : classificarObjecao(mensagemOriginal);
       if (tipoObjecao) {
         const chave = chaveObjecao(state.idConversa, tipoObjecao);
         let primeiraVez = true;
@@ -659,7 +725,15 @@ async function executarAgente(state: MainAgentStateType) {
     // preço, o guard não rodaria e o "link enviado" (que roteia para a cadência de lembrete,
     // 20min) ficaria sem ninguém para escrevê-lo, agora que o LLM não pode mais escrevê-lo.
     const linkEnviado = temLinkDePagamento(turnoEnviado);
-    if (temPrecoDePlano(turnoEnviado) || linkEnviado) {
+    if (pausouNoPitch) {
+      // Nada de Kanban aqui: o lead NÃO ouviu preço nem recebeu link — a oferta foi trocada pela
+      // ponte. Mover para "Aguardando Pagamento" agora marcaria como proposta apresentada um lead
+      // que ainda vai receber o pitch de uma pessoa, e ligaria a cadência de pós-preço por cima do
+      // atendente. Quem move o card daqui em diante é quem assumir a conversa.
+      logger.info("main-agent", "Pausa no pitch: card mantido onde está, atendente assume", {
+        idConversa: state.idConversa,
+      });
+    } else if (temPrecoDePlano(turnoEnviado) || linkEnviado) {
       await moverParaAguardandoPagamento(state.idConta, tarefa as Record<string, unknown>, etapas, linkEnviado);
     } else if (!ofertaJaApresentada) {
       await desfazerPagamentoPrematuro(state.idConta, tarefa as Record<string, unknown>, etapas, stepAntesDoTurno);

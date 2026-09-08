@@ -6,11 +6,19 @@ mock.module("../../src/graphs/follow-up/graph.ts", () => ({
   })),
 }));
 
+// Labels da conversa que o follow-up vai consultar. Por padrão a IA está ativa; os testes de
+// pausa trocam isso.
+let labelsDaConversa: string[] = ["agente-on"];
+// Preserva o módulo real: mock.module VAZA entre arquivos no bun, e substituir chatwoot.ts
+// inteiro derruba quem importa qualquer outro export dele.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   atualizarKanbanTask: mock(async () => ({})),
   buscarKanbanBoard: mock(async () => ({ steps: [] })),
   enviarMensagem: mock(async () => ({})),
   moverKanbanTask: mock(async () => ({})),
+  buscarConversa: mock(async () => ({ labels: labelsDaConversa })),
 }));
 
 mock.module("../../src/db/memoria.ts", () => ({

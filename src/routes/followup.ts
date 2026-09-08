@@ -2,10 +2,11 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import type { ChatwootFollowUpPayload } from "../types/chatwoot.ts";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
-import { atualizarKanbanTask } from "../services/chatwoot.ts";
+import { atualizarKanbanTask, buscarConversa } from "../services/chatwoot.ts";
 import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
 import { delayInicialMs } from "../lib/delays-followup.ts";
 import { primeiroNomeSaudacao } from "../lib/nome.ts";
+import { iaEstaPausada } from "../lib/pausa-pitch.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 
@@ -133,6 +134,21 @@ async function processarTaskOverdue(payload: ChatwootFollowUpPayload) {
   if (!telefone) {
     logger.error("follow-up", "Nenhum telefone encontrado");
     return { status: "error", reason: "no_phone" };
+  }
+
+  // A IA está pausada nesta conversa? Então o follow-up também cala.
+  // O webhook do Chatwoot já respeitava a label agente-on, mas o follow-up é disparado pelo Kanban
+  // e não passava por essa checagem: uma conversa escalada (ou pausada no pitch) continuava
+  // recebendo toque automático por cima do atendente humano que assumiu.
+  try {
+    const detalhe = (await buscarConversa(env.CHATWOOT_ACCOUNT_ID, conversa.id)) as { labels?: string[] };
+    if (iaEstaPausada(detalhe.labels)) {
+      logger.info("follow-up", `Conversa ${conversa.id} está com a IA pausada (sem agente-on) — follow-up ignorado`);
+      return { status: "ignored", reason: "ia_pausada" };
+    }
+  } catch (e) {
+    // Falha de rede não pode travar o follow-up de quem está com a IA ativa: segue o fluxo.
+    logger.warn("follow-up", "Não consegui checar as labels da conversa, seguindo com o follow-up:", e);
   }
 
   // Determina tipo de follow-up pelo nome da etapa atual

@@ -8,7 +8,11 @@ const enviarTemplateCalls: unknown[][] = [];
 const salvarCalls: Array<{ telefone: string; content: string }> = [];
 
 // graph.ts importa vários named exports de chatwoot.ts; stubamos todos (só enviarTemplate é usado aqui).
+// Preserva o módulo real: mock.module VAZA entre arquivos no bun, e substituir chatwoot.ts
+// inteiro derruba quem importa qualquer outro export dele.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   enviarTemplate: async (...args: unknown[]) => { enviarTemplateCalls.push(args); },
   buscarKanbanBoard: async () => ({}),
   enviarMensagem: async () => {},

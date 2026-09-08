@@ -7,7 +7,11 @@ mock.module("../../src/services/openai.ts", () => ({
   transcreverAudio: mockTranscreverAudio,
 }));
 
+// Preserva o módulo real: mock.module VAZA entre arquivos no bun, e substituir chatwoot.ts
+// inteiro derruba quem importa qualquer outro export dele.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   enviarMensagem: mockEnviarMensagem,
 }));
 

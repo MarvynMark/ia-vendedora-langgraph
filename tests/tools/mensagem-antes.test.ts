@@ -5,7 +5,11 @@ const mockRegistrarTextoMidia = mock((_c: string | number, _t: string) => {});
 const mockRegistrarNaoEnviado = mock((_c: string | number, _t: string) => {});
 let saidas: string[] = [];
 
+// Preserva o módulo real: mock.module VAZA entre arquivos no bun, e substituir chatwoot.ts
+// inteiro derruba quem importa qualquer outro export dele.
+const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
+  ...chatwootReal,
   enviarMensagem: mockEnviarMensagem,
   pausaComDigitando: mock(async () => {}),
   calcularDelayDigitando: () => 0,
