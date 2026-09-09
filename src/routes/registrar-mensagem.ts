@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { salvarMensagem } from "../db/memoria.ts";
+import { salvarMensagemSeNova } from "../db/memoria.ts";
 import { logger } from "../lib/logger.ts";
 
 // Registra na MEMÓRIA DA IA uma mensagem que foi entregue ao lead por fora do app.
@@ -42,7 +42,10 @@ export const registrarMensagemRouter = new Elysia().post(
 
     const { telefone, conteudo, origem, template } = parsed.data;
 
-    await salvarMensagem(telefone, {
+    // Idempotente: com o webhook já registrando as saídas externas, a mesma mensagem
+    // chega por dois caminhos (o aviso do painel e o message_created do Chatwoot).
+    // Quem chegar depois é descartado.
+    const gravou = await salvarMensagemSeNova(telefone, {
       type: "ai",
       content: conteudo,
       tool_calls: [],
@@ -52,10 +55,12 @@ export const registrarMensagemRouter = new Elysia().post(
       invalid_tool_calls: [],
     });
 
-    logger.info("registrar-mensagem", "Mensagem externa registrada na memória da IA", {
+    logger.info("registrar-mensagem", gravou
+      ? "Mensagem externa registrada na memória da IA"
+      : "Mensagem externa ignorada (já estava no histórico)", {
       telefone, origem: origem ?? "externo", template, tamanho: conteudo.length,
     });
 
-    return { ok: true };
+    return { ok: true, gravou };
   },
 );

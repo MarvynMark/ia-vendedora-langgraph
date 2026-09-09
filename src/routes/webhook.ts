@@ -4,10 +4,11 @@ import type { ChatwootWebhookPayload } from "../types/chatwoot.ts";
 import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
+import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
 import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera } from "./webhook-filtros.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
-import { limparHistorico } from "../db/memoria.ts";
+import { limparHistorico, salvarMensagemSeNova } from "../db/memoria.ts";
 import { buscarDadosFormulario } from "../db/formulario.ts";
 import { pool } from "../db/pool.ts";
 import {
@@ -95,6 +96,57 @@ export const webhookRouter = new Elysia()
       return { status: "error", reason: "invalid_payload" };
     }
     const payload = body as ChatwootWebhookPayload;
+
+    // ── Mensagem que SAIU para o lead sem ter sido o agente ──
+    // Atendente digitando no Chatwoot, painel de disparo, automação externa. O agente
+    // não deve RESPONDER a isso, mas precisa SABER que aconteceu: a memória dele é o
+    // n8n_historico_mensagens, não o histórico do Chatwoot, e sem este registro ele
+    // retoma de onde parou e ignora o que o humano disse no meio da conversa.
+    const motivoNaoReg = motivoNaoRegistrarSaida(
+      parsed.data.message_type,
+      parsed.data.sender.id,
+      (body as Record<string, unknown>).private as boolean | undefined,
+      parsed.data.content as string | null,
+      env.CHATWOOT_AGENT_USER_ID,
+    );
+    if (motivoNaoReg === null) {
+      try {
+        // O sender de uma mensagem de saída é o ATENDENTE, não o lead — então o telefone
+        // tem que vir do contato da conversa. Não dá para usar o source_id do payload:
+        // ele é o wa_id, que em número brasileiro diverge do phone_number no 9, e gravar
+        // por ele criaria uma memória paralela que o agente nunca lê.
+        const conversa = await buscarConversa(
+          parsed.data.account.id.toString(), parsed.data.conversation.id,
+        ) as { meta?: { sender?: { phone_number?: string } } };
+        const telefoneLead = conversa?.meta?.sender?.phone_number ?? "";
+
+        if (telefoneLead) {
+          const texto = (parsed.data.content as string) ?? "";
+          const gravou = await salvarMensagemSeNova(telefoneLead, {
+            type: "ai",
+            content: texto,
+            tool_calls: [],
+            additional_kwargs: { origem: "saida_externa", autor: parsed.data.sender.name },
+            response_metadata: {},
+            invalid_tool_calls: [],
+          });
+          logger.info("webhook", gravou
+            ? "Saída externa registrada na memória da IA"
+            : "Saída externa ignorada (já estava no histórico)", {
+            telefone: telefoneLead, autor: parsed.data.sender.name, tamanho: texto.length,
+          });
+        } else {
+          logger.warn("webhook", "Saída externa sem telefone do lead; não registrada", {
+            conversa: parsed.data.conversation.id,
+          });
+        }
+      } catch (e) {
+        // Nunca derruba o webhook por causa do registro: perder contexto é ruim,
+        // mas quebrar o atendimento é pior.
+        logger.error("webhook", "Falha ao registrar saída externa", e);
+      }
+      return { status: "ignored", reason: "saida_externa_registrada" };
+    }
 
     // Decisões de ignorar ANTES do grupo-espera: mensagem não-incoming, REAÇÃO (emoji — conv 4677:
     // lead reagiu ❤️ e a IA tratou como "sim" e mandou o link) e mensagem do próprio bot/agente

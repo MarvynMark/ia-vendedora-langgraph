@@ -28,6 +28,9 @@ export const env = {
   CHATWOOT_BASE_URL: process.env["CHATWOOT_BASE_URL"]!,
   CHATWOOT_API_TOKEN: process.env["CHATWOOT_API_TOKEN"]!,
   CHATWOOT_ACCOUNT_ID: process.env["CHATWOOT_ACCOUNT_ID"]!,
+  // Usuário do Chatwoot com que o app envia. Serve para distinguir a fala do agente
+  // da fala de um atendente humano na hora de registrar as saídas na memória da IA.
+  CHATWOOT_AGENT_USER_ID: Number(process.env["CHATWOOT_AGENT_USER_ID"] ?? 3),
   CHATWOOT_INBOX_ID: Number(process.env["CHATWOOT_INBOX_ID"]!),
   // ⚠️ Declarada e obrigatória, mas NUNCA lida fora deste arquivo: todo o roteiro de alerta é por
   // conversation_id. Fica só porque removê-la exige mexer no Coolify.

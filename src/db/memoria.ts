@@ -34,6 +34,31 @@ export async function houveAiRecente(sessionId: string, minutos: number): Promis
   return (result.rowCount ?? 0) > 0;
 }
 
+/** Grava só se a MESMA fala não tiver entrado nos últimos `janelaMinutos`.
+ *
+ *  Existe porque a mesma mensagem pode chegar por dois caminhos: o painel de disparo
+ *  avisando pelo /webhook/registrar-mensagem e o webhook do Chatwoot vendo a mesma
+ *  mensagem sair. Sem esta guarda o histórico do lead ganharia a fala repetida, e
+ *  repetição no histórico faz o modelo achar que insistiu e mudar de assunto.
+ *
+ *  Retorna true se gravou. */
+export async function salvarMensagemSeNova(
+  sessionId: string,
+  mensagem: MensagemHistorico,
+  janelaMinutos = 10,
+): Promise<boolean> {
+  const jaTem = await pool.query(
+    `SELECT 1 FROM n8n_historico_mensagens
+     WHERE session_id = $1 AND type = $2 AND content = $3
+       AND created_at > NOW() - ($4 || ' minutes')::interval
+     LIMIT 1`,
+    [sessionId, mensagem.type, mensagem.content, janelaMinutos],
+  );
+  if ((jaTem.rowCount ?? 0) > 0) return false;
+  await salvarMensagem(sessionId, mensagem);
+  return true;
+}
+
 export async function salvarMensagem(
   sessionId: string,
   mensagem: MensagemHistorico,
