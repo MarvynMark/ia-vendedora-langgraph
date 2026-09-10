@@ -11,6 +11,8 @@ import {
   criarToolEnviarAudioWalker2,
 } from "./enviar-audio-walker.ts";
 import { criarToolBuscarContextoSimilar } from "./buscar-contexto-similar.ts";
+import { criarToolAgendarSessao } from "./agendar-sessao.ts";
+import { agendaConfigurada } from "../services/google-calendar.ts";
 
 interface ContextoMainAgent {
   idMensagem: string;
@@ -22,6 +24,9 @@ interface ContextoMainAgent {
   nome: string;
   mensagem: string;
   tarefa: Record<string, unknown>;
+  /** Qual funil este lead está vendo. Só a trilha de sessão ganha a tool de agenda. */
+  trilha?: "antigo" | "sessao";
+  concurso?: string;
 }
 
 export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): StructuredToolInterface[] {
@@ -30,7 +35,22 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
   const etapas = board?.steps ?? [];
   const etapasDescricao = etapas.map(s => `${s.name}: ${s.id}`).join("\n") || "(não disponível)";
 
+  // A tool de agenda entra SÓ na trilha de sessão e SÓ se a integração estiver configurada.
+  // Sem essa guarda, um lead do funil antigo poderia receber convite para uma call que ninguém
+  // combinou — e, com a agenda fora do ar, a IA prometeria horário que não existe.
+  const toolsAgenda =
+    contexto.trilha === "sessao" && agendaConfigurada()
+      ? [criarToolAgendarSessao({
+          idConta: contexto.idConta,
+          idConversa: contexto.idConversa,
+          telefone: contexto.telefone,
+          nome: contexto.nome,
+          ...(contexto.concurso ? { concurso: contexto.concurso } : {}),
+        })]
+      : [];
+
   return [
+    ...toolsAgenda,
     refletir,
     criarToolEscalarHumano({
       telefone: contexto.telefone,

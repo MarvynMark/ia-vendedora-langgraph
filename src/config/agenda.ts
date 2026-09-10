@@ -60,16 +60,15 @@ export function ehDiaDeAtendimento(data: Date): boolean {
 
 /** Rótulo humano do dia, para a IA escrever "terça (16/09)". */
 export function rotularDia(data: Date): string {
-  const dias = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-  const dia = String(data.getDate()).padStart(2, "0");
-  const mes = String(data.getMonth() + 1).padStart(2, "0");
-  return `${dias[data.getDay()]} (${dia}/${mes})`;
+  const nomes = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+  const { mes0, dia, diaSemana } = dataDeParedeSP(data);
+  return `${nomes[diaSemana]} (${String(dia).padStart(2, "0")}/${String(mes0 + 1).padStart(2, "0")})`;
 }
 
 /** Rótulo humano da hora: "14h" em vez de "14:00" — é como se fala no WhatsApp. */
 export function rotularHora(data: Date): string {
-  const h = data.getHours();
-  const m = data.getMinutes();
+  const sp = new Date(data.getTime() + SP_OFFSET_MS);
+  const h = sp.getUTCHours(), m = sp.getUTCMinutes();
   return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
 }
 
@@ -93,7 +92,7 @@ const FAIXAS: Record<Exclude<Preferencia, "qualquer">, [number, number]> = {
 export function atendePreferencia(data: Date, pref: Preferencia): boolean {
   if (pref === "qualquer") return true;
   const [min, max] = FAIXAS[pref];
-  const h = data.getHours();
+  const h = horaDeParedeSP(data);
   return h >= min && h <= max;
 }
 
@@ -106,4 +105,32 @@ export function classificarPreferencia(texto: string): Preferencia | null {
   if (/tarde|depois do almoco/.test(t)) return "tarde";
   if (/noite|a noite|fim do dia|depois do trabalho|depois das 18|apos as 18/.test(t)) return "noite";
   return null;
+}
+
+// ── Helpers de hora de parede (America/Sao_Paulo) ────────────────────────────────────────────
+// Mesma convenção do lib/horario-comercial.ts: SP = UTC − 3h. Duplicado aqui de propósito para
+// este módulo continuar PURO (sem depender de nada que faça rede), que é o que permite testar o
+// miolo do agendamento — onde mora o risco de oferecer horário ocupado — sem mock nenhum.
+const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
+
+export function instanteDeParedeSP(ano: number, mes0: number, dia: number, hora: number, minuto = 0): Date {
+  return new Date(Date.UTC(ano, mes0, dia, hora, minuto) - SP_OFFSET_MS);
+}
+
+export function dataDeParedeSP(date: Date): { ano: number; mes0: number; dia: number; diaSemana: number } {
+  const sp = new Date(date.getTime() + SP_OFFSET_MS);
+  return { ano: sp.getUTCFullYear(), mes0: sp.getUTCMonth(), dia: sp.getUTCDate(), diaSemana: sp.getUTCDay() };
+}
+
+export function horaDeParedeSP(date: Date): number {
+  return new Date(date.getTime() + SP_OFFSET_MS).getUTCHours();
+}
+
+/** Todos os horários da grade naquele dia, como instantes. */
+export function slotsDoDia(data: Date): Date[] {
+  const { ano, mes0, dia, diaSemana } = dataDeParedeSP(data);
+  return (GRADE_SESSAO[diaSemana] ?? []).map((hhmm) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return instanteDeParedeSP(ano, mes0, dia, h!, m!);
+  });
 }

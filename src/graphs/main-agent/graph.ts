@@ -372,6 +372,7 @@ async function executarAgente(state: MainAgentStateType) {
     nome: state.nome,
     mensagem: state.mensagensAgregadas || state.mensagemProcessada,
     tarefa,
+    trilha,
   });
 
   const model = new ChatOpenAI({
