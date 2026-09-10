@@ -69,3 +69,47 @@ export const RESPOSTA_ELEGIBILIDADE =
   "O que muda de um estado pro outro é quais graduações o edital aceita, e isso a gente confere no edital do teu concurso. " +
   "Estar no comecinho da faculdade é justamente a melhor hora pra começar, porque você chega na prova com anos de preparo. " +
   "Quer que eu te mostre como seria a tua preparação começando agora?";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GATE DE NÍVEL SUPERIOR — quem pode ocupar a agenda da sessão estratégica.
+//
+// O cargo exige nível superior, então lead sem graduação nenhuma não deve consumir 30 minutos de
+// call. Mas o erro caro aqui é o FALSO NEGATIVO: "não tem graduação" é a 2ª maior causa de perda
+// registrada na planilha de aplicação (153 de 733) e é, em boa parte, erro de premissa — o diploma
+// é cobrado na POSSE. Quem está cursando é justamente quem tem MAIS tempo de preparo pela frente.
+//
+// Por isso o default é QUALIFICAR: só desqualifica declaração explícita e inequívoca de que não
+// tem e não está cursando. Falso negativo custa venda; falso positivo custa meia hora.
+//
+// Entrada: o `area_graduacao` do formulário (texto livre — "Biomedicina", "cursando Direito",
+// "só o ensino médio", "ainda não fiz faculdade").
+
+export type SituacaoSuperior = "tem" | "cursando" | "nao";
+
+// Testado ANTES da negação de propósito: "não tenho ainda, tô cursando o 3º período" é CURSANDO,
+// e a negação sozinha classificaria como "nao" — mandando embora exatamente o perfil certo.
+const RE_CURSANDO =
+  /cursand|em curso|em andamento|faculdade|graduando|incomplet|trancad|\d\s*[ºo°]?\s*(semestre|per[íi]odo|ano)|(primeiro|segundo|terceiro|quarto|quinto|sexto|s[ée]timo|oitavo|nono|d[ée]cimo)\s+(semestre|per[íi]odo|ano)|me formo|vou me formar|terminando|finalizando/i;
+
+const RE_SEM_SUPERIOR =
+  /n[ãa]o tenho|n[ãa]o possuo|n[ãa]o fiz|n[ãa]o conclu|sem gradua|sem forma[çc][ãa]o|sem curso superior|nenhuma|nenhum|ensino m[ée]dio|segundo grau|apenas o m[ée]dio|s[óo] o m[ée]dio|t[ée]cnico apenas|ainda n[ãa]o/i;
+
+/**
+ * Classifica a situação de nível superior do lead a partir do texto do formulário.
+ * `null` = não deu para saber (campo vazio ou resposta ambígua) — e nesse caso o lead QUALIFICA.
+ */
+export function qualificacaoSuperior(texto: string | null | undefined): SituacaoSuperior | null {
+  const t = (texto ?? "").trim();
+  if (!t) return null;
+  if (RE_CURSANDO.test(t)) return "cursando";
+  if (RE_SEM_SUPERIOR.test(t)) return "nao";
+  // Sobrou um nome de curso ("Biomedicina", "Direito", "Enfermagem") — é graduação declarada.
+  // Exige ao menos 3 letras para não classificar lixo ("-", "x", "??") como formação.
+  if (/[a-zà-ú]{3,}/i.test(t)) return "tem";
+  return null;
+}
+
+/** O lead pode ser convidado para a sessão estratégica? Só `"nao"` barra; o resto passa. */
+export function podeIrParaSessao(areaGraduacao: string | null | undefined): boolean {
+  return qualificacaoSuperior(areaGraduacao) !== "nao";
+}

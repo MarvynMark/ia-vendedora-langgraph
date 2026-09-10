@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { criarContato, criarConversa, criarKanbanTask, buscarContatoPorQuery, adicionarEtiquetas, atualizarContatoDados } from "../services/chatwoot.ts";
+import { tierDoLead, ETIQUETA_TIER } from "../lib/tier-lead.ts";
 
 const KANBAN_BOARD_ID = 1;
 const KANBAN_STEP_NOVO_LEAD = 1;
@@ -31,7 +32,13 @@ const CAMPO_PADROES: Array<{ re: RegExp; coluna: string }> = [
   { re: /n[íi]vel/i, coluna: "nivel_concurseiro" },
   { re: /j[áa] foi aluno/i, coluna: "ja_foi_aluno" },
   { re: /pronto para (garantir|come[çc]ar)|garantir sua vaga/i, coluna: "pronto_para_garantir" },
-  // "disposto a investir" foi REMOVIDO do formulário (fluxo único) — de propósito não tem padrão.
+  // "disposto a investir" VOLTOU ao formulário em 10/09/2026 (tinha saído em fd5f750, 24/07).
+  // Agora ela NÃO roteia ninguém — serve para MEDIR o funil de sessão estratégica, comparando
+  // aceite/comparecimento/fechamento entre os dois tiers. Ver src/lib/tier-lead.ts.
+  // Nenhum padrão acima casa com o título dessa pergunta (conferido um a um), então a posição
+  // na lista é indiferente — mas o "primeiro casa, primeiro leva" continua valendo se o
+  // formulário for reescrito.
+  { re: /disposto|condi[çc][õo]es de investir/i, coluna: "disposto_investir" },
 ];
 
 const COLUNAS_VALIDAS = new Set(CAMPO_PADROES.map(p => p.coluna));
@@ -174,6 +181,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     ...(d.motivo_mentoria     ? { motivo_mentoria: d.motivo_mentoria } : {}),
     ...(d.pronto_para_garantir ? { pronto_para_garantir: d.pronto_para_garantir } : {}),
     ...(d.ja_foi_aluno        ? { ja_foi_aluno: d.ja_foi_aluno } : {}),
+    ...(d.disposto_investir   ? { disposto_investir: d.disposto_investir } : {}),
   };
 
   // Cria contato se não existir, ou atualiza atributos do existente
@@ -232,6 +240,12 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   // formulário vem incompleto. É o único gatilho de automação agora (as labels sim/nao, que
   // dependiam do "disposto a investir", foram aposentadas).
   etiquetas.push("agente-on");
+
+  // Tier de investimento — etiqueta de MEDIÇÃO do funil de sessão estratégica, não de roteamento.
+  // Quem decide se o lead vai para a sessão é env.FUNIL_CALL; esta label só permite comparar
+  // aceite/comparecimento/fechamento entre os dois grupos no fim do teste. Ver lib/tier-lead.ts.
+  const tier = tierDoLead(d.disposto_investir);
+  if (tier) etiquetas.push(ETIQUETA_TIER[tier]);
 
   // (Labels "sim"/"nao" APOSENTADAS: derivavam da pergunta "disposto a investir", removida do
   // formulário — agora é um fluxo único para todos, com a qualificação feita pela própria IA.

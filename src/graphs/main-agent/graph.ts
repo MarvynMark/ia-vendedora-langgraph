@@ -4,6 +4,8 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { MainAgentState, type MainAgentStateType } from "./state.ts";
 import { gerarPromptAgentePrincipal } from "./prompt.ts";
+import { gerarPromptAgenteSessao } from "./prompt-sessao.ts";
+import { trilhaDoLead, PONTE_PRECO_SESSAO } from "../../lib/funil-call.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
@@ -335,7 +337,16 @@ async function executarAgente(state: MainAgentStateType) {
     }
   }
 
-  let systemPrompt = gerarPromptAgentePrincipal({
+  // ESCOLHA DA TRILHA — a única linha que separa o funil de sempre do funil de sessão estratégica.
+  // Com FUNIL_CALL="off" (default) isto devolve sempre a trilha antiga e nada muda em produção.
+  // Ver lib/funil-call.ts: quem já ouviu preço nesta conversa NUNCA é movido de trilha no meio.
+  const trilha = trilhaDoLead({
+    etiquetas: state.etiquetas,
+    ofertaJaApresentada: historico.some((m) => m.type === "ai" && (temPrecoDePlano(m.content ?? "") || temLinkDePagamento(m.content ?? ""))),
+  });
+  const gerarPrompt = trilha === "sessao" ? gerarPromptAgenteSessao : gerarPromptAgentePrincipal;
+
+  let systemPrompt = gerarPrompt({
     tarefa,
     etapasDescricao,
     dataHoraAtual,
@@ -511,6 +522,22 @@ async function executarAgente(state: MainAgentStateType) {
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = PERGUNTA_DESCOBERTA_MATERIAL;
+    }
+
+    // TRAVA DE PREÇO DA TRILHA DE SESSÃO — nesta trilha a IA agenda, não vende: preço e link são
+    // assunto da call. O prompt já proíbe, mas prompt sozinho é furado sob insistência (é o que
+    // acontece hoje no funil antigo, onde a regra manda dar o número na 2ª pergunta). Aqui a
+    // oferta é substituída pela ponte, no mesmo padrão do gate de material.
+    //
+    // Não há exceção de "sinal de compra" AQUI de propósito: quem quer comprar é atendido por uma
+    // pessoa (o prompt manda usar Escalar_humano), e nesse caminho nenhum preço sai da IA — então
+    // não há o que destravar. Deixar uma exceção aberta reabriria o furo que a trava fecha.
+    if (trilha === "sessao" && ofertaNoTurno(outputFinal)) {
+      logger.warn("main-agent", "Preço/link bloqueado: trilha de sessão estratégica", {
+        idConversa: state.idConversa,
+        outputBloqueado: outputFinal.slice(0, 160),
+      });
+      outputFinal = PONTE_PRECO_SESSAO;
     }
 
     // TRAVA DE ELEGIBILIDADE — a IA não manda embora quem ainda está cursando. O diploma é

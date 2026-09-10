@@ -73,13 +73,37 @@ describe("parsearFormulario (mapeamento por padrão)", () => {
     );
   });
 
-  test("'disposto a investir' foi removido: se vier no payload, é ignorado (não vira coluna)", () => {
+  // A pergunta "disposto a investir" VOLTOU ao formulário em 10/09/2026 (tinha saído em fd5f750).
+  // Ela não roteia mais ninguém — o funil de sessão estratégica convida todo mundo — mas é a
+  // etiqueta de medição que permite comparar aceite e fechamento entre os dois tiers no fim do
+  // teste. Ver src/lib/tier-lead.ts. Este teste substitui o que afirmava a remoção.
+  test("'disposto a investir' volta a virar coluna, com o valor em R$ 300", () => {
     const d = parsearFormulario({
-      "Você está disposto e teria condições de investir cerca de R$ 197 por mês?": "Não",
+      "Você está disposto e teria condições de investir cerca de R$ 300 por mês (em 12x) para ser acompanhado até a aprovação?": "Sim, é o que eu quero!",
       "Qual é o seu nome completo?": "João",
     });
     expect(d.nome_completo).toBe("João");
-    expect(d).not.toHaveProperty("disposto_investir");
+    expect(d.disposto_investir).toBe("Sim, é o que eu quero!");
+  });
+
+  test("casa também com o texto antigo da pergunta (leads que preencheram antes)", () => {
+    const d = parsearFormulario({
+      "Você está disposto e teria condições de investir cerca de R$ 250 por mês (pagamento em 12x de 250)?": "Infelizmente não no momento!",
+    });
+    expect(d.disposto_investir).toBe("Infelizmente não no momento!");
+  });
+
+  test("a pergunta de investimento não rouba nenhum outro campo do formulário", () => {
+    const d = parsearFormulario({
+      "Você está disposto e teria condições de investir cerca de R$ 300 por mês?": "Sim, é o que eu quero!",
+      "Qual sua maior dificuldade frente à organização e planejamento de estudos?": "não sei por onde começar",
+      "Qual é a sua área de graduação/curso de formação superior?": "Biomedicina",
+      "Você está pronto para garantir sua vaga?": "Sim, com certeza!",
+    });
+    expect(d.disposto_investir).toBe("Sim, é o que eu quero!");
+    expect(d.maior_dificuldade).toBe("não sei por onde começar");
+    expect(d.area_graduacao).toBe("Biomedicina");
+    expect(d.pronto_para_garantir).toBe("Sim, com certeza!");
   });
 });
 

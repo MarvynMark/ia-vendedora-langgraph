@@ -80,4 +80,18 @@ export const env = {
   GRUPO_ESPERA_LINK: process.env["GRUPO_ESPERA_LINK"] ?? "https://chat.whatsapp.com/IV5ub2oizto08ulrTaNuTO?mode=gi_t",
   TEMPLATE_DELAY_MS: Number(process.env["TEMPLATE_DELAY_MS"] ?? "300000"), // 5 minutos
   MODO_TESTE: process.env["MODO_TESTE"] === "true",
+
+  // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
+  // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert
+  // (o revert de bf3063d mostrou que ele leva junto correções boas que vieram no mesmo commit).
+  //   "off"    → comportamento IDÊNTICO ao de hoje; o código da trilha de call fica inerte.
+  //   "piloto" → só o tier "call" (respondeu que teria condição de investir) vai para a sessão;
+  //              o tier "ia" segue byte a byte no fluxo antigo.
+  //   "on"     → todos vão para a sessão.
+  // Default "off" DE PROPÓSITO: dá para deployar o código antes de decidir ligar.
+  FUNIL_CALL: (["off", "piloto", "on"] as const).includes(
+    process.env["FUNIL_CALL"] as "off" | "piloto" | "on",
+  )
+    ? (process.env["FUNIL_CALL"] as "off" | "piloto" | "on")
+    : "off",
 } as const;
