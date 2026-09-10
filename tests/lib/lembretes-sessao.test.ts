@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { TEMPLATES_SESSAO } from "../../src/lib/lembretes-sessao.ts";
+import { PRAZO_REMARCACAO_H } from "../../src/config/agenda.ts";
 
 // A lógica de janela é testada pela aritmética abaixo: são as MESMAS constantes usadas no módulo.
 // O objetivo é travar a regra "janela larga + marca no evento", que é o que garante envio único
@@ -44,5 +45,21 @@ describe("templates da cadência", () => {
     expect(TEMPLATES_SESSAO.lembrete24h).toBe("sessao_lembrete_24h");
     expect(TEMPLATES_SESSAO.lembrete1h).toBe("sessao_lembrete_1h");
     expect(TEMPLATES_SESSAO.resgate).toBe("sessao_resgate_noshow");
+  });
+});
+
+describe("prazo de remarcação", () => {
+  test("3 horas: dentro do prazo a IA resolve, fora ela escala", () => {
+    const dentroDoPrazo = (horasAteSessao: number) => horasAteSessao >= PRAZO_REMARCACAO_H;
+    expect(dentroDoPrazo(5)).toBe(true);
+    expect(dentroDoPrazo(3)).toBe(true);
+    expect(dentroDoPrazo(2.9)).toBe(false);
+    expect(dentroDoPrazo(0)).toBe(false);
+    expect(dentroDoPrazo(-1)).toBe(false); // sessão já passou (no-show)
+  });
+
+  test("o lembrete de 24h ainda cabe dentro do prazo de remarcação", () => {
+    // Se não coubesse, o lembrete cobraria um combinado que a pessoa já não teria como cumprir.
+    expect(22).toBeGreaterThan(PRAZO_REMARCACAO_H);
   });
 });

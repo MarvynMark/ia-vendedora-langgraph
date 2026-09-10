@@ -35,6 +35,18 @@ export const DIAS_A_FRENTE = 14;
 export const MAX_OFERTAS = 2;
 
 /**
+ * Antecedência mínima para desmarcar ou remarcar, em horas.
+ *
+ * Não é burocracia: é o compromisso que faz a pessoa aparecer. Vaga sem custo de desistência é
+ * vaga que fica vazia, e cada cadeira vazia é uma hora de closer que não volta.
+ *
+ * A IA NUNCA abre exceção — ela escala para um humano. Se a IA remarcasse sozinha, a regra viraria
+ * teatro e o lead descobriria na primeira tentativa. Se recusasse sozinha, o negócio perderia
+ * vendas que uma pessoa recuperaria com uma frase. A exceção existe, só não é decisão de robô.
+ */
+export const PRAZO_REMARCACAO_H = 3;
+
+/**
  * Grade por dia da semana (0=domingo … 6=sábado). O 12h não existe na lista — é o almoço.
  * Fim de semana fora: sessão é trabalho, e closer cansado fecha mal.
  */

@@ -11,7 +11,7 @@
 import { logger } from "./logger.ts";
 import { env } from "../config/env.ts";
 import { primeiroNomeSaudacao } from "./nome.ts";
-import { rotularDia, rotularHora } from "../config/agenda.ts";
+import { PRAZO_REMARCACAO_H, rotularDia, rotularHora } from "../config/agenda.ts";
 import {
   agendaConfigurada,
   listarSessoes,
@@ -129,7 +129,9 @@ export async function verificarLembretesSessao(agora = new Date()): Promise<void
       if (faltam > 22 * HORA_MS && faltam <= 26 * HORA_MS && !lembreteJaEnviado(item.evento, "lembrete24h")) {
         await disparar(s, "lembrete24h",
           `Oi, ${primeiroNomeSaudacao(s.nomeLead, "tudo bem")}! Passando pra confirmar nossa conversa de amanhã, ${rotularHora(s.inicio)}. ` +
-          `Tá de pé pra você? Se precisar mudar, é só me falar que eu remarco.`);
+          `Tá de pé pra você? Se precisar mudar, me avisa até ${PRAZO_REMARCACAO_H}h antes que eu consigo remanejar.`);
+        // O lembrete de 24h é o momento CERTO de lembrar do combinado: ainda dá tempo de remarcar
+        // dentro do prazo. Cobrar isso 1h antes seria cobrar quando a pessoa já não pode cumprir.
         continue;
       }
 

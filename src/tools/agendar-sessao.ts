@@ -9,7 +9,7 @@ import {
   cancelarSessao,
 } from "../services/google-calendar.ts";
 import { slotsLivres, quemAtende } from "../lib/disponibilidade.ts";
-import { DIAS_A_FRENTE, classificarPreferencia, rotularDia, rotularHora, type Preferencia } from "../config/agenda.ts";
+import { DIAS_A_FRENTE, PRAZO_REMARCACAO_H, classificarPreferencia, rotularDia, rotularHora, type Preferencia } from "../config/agenda.ts";
 import { logger } from "../lib/logger.ts";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -47,11 +47,31 @@ export function criarToolAgendarSessao(ctx: ContextoAgenda) {
       const pref: Preferencia = classificarPreferencia(periodo ?? "") ?? "qualquer";
 
       try {
-        if (acao === "cancelar") {
+        // TRAVA DO COMPROMISSO — vale para cancelar E remarcar.
+        // Dentro do prazo, a IA resolve sozinha. Fora dele, ela NÃO decide: escala. Conceder a
+        // exceção sozinha esvaziaria a regra que faz o lead aparecer; negá-la sozinha jogaria fora
+        // uma venda que uma pessoa recuperaria. Quem decide exceção é gente.
+        if (acao === "cancelar" || acao === "remarcar") {
           const achado = await buscarSessaoDoTelefone(ctx.telefone, agora);
-          if (!achado) return "Não havia sessão futura marcada para este lead.";
-          await cancelarSessao(achado.calendarId, achado.evento.id!);
-          return "Sessão cancelada. Se fizer sentido, ofereça outro horário.";
+          if (!achado) {
+            if (acao === "cancelar") return "Não havia sessão futura marcada para este lead.";
+          } else {
+            const inicioSessao = new Date(achado.evento.start?.dateTime ?? achado.evento.start?.date ?? 0);
+            const horasAteSessao = (inicioSessao.getTime() - agora.getTime()) / 3_600_000;
+            if (horasAteSessao < PRAZO_REMARCACAO_H) {
+              logger.warn("agendar-sessao", `${acao} fora do prazo (${horasAteSessao.toFixed(1)}h) — escalando`, { telefone: ctx.telefone });
+              return [
+                `FORA DO PRAZO: faltam ${horasAteSessao.toFixed(1)}h para a sessão e o combinado é avisar com ${PRAZO_REMARCACAO_H}h de antecedência.`,
+                "Você NÃO pode remarcar nem cancelar agora, e NÃO prometa que vai remarcar.",
+                "Reconheça o que ele disse, lembre em UMA frase que a vaga foi reservada só pra ele,",
+                "diga que vai ver o que dá pra fazer — e use Escalar_humano AGORA. Quem decide isso é uma pessoa.",
+              ].join("\n");
+            }
+          }
+          if (acao === "cancelar" && achado) {
+            await cancelarSessao(achado.calendarId, achado.evento.id!);
+            return "Sessão cancelada dentro do prazo. Pergunte se ele quer já deixar outro horário marcado.";
+          }
         }
 
         const agendas = await buscarAgendas(agora, new Date(agora.getTime() + DIAS_A_FRENTE * DIA_MS));
