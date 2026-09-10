@@ -81,6 +81,19 @@ export const env = {
   TEMPLATE_DELAY_MS: Number(process.env["TEMPLATE_DELAY_MS"] ?? "300000"), // 5 minutos
   MODO_TESTE: process.env["MODO_TESTE"] === "true",
 
+  // Google Calendar via OAuth (não Service Account): o Workspace da csiacademy.com.br aplica
+  // `iam.managed.disableServiceAccountKeyCreation` e proíbe chaves de conta de serviço. OAuth passa
+  // por essa política E, agindo como um usuário real, consegue criar sala do Meet por evento —
+  // coisa que Service Account em calendário compartilhado não faz.
+  // O app é INTERNO no Workspace, então o refresh token não expira.
+  // Opcionais de propósito: sem elas o app sobe normal e AGENDA_ATIVA fica desligada.
+  AGENDA_ATIVA: process.env["AGENDA_ATIVA"] === "true",
+  GOOGLE_OAUTH_CLIENT_ID: process.env["GOOGLE_OAUTH_CLIENT_ID"] ?? "",
+  GOOGLE_OAUTH_CLIENT_SECRET: process.env["GOOGLE_OAUTH_CLIENT_SECRET"] ?? "",
+  GOOGLE_OAUTH_REFRESH_TOKEN: process.env["GOOGLE_OAUTH_REFRESH_TOKEN"] ?? "",
+  GOOGLE_CALENDAR_ID_GUSTHAVO: process.env["GOOGLE_CALENDAR_ID_GUSTHAVO"] ?? "",
+  GOOGLE_CALENDAR_ID_PEDRO: process.env["GOOGLE_CALENDAR_ID_PEDRO"] ?? "",
+
   // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
   // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert
   // (o revert de bf3063d mostrou que ele leva junto correções boas que vieram no mesmo commit).
