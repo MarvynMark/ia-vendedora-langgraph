@@ -16,6 +16,8 @@ import { registrarMensagemRouter } from "./routes/registrar-mensagem.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
 import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
 import { verificarIntrosPendentes } from "./lib/intro-pendente.ts";
+import { verificarLembretesSessao } from "./lib/lembretes-sessao.ts";
+import { agendaConfigurada } from "./services/google-calendar.ts";
 import { limparMensagensProcessadas } from "./db/fila.ts";
 import { iniciarVarreduraFilaOrfa, recuperarConversasTravadasNoBoot } from "./lib/varredura-fila.ts";
 import { verificarNoticias } from "./lib/monitor-noticias.ts";
@@ -94,6 +96,21 @@ setInterval(async () => {
     logger.error("intro", "Erro no job de intros pendentes:", e);
   }
 }, 30_000);
+
+// Job: lembretes da sessão estratégica — 24h antes, 1h antes e encerramento (a cada 5min).
+// A cada 5 minutos, e não a cada hora, por causa do lembrete de 1h: a janela dele é de 40 min, e
+// um cron horário poderia cair fora dela e pular o lembrete que mais reduz no-show.
+// Só roda com a agenda configurada; sem isso é no-op e não custa nada.
+if (agendaConfigurada()) {
+  logger.info("lembretes-sessao", "Cadência de lembretes ativa (a cada 5min)");
+  setInterval(async () => {
+    try {
+      await verificarLembretesSessao();
+    } catch (e) {
+      logger.error("lembretes-sessao", "Erro no job de lembretes:", e);
+    }
+  }, 5 * 60_000);
+}
 
 // Job: limpar dedup de mensagens processadas (a cada 24h)
 setInterval(async () => {

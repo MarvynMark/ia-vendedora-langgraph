@@ -107,6 +107,16 @@ export async function criarSessao(dados: DadosSessao): Promise<{ id: string; mee
       ].filter(Boolean).join("\n"),
       start: { dateTime: dados.inicio.toISOString(), timeZone: TZ },
       end: { dateTime: fim.toISOString(), timeZone: TZ },
+      // O estado do lembrete mora NO EVENTO, não numa tabela paralela. Assim ele nasce e morre
+      // junto com a sessão: remarcou, os lembretes voltam a valer; cancelou, some tudo. Uma
+      // tabela separada ficaria dessincronizada no primeiro cancelamento feito pela agenda.
+      extendedProperties: {
+        private: {
+          telefone: dados.telefone,
+          ...(dados.idConversa ? { idConversa: dados.idConversa } : {}),
+          ...(dados.concurso ? { concurso: dados.concurso } : {}),
+        },
+      },
       conferenceData: {
         createRequest: {
           requestId: `vestigium-${dados.telefone}-${dados.inicio.getTime()}`,
@@ -160,4 +170,54 @@ export async function moverSessao(calendarId: string, idEvento: string, novoInic
 export async function cancelarSessao(calendarId: string, idEvento: string): Promise<void> {
   await calendario().events.delete({ calendarId, eventId: idEvento });
   logger.info("google-calendar", `Sessão ${idEvento} cancelada`);
+}
+
+/** Chaves de idempotência dos lembretes, gravadas no próprio evento. */
+export type MarcaLembrete = "lembrete24h" | "lembrete1h" | "resgate";
+
+/** Sessões que começam (ou terminam) dentro do intervalo, nas duas agendas. */
+export async function listarSessoes(
+  de: Date,
+  ate: Date,
+): Promise<Array<{ evento: calendar_v3.Schema$Event; calendarId: string; nomeAtendente: string }>> {
+  const out: Array<{ evento: calendar_v3.Schema$Event; calendarId: string; nomeAtendente: string }> = [];
+  for (const a of ATENDENTES) {
+    const { data } = await calendario().events.list({
+      calendarId: a.calendarId,
+      timeMin: de.toISOString(),
+      timeMax: ate.toISOString(),
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: 250,
+    });
+    for (const evento of data.items ?? []) {
+      if (evento.status === "cancelled") continue;
+      out.push({ evento, calendarId: a.calendarId, nomeAtendente: a.nome });
+    }
+  }
+  return out;
+}
+
+/** Já mandamos este lembrete para esta sessão? */
+export function lembreteJaEnviado(evento: calendar_v3.Schema$Event, marca: MarcaLembrete): boolean {
+  return evento.extendedProperties?.private?.[marca] === "1";
+}
+
+/**
+ * Marca o lembrete como enviado, no próprio evento.
+ *
+ * Chamado ANTES do envio de propósito: se marcar depois e o processo cair no meio, o lead recebe
+ * o mesmo lembrete de novo no ciclo seguinte. Perder um lembrete é ruim; mandar dois é pior —
+ * cheira a robô e queima a confiança logo antes da call.
+ */
+export async function marcarLembrete(
+  calendarId: string,
+  idEvento: string,
+  marca: MarcaLembrete,
+): Promise<void> {
+  await calendario().events.patch({
+    calendarId,
+    eventId: idEvento,
+    requestBody: { extendedProperties: { private: { [marca]: "1" } } },
+  });
 }
