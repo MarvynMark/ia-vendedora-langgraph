@@ -138,6 +138,14 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   // FÁCIL de responder ("firme ou travou?") em vez do passivo "me chama se fizer sentido".
   nutrir_reabertura:
     "Oi [Nome], tô abrindo uma turma nova da mentoria e lembrei de você. Antes de qualquer coisa, queria saber: como tá indo a sua preparação, seguiu firme ou acabou travando um pouco?",
+
+  // --- Lembretes da sessão estratégica (aprovados e sincronizados 11/09/2026) ---
+  // SEM variável de nome: "Oi, {{1}}!" foi rejeitado duas vezes (INVALID_FORMAT). O texto
+  // que vai ao CRM é montado em lembretes-sessao.ts com as variáveis preenchidas.
+  sessao_confirma_24h:
+    "Oi! Passando pra confirmar nossa conversa de amanhã, às {{1}}. Tá de pé pra você? Se precisar mudar, me avisa com pelo menos 3 horas de antecedência que eu consigo remanejar o horário.",
+  sessao_link_1h:
+    "Opa! Nossa conversa é daqui a pouco, às {{1}}. É por aqui: {{2}} — te espero!",
 };
 
 // Metadados por template aprovado na Meta (idioma e cabeçalho de mídia, quando houver).
@@ -189,4 +197,8 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   nutrir_ebook: { language: "pt_BR", bodyVars: 1 },
   nutrir_video_aprovada: { language: "pt_BR", bodyVars: 0 },
   nutrir_reabertura: { language: "pt_BR", bodyVars: 1 },
+
+  // Sessão estratégica — {{1}} = horário; o de 1h leva também {{2}} = link do Meet.
+  sessao_confirma_24h: { language: "pt_BR", bodyVars: 1 },
+  sessao_link_1h: { language: "pt_BR", bodyVars: 2 },
 };
