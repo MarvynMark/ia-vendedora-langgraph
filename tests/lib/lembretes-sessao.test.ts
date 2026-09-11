@@ -42,8 +42,8 @@ describe("janelas dos lembretes", () => {
 
 describe("templates da cadência", () => {
   test("cada marca tem seu template nomeado", () => {
-    expect(TEMPLATES_SESSAO.lembrete24h).toBe("sessao_lembrete_24h");
-    expect(TEMPLATES_SESSAO.lembrete1h).toBe("sessao_lembrete_1h");
+    expect(TEMPLATES_SESSAO.lembrete24h).toBe("sessao_confirma_24h");
+    expect(TEMPLATES_SESSAO.lembrete1h).toBe("sessao_link_1h");
     expect(TEMPLATES_SESSAO.resgate).toBe("sessao_resgate_noshow");
   });
 });

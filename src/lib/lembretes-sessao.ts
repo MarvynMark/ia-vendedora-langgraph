@@ -10,7 +10,6 @@
 
 import { logger } from "./logger.ts";
 import { env } from "../config/env.ts";
-import { primeiroNomeSaudacao } from "./nome.ts";
 import { PRAZO_REMARCACAO_H, rotularDia, rotularHora } from "../config/agenda.ts";
 import {
   agendaConfigurada,
@@ -30,10 +29,14 @@ const HORA_MS = 60 * MIN_MS;
  * (o lead agendou ontem, o lembrete é hoje), então texto livre não sai — quem entrega é a Meta.
  * Enquanto não estiverem aprovados e sincronizados no Chatwoot, o envio ao lead é substituído por
  * um aviso ao comercial, para uma pessoa cutucar à mão em vez de o lembrete sumir em silêncio.
+ *
+ * SEM variável de nome: as duas versões com "Oi, {{1}}!" (sessao_lembrete_24h e _v2, 10/09)
+ * voltaram INVALID_FORMAT. As variáveis são só o que muda por sessão — horário e link do Meet.
+ * O resgate não tem template porque vai ao comercial, não ao lead.
  */
 export const TEMPLATES_SESSAO: Record<Exclude<MarcaLembrete, never>, string> = {
-  lembrete24h: "sessao_lembrete_24h",
-  lembrete1h: "sessao_lembrete_1h",
+  lembrete24h: "sessao_confirma_24h", // {{1}} = horário
+  lembrete1h: "sessao_link_1h", // {{1}} = horário, {{2}} = link do Meet
   resgate: "sessao_resgate_noshow",
 };
 
@@ -63,7 +66,12 @@ interface Sessao {
   atendente: string;
 }
 
-async function disparar(s: Sessao, marca: MarcaLembrete, texto: string): Promise<void> {
+async function disparar(
+  s: Sessao,
+  marca: MarcaLembrete,
+  texto: string,
+  variaveis: Record<string, string>,
+): Promise<void> {
   // Marca ANTES de enviar: cair no meio e não mandar é melhor que mandar duas vezes.
   await marcarLembrete(s.calendarId, s.idEvento, marca);
 
@@ -82,9 +90,7 @@ async function disparar(s: Sessao, marca: MarcaLembrete, texto: string): Promise
     logger.error("lembretes-sessao", "Sessão sem idConversa — não dá para enviar", { idEvento: s.idEvento });
     return;
   }
-  await enviarTemplate(env.CHATWOOT_ACCOUNT_ID, s.idConversa, template, texto, {
-    "1": primeiroNomeSaudacao(s.nomeLead, "tudo bem"),
-  });
+  await enviarTemplate(env.CHATWOOT_ACCOUNT_ID, s.idConversa, template, texto, variaveis);
   logger.info("lembretes-sessao", `${marca} enviado`, { telefone: s.telefone, idEvento: s.idEvento });
 }
 
@@ -127,9 +133,11 @@ export async function verificarLembretesSessao(agora = new Date()): Promise<void
 
       // 24h antes — entre 22h e 26h de antecedência.
       if (faltam > 22 * HORA_MS && faltam <= 26 * HORA_MS && !lembreteJaEnviado(item.evento, "lembrete24h")) {
+        // Texto 1:1 com o template aprovado — é o que o lead lê e o que o CRM mostra.
         await disparar(s, "lembrete24h",
-          `Oi, ${primeiroNomeSaudacao(s.nomeLead, "tudo bem")}! Passando pra confirmar nossa conversa de amanhã, ${rotularHora(s.inicio)}. ` +
-          `Tá de pé pra você? Se precisar mudar, me avisa até ${PRAZO_REMARCACAO_H}h antes que eu consigo remanejar.`);
+          `Oi! Passando pra confirmar nossa conversa de amanhã, às ${rotularHora(s.inicio)}. ` +
+          `Tá de pé pra você? Se precisar mudar, me avisa com pelo menos ${PRAZO_REMARCACAO_H} horas de antecedência que eu consigo remanejar o horário.`,
+          { "1": rotularHora(s.inicio) });
         // O lembrete de 24h é o momento CERTO de lembrar do combinado: ainda dá tempo de remarcar
         // dentro do prazo. Cobrar isso 1h antes seria cobrar quando a pessoa já não pode cumprir.
         continue;
@@ -138,8 +146,8 @@ export async function verificarLembretesSessao(agora = new Date()): Promise<void
       // 1h antes — entre 40 e 80 minutos. Aqui o link vai de novo: é o que mais reduz no-show.
       if (faltam > 40 * MIN_MS && faltam <= 80 * MIN_MS && !lembreteJaEnviado(item.evento, "lembrete1h")) {
         await disparar(s, "lembrete1h",
-          `${primeiroNomeSaudacao(s.nomeLead, "Opa")}, nossa conversa é daqui a pouco, ${rotularHora(s.inicio)}. ` +
-          `É por aqui: ${s.meet}. Te espero!`);
+          `Opa! Nossa conversa é daqui a pouco, às ${rotularHora(s.inicio)}. É por aqui: ${s.meet} — te espero!`,
+          { "1": rotularHora(s.inicio), "2": s.meet });
         continue;
       }
 
