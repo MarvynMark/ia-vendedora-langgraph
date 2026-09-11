@@ -1,5 +1,5 @@
 import { primeiroNomeSaudacao, primeiroConcurso } from "../../lib/nome.ts";
-import { podeIrParaSessao } from "../../lib/elegibilidade.ts";
+import { motivoInelegivel } from "../../lib/elegibilidade.ts";
 import { BLOCO_PAPEL, BLOCO_PERSONALIDADE, BLOCO_RAG, type ContextoPrompt } from "./prompt-blocos.ts";
 
 // TRILHA DE SESSÃO ESTRATÉGICA — a IA qualifica e AGENDA; quem fecha é humano, na call.
@@ -39,9 +39,33 @@ export function gerarPromptAgenteSessao(ctx: ContextoPrompt): string {
   const formacao =
     (ctx.atributosContato?.qual_formacao as string | undefined) ??
     (dadosFormulario.match(/Forma[çc][ãa]o:\s*([^\n|]+)/i)?.[1] ?? "");
-  const podeAgendar = podeIrParaSessao(formacao);
+  const motivo = motivoInelegivel(formacao);
 
-  const blocoGateSuperior = podeAgendar
+  // Formação que os editais de Perito Criminal não aceitam (regra do Gusthavo, 11/09/2026). Tem
+  // diploma, mas para a posse é como não ter: não ocupa a agenda, e ouve a verdade sem rodeio.
+  const blocoFormacaoNaoAceita = motivo !== "formacao_nao_aceita"
+    ? ""
+    : `
+# ⛔ ESTE LEAD NÃO VAI PARA A SESSÃO
+
+<gate-formacao>
+  A formação declarada é **Investigação Forense e Perícia Criminal** (ou só uma delas). Essa
+  graduação **NÃO é aceita nos editais de Perito Criminal**. **NÃO convide para a sessão e NÃO
+  ofereça horário.**
+
+  Diga isso com honestidade e sem rodeio, em no máximo três frases: o curso tem o nome da área,
+  mas os editais do cargo não o aceitam como graduação, então o caminho é uma graduação que os
+  editais aceitem. Não liste quais são aceitas (varia por estado); diga que quando ele estiver
+  cursando uma delas pode voltar a falar com você, que aí dá pra montar o plano.
+
+  🚫 Se ele disser que TEM ou está CURSANDO outra graduação, você estava com a informação
+  incompleta: **ele PASSA a ser elegível na hora** — siga o fluxo normal e convide.
+
+  Depois de responder, mova o card para "Nutrir" com Atualizar_tarefa.
+</gate-formacao>
+`;
+
+  const blocoGateSuperior = motivo !== "sem_superior"
     ? ""
     : `
 # ⛔ ESTE LEAD NÃO VAI PARA A SESSÃO
@@ -84,7 +108,7 @@ ${BLOCO_PERSONALIDADE}
   É proibido encerrar turno com "qualquer coisa me chama", "fico à disposição" ou variação que
   devolva a bola pro lead sem um horário na mesa.
 </objetivo>
-${blocoGateSuperior}
+${blocoGateSuperior}${blocoFormacaoNaoAceita}
 # COMO USAR OS DADOS DO LEAD
 
 <dados>
@@ -294,6 +318,8 @@ ${blocoGateSuperior}
   Nunca afirme NEM negue que a formação dela é aceita — isso está no edital de cada estado. Diga
   que a preparação é pro conteúdo que a banca cobra, com plano individual pela formação, e que o
   que decide é estar pronto quando a vaga aparecer. Depois reancore no horário.
+  **Única exceção, que você SABE:** a graduação em **Investigação Forense e Perícia Criminal**
+  não é aceita nos editais de Perito Criminal. Se o lead perguntar por ela, diga a verdade.
 
   ## "Já posso prestar? Ainda tô cursando"
   **SIM, PODE.** O diploma é exigido na POSSE, não para prestar a prova. Quem está cursando é quem

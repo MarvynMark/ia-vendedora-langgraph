@@ -109,7 +109,49 @@ export function qualificacaoSuperior(texto: string | null | undefined): Situacao
   return null;
 }
 
-/** O lead pode ser convidado para a sessão estratégica? Só `"nao"` barra; o resto passa. */
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMAÇÃO NÃO ACEITA — tem diploma, mas os editais de Perito Criminal não aceitam.
+//
+// Regra do Gusthavo (11/09/2026): a graduação em "Investigação Forense e Perícia Criminal"
+// (tecnólogo) NÃO é aceita como formação para o cargo. Quem só tem ela está, para efeito de
+// posse, na mesma situação de quem não tem graduação — e o convite para a sessão seria uma
+// meia hora que termina em "não posso te ajudar".
+//
+// Só barra quando essa é a ÚNICA formação declarada. "Biomedicina e tecnólogo em investigação
+// forense" tem uma graduação aceita e passa — falso negativo custa venda.
+
+const RE_FORMACAO_NAO_ACEITA = /investiga[çc][ãa]o forense|per[íi]cia criminal/i;
+
+// Palavras que sobram num campo de formação sem formar outro curso: títulos, adjetivos, conectivos.
+// Comparadas sem acento (ver o aviso sobre \b e acentuação no topo do arquivo).
+const ENCHIMENTO = new Set([
+  "tecnologo", "tecnologa", "tecnologia", "tecnico", "tecnica", "curso", "superior", "graduacao",
+  "graduado", "graduada", "formado", "formada", "formacao", "bacharel", "bacharelado", "licenciatura",
+  "completo", "completa", "concluido", "concluida", "cursando", "area", "nivel", "ensino", "faculdade",
+  "sou", "tenho", "fiz", "com", "por", "para", "pra", "em", "de", "do", "da", "e", "no", "na", "ja",
+]);
+
+const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+export function formacaoNaoAceita(areaGraduacao: string | null | undefined): boolean {
+  const t = (areaGraduacao ?? "").trim();
+  if (!RE_FORMACAO_NAO_ACEITA.test(t)) return false;
+  const resto = semAcento(t.replace(new RegExp(RE_FORMACAO_NAO_ACEITA.source, "gi"), " "));
+  // Sobrou outro nome de curso (4+ letras fora do enchimento)? Então há outra formação e passa.
+  const outroCurso = resto.split(/[^a-z]+/).some((p) => p.length >= 4 && !ENCHIMENTO.has(p));
+  return !outroCurso;
+}
+
+export type MotivoInelegivel = "sem_superior" | "formacao_nao_aceita";
+
+/** Por que o lead NÃO pode ir para a sessão — ou `null` se pode. */
+export function motivoInelegivel(areaGraduacao: string | null | undefined): MotivoInelegivel | null {
+  if (qualificacaoSuperior(areaGraduacao) === "nao") return "sem_superior";
+  if (formacaoNaoAceita(areaGraduacao)) return "formacao_nao_aceita";
+  return null;
+}
+
+/** O lead pode ser convidado para a sessão estratégica? O default é QUALIFICAR. */
 export function podeIrParaSessao(areaGraduacao: string | null | undefined): boolean {
-  return qualificacaoSuperior(areaGraduacao) !== "nao";
+  return motivoInelegivel(areaGraduacao) === null;
 }
