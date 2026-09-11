@@ -350,6 +350,12 @@ export function formatarTexto(texto: string): string {
 
   // 1) Markdown → WhatsApp: negrito ** -> * e fora os # de cabeçalho.
   let t = original.replace(/\*\*/g, "*").replace(/^#{1,6}\s*/gm, "");
+  // Link em markdown vira o endereço puro. O WhatsApp não renderiza [texto](url): na conv 7399 o
+  // lead recebeu "[Link do Meet](https://meet.google.com/...)" com os colchetes e tudo.
+  t = t.replace(/\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, "$2");
+  // Travessão fora. O modelo copia o "—" do prompt e o lead lê como texto de IA (pedido do
+  // Gusthavo, conv 7399). Vira vírgula, que é como a frase seria dita em voz alta.
+  t = t.replace(/\s*[—–]\s*/g, ", ").replace(/^, /gm, "").replace(/([.!?:])\s*, /g, "$1 ");
 
   // 2) Blocos: o que o agente já separou com linha em branco é respeitado como veio.
   const blocosOriginais = t.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
@@ -407,8 +413,11 @@ export function dividirEmFrases(texto: string): string[] {
  * Aqui o teto vira código. Nada é DESCARTADO: enquanto passar do teto, funde o PAR VIZINHO mais
  * curto. Assim as bolhas curtas de preâmbulo ("Entendo, Julia.") grudam umas nas outras primeiro,
  * e as frases longas — que carregam o preço, a pergunta e o link — tendem a sobreviver sozinhas.
+ *
+ * 5 → 3 em 11/09 (conv 7399, primeiro lead da trilha de sessão): o lead escrevia 5 palavras e
+ * recebia 5 bolhas de volta, em TODOS os turnos. Três é o que uma pessoa manda numa resposta.
  */
-export const MAX_BOLHAS_POR_TURNO = 5;
+export const MAX_BOLHAS_POR_TURNO = 3;
 
 export function agruparAteLimite(frases: string[], max = MAX_BOLHAS_POR_TURNO): string[] {
   if (max < 1 || frases.length <= max) return frases;

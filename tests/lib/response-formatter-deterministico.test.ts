@@ -54,6 +54,21 @@ describe("formatarTexto — determinístico", () => {
     const t = "Aqui está o link: https://peritowalker.com.br/mentoriaperito";
     expect(formatarTexto(t)).toContain("https://peritowalker.com.br/mentoriaperito");
   });
+
+  // conv 7399 — o lead recebeu "[Link do Meet](https://meet.google.com/...)" com colchetes.
+  test("link em markdown vira o endereço puro", () => {
+    const t = "Aqui está o link da reunião: [Link do Meet](https://meet.google.com/xec-aheb-pvh).";
+    expect(formatarTexto(t)).toBe("Aqui está o link da reunião: https://meet.google.com/xec-aheb-pvh.");
+  });
+
+  // conv 7399 — o modelo copia o travessão do prompt e o lead lê como texto de IA.
+  test("travessão vira vírgula", () => {
+    expect(formatarTexto("Você não tá parado por falta de esforço — tá parado porque ninguém te deu a ordem."))
+      .toBe("Você não tá parado por falta de esforço, tá parado porque ninguém te deu a ordem.");
+    expect(formatarTexto("eu não pego todo mundo – antes a gente marca uma conversa."))
+      .toBe("eu não pego todo mundo, antes a gente marca uma conversa.");
+    expect(formatarTexto("Te espero segunda-feira às 18h.")).toBe("Te espero segunda-feira às 18h."); // hífen fica
+  });
 });
 
 // conv 6907 — mesmo modo de falha das 6941/6943, sobrevivendo no formatador de SSML: o texto do
@@ -108,8 +123,14 @@ describe("agruparAteLimite", () => {
     "Pode ser transparente comigo.",
   ];
 
-  test("respeita o teto de 5 bolhas", () => {
-    expect(agruparAteLimite(PITCH).length).toBe(5);
+  test("respeita o teto de 5 bolhas quando pedido", () => {
+    expect(agruparAteLimite(PITCH, 5).length).toBe(5);
+  });
+
+  test("com o teto padrão (3), oito frases viram três bolhas sem perder nada", () => {
+    const bolhas = agruparAteLimite(PITCH);
+    expect(bolhas.length).toBe(3);
+    expect(bolhas.join(" ")).toBe(PITCH.join(" "));
   });
 
   test("não descarta nada — todo o texto continua presente", () => {
@@ -118,7 +139,7 @@ describe("agruparAteLimite", () => {
   });
 
   test("funde as bolhas curtas primeiro e deixa as longas sozinhas", () => {
-    const bolhas = agruparAteLimite(PITCH);
+    const bolhas = agruparAteLimite(PITCH, 5);
     // "Entendo, Julia." é a mais curta: some dentro de uma bolha maior, nunca fica sozinha
     expect(bolhas).not.toContain("Entendo, Julia.");
     expect(bolhas[0]).toContain("Entendo, Julia.");
@@ -141,7 +162,7 @@ describe("agruparAteLimite", () => {
     expect(agruparAteLimite(PITCH, 1)).toEqual([PITCH.join(" ")]);
   });
 
-  test("MAX_BOLHAS_POR_TURNO é o teto que o roteiro usa no pitch e no fechamento", () => {
-    expect(MAX_BOLHAS_POR_TURNO).toBe(5);
+  test("MAX_BOLHAS_POR_TURNO é 3 — o que uma pessoa manda numa resposta (conv 7399)", () => {
+    expect(MAX_BOLHAS_POR_TURNO).toBe(3);
   });
 });

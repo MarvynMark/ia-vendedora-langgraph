@@ -8,10 +8,10 @@ describe("dividirMensagem", () => {
     expect(resultado).toEqual(["Bloco 1", "Bloco 2", "Bloco 3"]);
   });
 
-  test("limita a 5 blocos", () => {
-    const texto = "1\n\n2\n\n3\n\n4\n\n5\n\n6\n\n7";
+  test("limita a 10 blocos (o teto por turno é aplicado depois, em agruparAteLimite)", () => {
+    const texto = Array.from({ length: 12 }, (_, i) => String(i + 1)).join("\n\n");
     const resultado = dividirMensagem(texto);
-    expect(resultado.length).toBe(5);
+    expect(resultado.length).toBe(10);
   });
 
   test("ignora blocos vazios", () => {
