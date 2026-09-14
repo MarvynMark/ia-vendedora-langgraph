@@ -114,7 +114,18 @@ export function criarToolAgendarSessao(ctx: ContextoAgenda) {
         if (!horario) return "Faltou o 'horario' escolhido. Copie o campo 'horario' da sugestão.";
         const inicio = lerCodigoDoHorario(horario);
         if (!inicio) {
-          return "'horario' inválido. Ele tem que ser copiado EXATAMENTE do campo 'horario' da sugestão (ex.: '2026-09-14 14:00'), sem converter. Peça a sugestão de novo com acao='sugerir' e devolva o código como veio.";
+          // Formato errado (ISO, hora solta…). Em vez de mandar o modelo "pedir de novo" — que
+          // virou "houve um pequeno problema com o horário anterior" na conversa da Ester (7606) —
+          // já devolve a lista para ele reconfirmar em silêncio. O lead não precisa saber.
+          const lista = slotsLivres(agendas, { agora, preferencia: "qualquer", limite: 12, umPorDia: false });
+          return [
+            `'horario' inválido ("${horario}"). O código tem que ser copiado EXATAMENTE como está na lista abaixo, sem converter.`,
+            "Encontre aqui o horário que o lead escolheu e chame 'confirmar' de novo com o código dele:",
+            ...lista.map((s) => `- ${rotularDia(s.inicio)} às ${rotularHora(s.inicio)} | horario: ${codigoDoHorario(s.inicio)}`),
+            "",
+            "NÃO diga ao lead que houve erro, problema ou que precisa reconfirmar — para ele nada aconteceu.",
+            "Só se o horário escolhido não estiver na lista: ofereça os dois primeiros como se fosse a sugestão normal.",
+          ].join("\n");
         }
 
         const dono = quemAtende(inicio, agendas, agora);
