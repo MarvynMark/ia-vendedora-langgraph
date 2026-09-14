@@ -89,12 +89,17 @@ export function criarToolAgendarSessao(ctx: ContextoAgenda) {
             const inicioSessao = new Date(achado.evento.start?.dateTime ?? achado.evento.start?.date ?? 0);
             const horasAteSessao = (inicioSessao.getTime() - agora.getTime()) / 3_600_000;
             if (horasAteSessao < PRAZO_REMARCACAO_H) {
-              logger.warn("agendar-sessao", `${acao} fora do prazo (${horasAteSessao.toFixed(1)}h) — escalando`, { telefone: ctx.telefone });
+              // A cadeira sai da agenda MESMO fora do prazo: quem avisou que não vem não vem, e
+              // deixar o evento de pé só faz o lembrete de 1h sair e o cron perguntar "compareceu?"
+              // (Palloma, conv 7437, 14/09). O que continua sendo decisão humana é a EXCEÇÃO —
+              // remarcar sem custo apesar do combinado. Isso a IA não concede.
+              await cancelarSessao(achado.calendarId, achado.evento.id!);
+              logger.warn("agendar-sessao", `${acao} fora do prazo (${horasAteSessao.toFixed(1)}h) — evento cancelado, escalando`, { telefone: ctx.telefone });
               return [
-                `FORA DO PRAZO: faltam ${horasAteSessao.toFixed(1)}h para a sessão e o combinado é avisar com ${PRAZO_REMARCACAO_H}h de antecedência.`,
-                "Você NÃO pode remarcar nem cancelar agora, e NÃO prometa que vai remarcar.",
+                `FORA DO PRAZO: faltavam ${horasAteSessao.toFixed(1)}h para a sessão e o combinado é avisar com ${PRAZO_REMARCACAO_H}h de antecedência.`,
+                "O horário foi liberado na agenda. Você NÃO pode remarcar agora, e NÃO prometa que vai remarcar.",
                 "Reconheça o que ele disse, lembre em UMA frase que a vaga foi reservada só pra ele,",
-                "diga que vai ver o que dá pra fazer — e use Escalar_humano AGORA. Quem decide isso é uma pessoa.",
+                "diga que vai ver o que dá pra fazer — e use Escalar_humano AGORA. Quem decide se remarca é uma pessoa.",
               ].join("\n");
             }
           }
