@@ -155,3 +155,77 @@ export function motivoInelegivel(areaGraduacao: string | null | undefined): Moti
 export function podeIrParaSessao(areaGraduacao: string | null | undefined): boolean {
   return motivoInelegivel(areaGraduacao) === null;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRAVA EM CÓDIGO — o gate acima existia só no prompt e o modelo passou por cima.
+//
+// Amanda (conv 7297, 14/09): formulário "Ensino médio", prompt com "⛔ NÃO convide para a sessão"
+// e mesmo assim, quando ela respondeu "Valor" a um follow-up, a IA seguiu o roteiro e perguntou
+// "manhã, tarde ou noite?". O objetivo da trilha ("toda resposta termina com um horário") falou
+// mais alto que o gate. Prompt contra prompt perde; aqui o convite é barrado antes de sair e a
+// tool de agenda recusa marcar.
+//
+// A exceção do gate continua valendo: se o lead disser NA CONVERSA que tem ou está cursando
+// graduação, o formulário estava errado e ele passa.
+
+/** De onde vem a formação: atributo do contato, senão o texto do formulário. */
+export function formacaoDoLead(
+  atributosContato: Record<string, unknown> | null | undefined,
+  dadosFormulario: string | null | undefined,
+): string {
+  const atributo = atributosContato?.["qual_formacao"];
+  if (typeof atributo === "string" && atributo.trim()) return atributo;
+  return (dadosFormulario ?? "").match(/Forma[çc][ãa]o:\s*([^\n|]+)/i)?.[1]?.trim() ?? "";
+}
+
+const RE_DECLAROU_SUPERIOR =
+  /sou formad|me formei|formei em|formad[oa] em|tenho (gradua|faculdade|diploma|curso superior|n[íi]vel superior|ensino superior)|fiz faculdade|graduad[oa] em|bacharel|licenciad[oa]|p[óo]s[- ]gradua/i;
+
+/** O lead contou na conversa que tem ou está cursando graduação? Aí o formulário perde. */
+export function leadDeclarouSuperior(mensagensLead: readonly string[]): boolean {
+  return mensagensLead.some((m) => RE_CURSANDO.test(m) || RE_DECLAROU_SUPERIOR.test(m));
+}
+
+/** O lead está barrado da sessão, considerando formulário E o que ele disse depois? */
+export function motivoBloqueioSessao(
+  formacao: string | null | undefined,
+  mensagensLead: readonly string[],
+): MotivoInelegivel | null {
+  const motivo = motivoInelegivel(formacao);
+  if (!motivo) return null;
+  return leadDeclarouSuperior(mensagensLead) ? null : motivo;
+}
+
+// A resposta da IA convida para a sessão / pede horário?
+const RE_CONVITE_SESSAO = [
+  /manh[ãa],? (à|a) tarde ou (à|a) noite/i,
+  /(de manh[ãa]|(à|a) tarde|(à|a) noite)\?/i,
+  /te encaixar/i,
+  /(marcar|agendar) (uma|nossa|a|essa) conversa/i,
+  /conversa (est[áa] )?marcada/i,
+  /qual (dos )?(hor[áa]rio|dia)s? fica melhor/i,
+  /prefere (marcar|conversar)/i,
+  /te espero (na |no |hoje|amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta)/i,
+  /meet\.google\.com/i,
+];
+
+export function convidaParaSessao(texto: string): boolean {
+  const t = texto ?? "";
+  return RE_CONVITE_SESSAO.some((re) => re.test(t));
+}
+
+/**
+ * O que sai no lugar do convite. Sem travessão, três bolhas no máximo, e a porta aberta: quem
+ * está cursando responde e passa. Nada de "não posso te ajudar" seco: o lead sem graduação é
+ * lead de daqui a quatro anos, e o Walker quer que ele volte.
+ */
+export const RESPOSTA_INELEGIVEL: Record<MotivoInelegivel, string> = {
+  sem_superior:
+    "Vou ser direto com você porque acho que é o mais justo: o concurso de Perito exige graduação, cobrada na posse. " +
+    "Então o primeiro passo, antes de qualquer plano de estudo, é começar uma faculdade. " +
+    "Se você já estiver cursando alguma, me fala qual que a gente conversa. Se ainda não, quando começar me chama que aí sim eu monto teu plano.",
+  formacao_nao_aceita:
+    "Vou ser direto com você porque acho que é o mais justo: o curso de Investigação Forense e Perícia Criminal tem o nome da área, mas os editais de Perito não aceitam ele como graduação. " +
+    "Então o caminho é uma graduação que os editais aceitem, e isso varia por estado. " +
+    "Se você tiver ou estiver cursando outra graduação, me fala qual que a gente conversa. Quando estiver cursando uma, me chama que aí eu monto teu plano.",
+};

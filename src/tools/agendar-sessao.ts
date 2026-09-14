@@ -20,6 +20,7 @@ import {
   type Preferencia,
 } from "../config/agenda.ts";
 import { logger } from "../lib/logger.ts";
+import { RESPOSTA_INELEGIVEL, type MotivoInelegivel } from "../lib/elegibilidade.ts";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -29,6 +30,8 @@ interface ContextoAgenda {
   telefone: string;
   nome: string;
   concurso?: string;
+  /** Lead barrado da sessão. Decidido no grafo (lib/elegibilidade.ts); aqui só se recusa. */
+  bloqueioSessao?: MotivoInelegivel;
 }
 
 // A IA devolve o horário escolhido como código de HORA DE PAREDE ("2026-09-14 14:00"), não ISO.
@@ -52,6 +55,17 @@ const esquema = z.object({
 export function criarToolAgendarSessao(ctx: ContextoAgenda) {
   return tool(
     async ({ acao, periodo, horario }) => {
+      // Sem graduação não ocupa a agenda — nem se o lead pedir, nem se o modelo esquecer o gate.
+      // 'cancelar' continua liberado: se alguém marcou antes, poder desmarcar é o mínimo.
+      if (ctx.bloqueioSessao && acao !== "cancelar") {
+        logger.warn("agendar-sessao", `Agendamento recusado: lead inelegível (${ctx.bloqueioSessao})`, { telefone: ctx.telefone });
+        return [
+          "LEAD INELEGÍVEL PARA A SESSÃO — não ofereça horário nem prometa marcar.",
+          "Responda com esta ideia, nas suas palavras, e mova o card para 'Nutrir' com Atualizar_tarefa:",
+          RESPOSTA_INELEGIVEL[ctx.bloqueioSessao],
+        ].join("\n");
+      }
+
       if (!agendaConfigurada()) {
         logger.error("agendar-sessao", "Agenda não configurada — a IA não pode prometer horário");
         return "AGENDA_INDISPONIVEL: não foi possível consultar os horários agora. Não invente horário. Diga ao lead que você já volta com as opções e use Escalar_humano.";

@@ -12,6 +12,7 @@ import {
 } from "./enviar-audio-walker.ts";
 import { criarToolBuscarContextoSimilar } from "./buscar-contexto-similar.ts";
 import { criarToolAgendarSessao } from "./agendar-sessao.ts";
+import type { MotivoInelegivel } from "../lib/elegibilidade.ts";
 import { agendaConfigurada } from "../services/google-calendar.ts";
 
 interface ContextoMainAgent {
@@ -27,6 +28,8 @@ interface ContextoMainAgent {
   /** Qual funil este lead está vendo. Só a trilha de sessão ganha a tool de agenda. */
   trilha?: "antigo" | "sessao";
   concurso?: string;
+  /** Lead barrado da sessão (sem graduação / formação não aceita): a tool de agenda recusa marcar. */
+  bloqueioSessao?: MotivoInelegivel;
 }
 
 export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): StructuredToolInterface[] {
@@ -46,6 +49,7 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
           telefone: contexto.telefone,
           nome: contexto.nome,
           ...(contexto.concurso ? { concurso: contexto.concurso } : {}),
+          ...(contexto.bloqueioSessao ? { bloqueioSessao: contexto.bloqueioSessao } : {}),
         })]
       : [];
 

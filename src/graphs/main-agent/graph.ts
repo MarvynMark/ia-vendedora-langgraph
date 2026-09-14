@@ -18,7 +18,14 @@ import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
 import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
-import { negaElegibilidadePorGraduacao, RESPOSTA_ELEGIBILIDADE } from "../../lib/elegibilidade.ts";
+import {
+  negaElegibilidadePorGraduacao,
+  RESPOSTA_ELEGIBILIDADE,
+  formacaoDoLead,
+  motivoBloqueioSessao,
+  convidaParaSessao,
+  RESPOSTA_INELEGIVEL,
+} from "../../lib/elegibilidade.ts";
 import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
 import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
 import { montarOutputDoTurno } from "./output.ts";
@@ -346,6 +353,16 @@ async function executarAgente(state: MainAgentStateType) {
   });
   const gerarPrompt = trilha === "sessao" ? gerarPromptAgenteSessao : gerarPromptAgentePrincipal;
 
+  // GATE DE NÍVEL SUPERIOR EM CÓDIGO — sem graduação (nem cursando) não vai para a sessão. O
+  // prompt já dizia isso e o modelo passou por cima (conv 7297). Decidido aqui, uma vez, e usado
+  // em dois lugares: a tool de agenda recusa marcar, e o convite é substituído na saída.
+  const bloqueioSessao = trilha === "sessao"
+    ? motivoBloqueioSessao(
+        formacaoDoLead(state.atributosContato, state.dadosFormulario),
+        [...historico.filter((m) => m.type === "human").map((m) => m.content ?? ""), state.mensagensAgregadas || state.mensagemProcessada || ""],
+      )
+    : null;
+
   let systemPrompt = gerarPrompt({
     tarefa,
     etapasDescricao,
@@ -373,6 +390,7 @@ async function executarAgente(state: MainAgentStateType) {
     mensagem: state.mensagensAgregadas || state.mensagemProcessada,
     tarefa,
     trilha,
+    ...(bloqueioSessao ? { bloqueioSessao } : {}),
   });
 
   const model = new ChatOpenAI({
@@ -539,6 +557,16 @@ async function executarAgente(state: MainAgentStateType) {
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = PONTE_PRECO_SESSAO;
+    }
+
+    // GATE DE NÍVEL SUPERIOR — vem DEPOIS da ponte de preço de propósito: a ponte termina pedindo
+    // horário, e para este lead não há horário. Substitui o convite pela verdade (conv 7297).
+    if (bloqueioSessao && convidaParaSessao(outputFinal)) {
+      logger.warn("main-agent", `Convite para sessão bloqueado: lead inelegível (${bloqueioSessao})`, {
+        idConversa: state.idConversa,
+        outputBloqueado: outputFinal.slice(0, 160),
+      });
+      outputFinal = RESPOSTA_INELEGIVEL[bloqueioSessao];
     }
 
     // TRAVA DE ELEGIBILIDADE — a IA não manda embora quem ainda está cursando. O diploma é

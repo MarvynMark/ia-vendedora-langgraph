@@ -1,5 +1,5 @@
 import { primeiroNomeSaudacao, primeiroConcurso } from "../../lib/nome.ts";
-import { motivoInelegivel } from "../../lib/elegibilidade.ts";
+import { formacaoDoLead, motivoInelegivel } from "../../lib/elegibilidade.ts";
 import { BLOCO_PAPEL, BLOCO_PERSONALIDADE, BLOCO_RAG, type ContextoPrompt } from "./prompt-blocos.ts";
 
 // TRILHA DE SESSÃO ESTRATÉGICA — a IA qualifica e AGENDA; quem fecha é humano, na call.
@@ -36,9 +36,7 @@ export function gerarPromptAgenteSessao(ctx: ContextoPrompt): string {
   // O default é qualificar: só barra declaração explícita de que não tem e não está cursando.
   // Quem está CURSANDO passa — o diploma é cobrado na posse, e mandar essa pessoa embora foi a
   // 2ª maior causa de perda registrada (153 de 733).
-  const formacao =
-    (ctx.atributosContato?.qual_formacao as string | undefined) ??
-    (dadosFormulario.match(/Forma[çc][ãa]o:\s*([^\n|]+)/i)?.[1] ?? "");
+  const formacao = formacaoDoLead(ctx.atributosContato, ctx.dadosFormulario);
   const motivo = motivoInelegivel(formacao);
 
   // Formação que os editais de Perito Criminal não aceitam (regra do Gusthavo, 11/09/2026). Tem
@@ -62,6 +60,10 @@ export function gerarPromptAgenteSessao(ctx: ContextoPrompt): string {
   incompleta: **ele PASSA a ser elegível na hora** — siga o fluxo normal e convide.
 
   Depois de responder, mova o card para "Nutrir" com Atualizar_tarefa.
+
+  ⚠️ Esta regra vale ACIMA do objetivo "toda resposta termina com um horário": para este lead a
+  resposta termina SEM horário, mesmo que ele pergunte valor ou peça pra marcar. O sistema barra
+  o convite em código; não tente.
 </gate-formacao>
 `;
 
@@ -83,6 +85,10 @@ export function gerarPromptAgenteSessao(ctx: ContextoPrompt): string {
   Quem está cursando é justamente quem tem mais tempo de preparo pela frente.
 
   Depois de responder, mova o card para "Nutrir" com Atualizar_tarefa.
+
+  ⚠️ Esta regra vale ACIMA do objetivo "toda resposta termina com um horário": para este lead a
+  resposta termina SEM horário, mesmo que ele pergunte valor ou peça pra marcar. O sistema barra
+  o convite em código; não tente.
 </gate-superior>
 `;
 
