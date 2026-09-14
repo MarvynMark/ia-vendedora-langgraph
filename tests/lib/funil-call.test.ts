@@ -33,3 +33,25 @@ describe("trilhaDoLead", () => {
     }
   });
 });
+
+// ── Triagem de desistência da sessão (conv 7399, 14/09/2026) ───────────────────────────────────
+import { pareceDesistirDaSessao } from "../../src/lib/funil-call.ts";
+
+describe("pareceDesistirDaSessao", () => {
+  test("pega o que o Ronaldo escreveu", () => {
+    expect(pareceDesistirDaSessao("Boa tarde!\nHouve um imprevisto e não poderei participar da nossa conversa hoje as 18hs.")).toBe(true);
+    expect(pareceDesistirDaSessao("Posso verificar melhor uma data aqui e te informar em um outro momento?")).toBe(true);
+  });
+
+  test("pega pedidos de remarcar e cancelar", () => {
+    expect(pareceDesistirDaSessao("dá pra remarcar pra quinta?")).toBe(true);
+    expect(pareceDesistirDaSessao("vou ter que desmarcar")).toBe(true);
+    expect(pareceDesistirDaSessao("não vai dar hoje, pode ser outro dia?")).toBe(true);
+  });
+
+  test("não dispara em conversa comum", () => {
+    expect(pareceDesistirDaSessao("Ok, obrigado!")).toBe(false);
+    expect(pareceDesistirDaSessao("Segunda as 18hs é melhor pra mim")).toBe(false);
+    expect(pareceDesistirDaSessao("Qual seria o valor?")).toBe(false);
+  });
+});

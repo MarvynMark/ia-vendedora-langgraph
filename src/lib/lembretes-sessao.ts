@@ -44,7 +44,7 @@ function templateDisponivel(nome: string): boolean {
   return Boolean(CONTEUDO_TEMPLATES[nome]);
 }
 
-async function avisarComercial(texto: string): Promise<void> {
+export async function avisarComercial(texto: string): Promise<void> {
   const conversa = env.CHATWOOT_COMERCIAL_CONVERSATION_ID;
   if (!conversa) return;
   try {

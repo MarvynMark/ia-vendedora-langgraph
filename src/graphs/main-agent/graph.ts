@@ -5,7 +5,10 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { MainAgentState, type MainAgentStateType } from "./state.ts";
 import { gerarPromptAgentePrincipal } from "./prompt.ts";
 import { gerarPromptAgenteSessao } from "./prompt-sessao.ts";
-import { trilhaDoLead, PONTE_PRECO_SESSAO } from "../../lib/funil-call.ts";
+import { trilhaDoLead, PONTE_PRECO_SESSAO, pareceDesistirDaSessao } from "../../lib/funil-call.ts";
+import { agendaConfigurada, buscarSessaoDoTelefone } from "../../services/google-calendar.ts";
+import { avisarComercial } from "../../lib/lembretes-sessao.ts";
+import { rotularDia, rotularHora } from "../../config/agenda.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
@@ -379,6 +382,26 @@ async function executarAgente(state: MainAgentStateType) {
     systemPrompt = systemPrompt + `\n\n⚠️ INSTRUÇÃO CRÍTICA: Esta conversa JÁ está em andamento. Você JÁ se apresentou e provavelmente já avançou no roteiro (reação inicial, áudios, vídeo, imagem). NÃO repita NENHUMA etapa que já fez: não reapresente, não refaça a reação da Mensagem 2, não reofereça nem prometa "reenviar" um áudio/vídeo/imagem que já mandou (cada mídia vai UMA vez só na conversa). Apenas responda ao que o lead acabou de escrever, continuando do ponto atual. Se o lead questionar se é automático/bot ou disser algo como "deixa pra lá", responda com naturalidade e brevidade e NÃO reinicie o roteiro.\n\n⚠️ VOZ (1ª PESSOA — OBRIGATÓRIO): mensagens ANTIGAS desta conversa podem ter sido escritas numa persona ANTIGA — ex.: "aqui é o Gusthavo, da equipe do Perito Walker" ou falando do Walker em 3ª pessoa ("o Walker monta", "aulas do Walker", "o Walker adapta o conteúdo", "acesso direto ao Perito Walker"). IGNORE completamente esse formato antigo. VOCÊ É O WALKER, sempre em 1ª pessoa: "eu monto", "meu método", "minha mentoria", "comigo", "eu adapto o conteúdo". NUNCA se refira ao Walker como se fosse outra pessoa nem à "equipe do Walker", mesmo que o histórico faça isso. A partir de agora a voz é 100% Walker falando com o lead.`;
   }
 
+  // SESSÃO EM RISCO — o lead com sessão marcada avisa que não vem (conv 7399). O prompt geral já
+  // manda remarcar/cancelar pela tool, mas o modelo respondeu "me avisa depois" e deixou o evento
+  // de pé. Aqui a instrução vai para ESTE turno, com o horário na frente dele; e no fim do turno,
+  // se a tool não tiver sido chamada, o comercial é avisado (ver abaixo).
+  const mensagemDoTurno = state.mensagensAgregadas || state.mensagemProcessada || "";
+  let sessaoEmRisco: { inicio: Date } | null = null;
+  if (trilha === "sessao" && agendaConfigurada() && pareceDesistirDaSessao(mensagemDoTurno)) {
+    try {
+      const achado = await buscarSessaoDoTelefone(state.telefone);
+      const inicioIso = achado?.evento.start?.dateTime;
+      if (inicioIso) sessaoEmRisco = { inicio: new Date(inicioIso) };
+    } catch (e) {
+      logger.error("main-agent", "Falha ao consultar sessão do lead para a triagem de desistência", e);
+    }
+  }
+  if (sessaoEmRisco) {
+    const quando = `${rotularDia(sessaoEmRisco.inicio)} às ${rotularHora(sessaoEmRisco.inicio)}`;
+    systemPrompt += `\n\n⚠️ SESSÃO MARCADA EM RISCO: este lead tem sessão ${quando} e a mensagem dele parece cancelamento ou pedido de remarcação. ANTES de responder, chame Agendar_sessao: "remarcar" se ele indicou período ou horário novo; "cancelar" se ele disse que avisa depois, não sabe quando, ou simplesmente não vem. É PROIBIDO responder "me avisa quando puder" deixando a sessão marcada: o lembrete de 1h sairia com link e a agenda ficaria reservada para ninguém. Depois de cancelar, deixe a porta aberta em UMA frase e pergunte se ele já tem ideia de quando consegue.`;
+  }
+
   const tools = criarToolsAgenteVestigium({
     idMensagem: state.idMensagem,
     idConta: state.idConta,
@@ -489,6 +512,19 @@ async function executarAgente(state: MainAgentStateType) {
           if (tc?.name) toolsChamadas.add(tc.name);
         }
       }
+    }
+    // Rede de segurança da sessão em risco: o modelo ignorou a instrução e não mexeu na agenda.
+    // Não cancela sozinho (regex erra: "não vou conseguir estudar 4h" não é desistência); avisa
+    // uma pessoa, que resolve em um clique. Melhor um aviso a mais que um lembrete a menos.
+    if (sessaoEmRisco && !toolsChamadas.has("Agendar_sessao")) {
+      const quando = `${rotularDia(sessaoEmRisco.inicio)} às ${rotularHora(sessaoEmRisco.inicio)}`;
+      logger.warn("main-agent", "Lead parece desistir da sessão e a IA não chamou Agendar_sessao", { idConversa: state.idConversa });
+      await avisarComercial(
+        `⚠️ SESSÃO EM RISCO — ${state.nome} (${state.telefone}), marcada ${quando}\n` +
+          `Disse: "${mensagemDoTurno.slice(0, 160)}"\n` +
+          `A IA respondeu sem cancelar nem remarcar. Ajuste a agenda à mão ou responda aqui.\n` +
+          `${env.CHATWOOT_BASE_URL}/app/accounts/${state.idConta}/conversations/${state.idConversa}`,
+      );
     }
     // Recebe o texto COMPLETO (inclusive o preâmbulo descartado): esta guarda detecta por regex
     // "a IA narrou o envio mas não chamou a tool", e perder o preâmbulo abriria um buraco nela.

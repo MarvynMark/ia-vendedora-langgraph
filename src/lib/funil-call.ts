@@ -45,3 +45,22 @@ export const PONTE_PRECO_SESSAO =
   "O valor eu te falo na nossa conversa, e não é enrolação: o plano muda conforme o teu ponto de partida e o teu concurso, e já vi gente escolher errado decidindo só pelo número. " +
   "Lá eu te mostro o que faz sentido pro teu caso e o valor certinho. " +
   "Me diz qual dos horários fica melhor pra você que eu já deixo reservado.";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DESISTÊNCIA / REMARCAÇÃO — o lead com sessão marcada avisa que não vem.
+//
+// Ronaldo (conv 7399, 14/09): "Houve um imprevisto e não poderei participar hoje as 18hs", depois
+// "posso verificar uma data e te informar em outro momento?". A IA respondeu "quando estiver
+// pronto me avisa" e NÃO chamou Agendar_sessao. O evento ficou na agenda, o lembrete de 1h saiu
+// com link para quem já tinha cancelado, e a cadeira ficou reservada para ninguém.
+//
+// Regex só de TRIAGEM: quem decide cancelar ou remarcar continua sendo o modelo, via tool. O que
+// muda é que, quando isto bate e há sessão futura, o turno recebe uma instrução explícita — e se
+// mesmo assim a tool não for chamada, o comercial é avisado para resolver à mão.
+const RE_DESISTE_DA_SESSAO =
+  /n[ãa]o (vou|vai|irei|consigo) (poder|conseguir|participar|comparecer|estar|dar)|n[ãa]o (poderei|conseguirei|participarei)|imprevisto|desmarcar|cancelar|remarcar|reagendar|adiar|(outro|outra) (dia|hor[áa]rio|data|hora)|mudar (o |a )?(dia|hor[áa]rio|data)|n[ãa]o (vai|vou) (dar|rolar)|n[ãa]o d[áa] (pra|para) (mim|hoje|amanh[ãa])|deixa (pra|para) (outro|depois)|te (avis|inform|fal)\w* (depois|em (um )?outro momento|outra hora|mais tarde)|(verificar|ver|olhar|conferir) (melhor )?(uma|a|minha) (data|agenda)/i;
+
+/** A mensagem do lead parece cancelamento ou pedido de remarcação da sessão? */
+export function pareceDesistirDaSessao(texto: string): boolean {
+  return RE_DESISTE_DA_SESSAO.test(texto ?? "");
+}
