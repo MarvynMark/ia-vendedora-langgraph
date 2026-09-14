@@ -98,8 +98,12 @@ export interface OpcoesBusca {
   limite?: number;
   diasAFrente?: number;
   /**
-   * Um horário por dia, para o lead escolher entre DIAS diferentes. Ligado por padrão: dois
-   * horários na mesma tarde não são escolha de verdade para quem tem aquele dia travado.
+   * Um horário por dia, para o lead escolher entre DIAS diferentes. DESLIGADO por padrão desde
+   * 13/09/2026: com ele ligado a segunda opção caía sempre no dia seguinte, e num domingo à noite
+   * 5 de 5 leads escolheram a terça com a segunda cheia de buraco. Agora as duas opções vêm do
+   * dia mais próximo ("segunda às 14h ou às 16h") e só pulam de dia quando ele não tem duas
+   * vagas no período pedido. Latência mata momentum; quem tem o dia travado diz, e a IA sugere
+   * de novo.
    */
   umPorDia?: boolean;
 }
@@ -118,7 +122,7 @@ export function slotsLivres(agendas: readonly AgendaAtendente[], opcoes: OpcoesB
   const preferencia = opcoes.preferencia ?? "qualquer";
   const limite = opcoes.limite ?? MAX_OFERTAS;
   const diasAFrente = opcoes.diasAFrente ?? DIAS_A_FRENTE;
-  const umPorDia = opcoes.umPorDia ?? true;
+  const umPorDia = opcoes.umPorDia ?? false;
   const minimo = inicioDaJanela(agora).getTime();
 
   const oferecer: SlotOferecivel[] = [];

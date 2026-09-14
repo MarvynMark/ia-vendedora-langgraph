@@ -13,9 +13,31 @@ const vazias = (): AgendaAtendente[] => [
 ];
 
 describe("slotsLivres", () => {
-  test("oferece DOIS horários, em dias diferentes", () => {
+  test("oferece DOIS horários, ambos no dia mais próximo (latência mata momentum)", () => {
     const s = slotsLivres(vazias(), { agora: AGORA });
     expect(s).toHaveLength(2);
+    expect(rotularDia(s[0]!.inicio)).toBe(rotularDia(s[1]!.inicio));
+    // 08h + 90 min de antecedência: o 9h fica de fora, começa no 10h.
+    expect(rotularHora(s[0]!.inicio)).toBe("10h");
+    expect(rotularHora(s[1]!.inicio)).toBe("11h");
+  });
+
+  test("só pula para o dia seguinte quando o dia mais próximo não tem duas vagas no período", () => {
+    // Quarta 16/09: tarde toda tomada nas duas agendas, menos as 17h.
+    const ocupadaMenos17h = [13, 14, 15, 16].map((h) => evento(16, h));
+    const agendas: AgendaAtendente[] = [
+      { nome: "Gusthavo", calendarId: "cal-g", ocupados: ocupadaMenos17h },
+      { nome: "Pedro", calendarId: "cal-p", ocupados: ocupadaMenos17h },
+    ];
+    const s = slotsLivres(agendas, { agora: AGORA, preferencia: "tarde" });
+    expect(s).toHaveLength(2);
+    expect(rotularDia(s[0]!.inicio)).toContain("16/09");
+    expect(rotularHora(s[0]!.inicio)).toBe("17h");
+    expect(rotularDia(s[1]!.inicio)).toContain("17/09");
+  });
+
+  test("com umPorDia ligado, volta a oferecer dias diferentes", () => {
+    const s = slotsLivres(vazias(), { agora: AGORA, umPorDia: true });
     expect(rotularDia(s[0]!.inicio)).not.toBe(rotularDia(s[1]!.inicio));
   });
 
