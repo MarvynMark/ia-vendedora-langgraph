@@ -138,6 +138,33 @@ export function horaDeParedeSP(date: Date): number {
   return new Date(date.getTime() + SP_OFFSET_MS).getUTCHours();
 }
 
+// ── Código do horário que a IA devolve ao confirmar ──────────────────────────────────────────
+// É hora DE PAREDE ("2026-09-14 14:00"), nunca ISO em UTC. O ISO com "Z" era o formato antigo e
+// foi a causa de duas sessões erradas em 11/09 (conv 7436 e 7261): a sugestão dizia "14h |
+// iso: 2026-09-14T17:00:00.000Z", o modelo "traduziu" e devolveu "2026-09-14T14:00:00.000Z" —
+// que é 11h de Brasília. O modelo pensa em hora local; o código tem que falar a língua dele,
+// senão a conversão vira ponto de falha em toda confirmação.
+
+/** "2026-09-14 14:00" — o que a IA copia da sugestão e devolve na confirmação. */
+export function codigoDoHorario(data: Date): string {
+  const sp = new Date(data.getTime() + SP_OFFSET_MS);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${sp.getUTCFullYear()}-${p(sp.getUTCMonth() + 1)}-${p(sp.getUTCDate())} ${p(sp.getUTCHours())}:${p(sp.getUTCMinutes())}`;
+}
+
+/**
+ * Lê o código de volta. Aceita só hora de parede sem fuso ("2026-09-14 14:00" ou com "T").
+ * Qualquer coisa com "Z" ou offset é recusada de propósito: é exatamente o formato em que o
+ * modelo erra. `null` = formato inválido, peça a sugestão de novo.
+ */
+export function lerCodigoDoHorario(texto: string): Date | null {
+  const m = /^\s*(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?\s*$/.exec(texto ?? "");
+  if (!m) return null;
+  const [, ano, mes, dia, hora, minuto] = m.map(Number) as [unknown, number, number, number, number, number];
+  const data = instanteDeParedeSP(ano, mes - 1, dia, hora, minuto);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
 /** Todos os horários da grade naquele dia, como instantes. */
 export function slotsDoDia(data: Date): Date[] {
   const { ano, mes0, dia, diaSemana } = dataDeParedeSP(data);

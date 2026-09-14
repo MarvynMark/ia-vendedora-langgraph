@@ -8,8 +8,17 @@ import {
   moverSessao,
   cancelarSessao,
 } from "../services/google-calendar.ts";
-import { slotsLivres, quemAtende } from "../lib/disponibilidade.ts";
-import { DIAS_A_FRENTE, PRAZO_REMARCACAO_H, classificarPreferencia, rotularDia, rotularHora, type Preferencia } from "../config/agenda.ts";
+import { slotsLivres, quemAtende, slotColide } from "../lib/disponibilidade.ts";
+import {
+  DIAS_A_FRENTE,
+  PRAZO_REMARCACAO_H,
+  classificarPreferencia,
+  codigoDoHorario,
+  lerCodigoDoHorario,
+  rotularDia,
+  rotularHora,
+  type Preferencia,
+} from "../config/agenda.ts";
 import { logger } from "../lib/logger.ts";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -22,22 +31,27 @@ interface ContextoAgenda {
   concurso?: string;
 }
 
-// A IA devolve o horário escolhido como ISO. Poderia guardar a oferta no banco (é o que a Theodoro
-// faz), mas não precisa: `quemAtende` refaz a checagem contra a grade E contra a agenda antes de
-// criar. ISO inventado por alucinação não passa na grade; horário tomado no meio-tempo não passa na
-// agenda. A trava está no lugar certo — no momento de escrever, não no de lembrar.
+// A IA devolve o horário escolhido como código de HORA DE PAREDE ("2026-09-14 14:00"), não ISO.
+// Poderia guardar a oferta no banco (é o que a Theodoro faz), mas não precisa: `quemAtende` refaz
+// a checagem contra a grade E contra a agenda antes de criar. Código inventado por alucinação não
+// passa na grade; horário tomado no meio-tempo não passa na agenda.
+//
+// Por que não ISO: em 11/09 a sugestão dizia "14h | iso: ...T17:00:00.000Z" e o modelo devolveu
+// "...T14:00:00.000Z" — passou na grade (11h é slot válido), marcou 11h e disse "14h" ao lead.
+// Aconteceu duas vezes no mesmo dia. A trava da grade não pega hora errada que também é livre;
+// o que pega é não dar ao modelo nada para converter.
 const esquema = z.object({
   acao: z.enum(["sugerir", "confirmar", "remarcar", "cancelar"])
     .describe("sugerir = pedir dois horários; confirmar = marcar o que o lead escolheu; remarcar = trocar; cancelar = desmarcar"),
   periodo: z.string().optional()
     .describe("O que o lead respondeu sobre o período: 'manhã', 'tarde', 'noite' ou 'tanto faz'. Só para 'sugerir' e 'remarcar'."),
-  inicio_iso: z.string().optional()
-    .describe("O horário escolhido pelo lead, EXATAMENTE como veio no campo 'iso' da sugestão. Para 'confirmar' e 'remarcar'."),
+  horario: z.string().optional()
+    .describe("O horário escolhido pelo lead, copiado EXATAMENTE do campo 'horario' da sugestão (ex.: '2026-09-14 14:00', hora de Brasília). Para 'confirmar' e 'remarcar'."),
 });
 
 export function criarToolAgendarSessao(ctx: ContextoAgenda) {
   return tool(
-    async ({ acao, periodo, inicio_iso }) => {
+    async ({ acao, periodo, horario }) => {
       if (!agendaConfigurada()) {
         logger.error("agendar-sessao", "Agenda não configurada — a IA não pode prometer horário");
         return "AGENDA_INDISPONIVEL: não foi possível consultar os horários agora. Não invente horário. Diga ao lead que você já volta com as opções e use Escalar_humano.";
@@ -47,12 +61,14 @@ export function criarToolAgendarSessao(ctx: ContextoAgenda) {
       const pref: Preferencia = classificarPreferencia(periodo ?? "") ?? "qualquer";
 
       try {
-        // TRAVA DO COMPROMISSO — vale para cancelar E remarcar.
-        // Dentro do prazo, a IA resolve sozinha. Fora dele, ela NÃO decide: escala. Conceder a
-        // exceção sozinha esvaziaria a regra que faz o lead aparecer; negá-la sozinha jogaria fora
-        // uma venda que uma pessoa recuperaria. Quem decide exceção é gente.
-        if (acao === "cancelar" || acao === "remarcar") {
-          const achado = await buscarSessaoDoTelefone(ctx.telefone, agora);
+        // TRAVA DO COMPROMISSO — vale para cancelar, remarcar E confirmar com sessão já marcada
+        // (que é remarcação com outro nome). Dentro do prazo, a IA resolve sozinha. Fora dele, ela
+        // NÃO decide: escala. Conceder a exceção sozinha esvaziaria a regra que faz o lead
+        // aparecer; negá-la sozinha jogaria fora uma venda que uma pessoa recuperaria. Quem decide
+        // exceção é gente.
+        let achado: Awaited<ReturnType<typeof buscarSessaoDoTelefone>> = null;
+        if (acao !== "sugerir") {
+          achado = await buscarSessaoDoTelefone(ctx.telefone, agora);
           if (!achado) {
             if (acao === "cancelar") return "Não havia sessão futura marcada para este lead.";
           } else {
@@ -76,41 +92,55 @@ export function criarToolAgendarSessao(ctx: ContextoAgenda) {
 
         const agendas = await buscarAgendas(agora, new Date(agora.getTime() + DIAS_A_FRENTE * DIA_MS));
 
-        if (acao === "sugerir" || (acao === "remarcar" && !inicio_iso)) {
+        if (acao === "sugerir" || (acao === "remarcar" && !horario)) {
           const slots = slotsLivres(agendas, { agora, preferencia: pref });
           if (slots.length === 0) {
             return pref === "qualquer"
               ? "SEM VAGA nos próximos dias. Seja honesto com o lead e use Escalar_humano."
               : `SEM VAGA no período '${pref}'. Diga isso com honestidade e pergunte se outro período serve.`;
           }
-          const linhas = slots.map((s) => `- ${rotularDia(s.inicio)} às ${rotularHora(s.inicio)} | iso: ${s.inicio.toISOString()}`);
+          const linhas = slots.map((s) => `- ${rotularDia(s.inicio)} às ${rotularHora(s.inicio)} | horario: ${codigoDoHorario(s.inicio)}`);
           return [
             `Horários livres${pref !== "qualquer" ? ` (${pref})` : ""}:`,
             ...linhas,
             "",
             "Ofereça ESTES DOIS ao lead, com dia e hora em português (ex.: 'quinta às 19h').",
-            "NÃO mostre o 'iso' ao lead — ele é só para você devolver em 'confirmar'.",
+            "NÃO mostre o 'horario' ao lead — ele é só para você devolver em 'confirmar', copiado sem alterar nada.",
             "NUNCA ofereça horário que não esteja nesta lista.",
           ].join("\n");
         }
 
         // confirmar / remarcar com horário escolhido
-        if (!inicio_iso) return "Faltou o inicio_iso do horário escolhido.";
-        const inicio = new Date(inicio_iso);
-        if (Number.isNaN(inicio.getTime())) return "inicio_iso inválido. Peça a sugestão de novo com acao='sugerir'.";
+        if (!horario) return "Faltou o 'horario' escolhido. Copie o campo 'horario' da sugestão.";
+        const inicio = lerCodigoDoHorario(horario);
+        if (!inicio) {
+          return "'horario' inválido. Ele tem que ser copiado EXATAMENTE do campo 'horario' da sugestão (ex.: '2026-09-14 14:00'), sem converter. Peça a sugestão de novo com acao='sugerir' e devolva o código como veio.";
+        }
 
         const dono = quemAtende(inicio, agendas, agora);
         if (!dono) {
           return "ESSE HORÁRIO NÃO ESTÁ MAIS DISPONÍVEL. Não insista nele: peça novos horários com acao='sugerir' e ofereça os que voltarem.";
         }
 
-        if (acao === "remarcar") {
-          const achado = await buscarSessaoDoTelefone(ctx.telefone, agora);
-          if (achado) {
+        // Um lead, UMA sessão. Vale para 'confirmar' também: se já existe sessão futura, ela é
+        // MOVIDA, nunca duplicada. Em 11/09 (conv 7436) um 'confirmar' depois de um 'remarcar'
+        // criou um segundo evento; o primeiro ficou órfão na agenda e o cron mandou lembrete de
+        // uma sessão que não existia mais para a lead.
+        if (achado) {
+          // Mover mantém a agenda (e o link) de quem já ia atender — mas só se ELE estiver livre
+          // no horário novo. Se o horário só cabe na outra agenda, o evento troca de dono: cancela
+          // e cria de novo, com link novo. Mover cego marcaria em cima de compromisso.
+          const agendaAtual = agendas.find((a) => a.calendarId === achado!.calendarId);
+          const cabeNaMesma = Boolean(agendaAtual && !slotColide(inicio, agendaAtual.ocupados));
+          if (cabeNaMesma) {
             await moverSessao(achado.calendarId, achado.evento.id!, inicio);
             const link = achado.evento.hangoutLink ?? "";
-            return `Sessão remarcada para ${rotularDia(inicio)} às ${rotularHora(inicio)}.${link ? ` Link: ${link}` : ""} Confirme com o lead e mande o link.`;
+            return [
+              `Sessão remarcada para ${rotularDia(inicio)} às ${rotularHora(inicio)}.${link ? ` Link: ${link}` : ""}`,
+              `Diga ao lead EXATAMENTE este dia e hora (${rotularDia(inicio)} às ${rotularHora(inicio)}) e mande o link.`,
+            ].join(" ");
           }
+          await cancelarSessao(achado.calendarId, achado.evento.id!);
         }
 
         const { meet } = await criarSessao({
@@ -123,8 +153,9 @@ export function criarToolAgendarSessao(ctx: ContextoAgenda) {
         });
 
         return [
-          `Sessão marcada para ${rotularDia(inicio)} às ${rotularHora(inicio)}.`,
-          meet ? `Link da reunião: ${meet}` : "ATENÇÃO: o link da reunião não foi gerado — use Escalar_humano.",
+          `Sessão ${achado ? "remarcada" : "marcada"} para ${rotularDia(inicio)} às ${rotularHora(inicio)}.`,
+          `Diga ao lead EXATAMENTE este dia e hora: ${rotularDia(inicio)} às ${rotularHora(inicio)}.`,
+          meet ? `Link da reunião${achado ? " (NOVO, o anterior não vale mais)" : ""}: ${meet}` : "ATENÇÃO: o link da reunião não foi gerado — use Escalar_humano.",
           "Confirme com o lead, mande o link e mova o card para 'Sessão agendada' com Atualizar_tarefa.",
           "NÃO diga ao lead quem vai atender.",
         ].join("\n");

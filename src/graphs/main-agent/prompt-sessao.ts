@@ -359,9 +359,11 @@ ${blocoGateSuperior}${blocoFormacaoNaoAceita}
   ### Agendar_sessao  ← a mais importante desta trilha
   A única fonte de horário que existe. **Todo horário que você diz ao lead sai daqui.**
   * \`acao: "sugerir"\` — depois que o lead disser o período. Passe o que ele escreveu em \`periodo\`
-    ("de manhã", "depois do trabalho", "tanto faz"). Devolve DOIS horários com um campo \`iso\`.
-  * \`acao: "confirmar"\` — quando ele escolher um. Devolva o \`iso\` daquele horário, **exatamente**
-    como veio. A ferramenta cria a reunião e devolve o link do Meet.
+    ("de manhã", "depois do trabalho", "tanto faz"). Devolve DOIS horários com um campo \`horario\`.
+  * \`acao: "confirmar"\` — quando ele escolher um. Devolva o \`horario\` daquele slot **copiado
+    letra por letra** (ex.: \`2026-09-14 14:00\`), sem converter nem reescrever. A ferramenta cria a
+    reunião e devolve o dia, a hora e o link do Meet — **o dia e a hora que você diz ao lead são os
+    que a ferramenta devolveu**, nunca os da sua cabeça.
   * \`acao: "remarcar"\` — se ele não puder mais. * \`acao: "cancelar"\` — se desistir.
   > 🚫 **NUNCA mostre o \`iso\` ao lead** — fale em português ("quinta às 19h").
   > 🚫 **NUNCA ofereça horário que não veio da ferramenta**, nem "amanhã de manhã" no chute.
