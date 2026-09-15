@@ -86,6 +86,28 @@ describe("parsearFormulario (mapeamento por padrão)", () => {
     expect(d.disposto_investir).toBe("Sim, é o que eu quero!");
   });
 
+  // Formulário de 15/09/2026: "quando pretende entrar" substituiu "pronto para garantir".
+  // Payload real do envio de teste das 09:52 daquele dia — todas as perguntas têm que mapear.
+  test("formulário de 15/09: 'quando pretende entrar' vira coluna e nada fica sem mapeamento", () => {
+    const d = parsearFormulario({
+      "Qual é o seu nome completo?": "Teste",
+      "Qual é o seu WhatsApp?": "11999999999",
+      "Qual é o seu e-mail?": "t@t.com",
+      "Qual é a sua graduação superior?": "Farmácia",
+      "Qual é o concurso de Perito Criminal você deseja prestar?": "PCSP",
+      "Qual é sua maior dificuldade frente aos estudos para concurso de Perito Criminal?": "Tempo",
+      "O que te fez dar o primeiro passo em busca de uma mentoria?": "Instagram",
+      "O que você espera que essa mentoria te traga em relação aos seus estudos?": "Direção",
+      "Caso for selecionado, quando pretende entrar para a Mentoria Vestigium?": "Imediatamente",
+      "Quanto estaria disposto a investir por mês na sua aprovação para concurso?": "R$ 300",
+    });
+    expect(d.quando_pretende_entrar).toBe("Imediatamente");
+    expect(Object.keys(d).sort()).toEqual([
+      "area_graduacao", "concurso_desejado", "disposto_investir", "email", "expectativa_mentoria",
+      "maior_dificuldade", "motivo_mentoria", "nome_completo", "quando_pretende_entrar", "whatsapp",
+    ].sort());
+  });
+
   test("casa também com o texto antigo da pergunta (leads que preencheram antes)", () => {
     const d = parsearFormulario({
       "Você está disposto e teria condições de investir cerca de R$ 250 por mês (pagamento em 12x de 250)?": "Infelizmente não no momento!",

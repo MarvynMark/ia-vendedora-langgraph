@@ -39,6 +39,9 @@ const CAMPO_PADROES: Array<{ re: RegExp; coluna: string }> = [
   // na lista é indiferente — mas o "primeiro casa, primeiro leva" continua valendo se o
   // formulário for reescrito.
   { re: /disposto|condi[çc][õo]es de investir/i, coluna: "disposto_investir" },
+  // Entrou no formulário em 15/09/2026 no lugar de "pronto para garantir": "Caso for selecionado,
+  // quando pretende entrar para a Mentoria Vestigium?". É sinal de urgência, não de roteamento.
+  { re: /quando pretende entrar|pretende entrar/i, coluna: "quando_pretende_entrar" },
 ];
 
 const COLUNAS_VALIDAS = new Set(CAMPO_PADROES.map(p => p.coluna));
@@ -182,6 +185,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     ...(d.pronto_para_garantir ? { pronto_para_garantir: d.pronto_para_garantir } : {}),
     ...(d.ja_foi_aluno        ? { ja_foi_aluno: d.ja_foi_aluno } : {}),
     ...(d.disposto_investir   ? { disposto_investir: d.disposto_investir } : {}),
+    ...(d.quando_pretende_entrar ? { quando_pretende_entrar: d.quando_pretende_entrar } : {}),
   };
 
   // Cria contato se não existir, ou atualiza atributos do existente

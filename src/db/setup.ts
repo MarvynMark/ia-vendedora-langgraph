@@ -56,9 +56,12 @@ export async function criarTabelas() {
         diferenca_com_mentor        TEXT,
         disposto_investir           VARCHAR(50),
         pronto_para_garantir        VARCHAR(50),
+        quando_pretende_entrar      VARCHAR(100),
         criado_em                   TIMESTAMPTZ DEFAULT NOW(),
         atualizado_em               TIMESTAMPTZ DEFAULT NOW()
       );
+      -- Coluna nova em tabela que já existe em produção (formulário mudou em 15/09/2026).
+      ALTER TABLE leads_formulario_mentoria ADD COLUMN IF NOT EXISTS quando_pretende_entrar VARCHAR(100);
 
       CREATE TABLE IF NOT EXISTS leads_template_pendente (
         id                SERIAL PRIMARY KEY,

@@ -28,11 +28,13 @@ export async function buscarDadosFormulario(telefone: string): Promise<string> {
       o_que_faltou: string | null;
       diferenca_com_mentor: string | null;
       idade: string | null;
+      quando_pretende_entrar: string | null;
     }>(
       `SELECT concurso_desejado, area_graduacao, nivel_concurseiro,
               maior_dificuldade, expectativa_mentoria, motivo_mentoria,
               disposto_investir, pronto_para_garantir, ja_foi_aluno,
-              plano_b, o_que_faltou, diferenca_com_mentor, idade
+              plano_b, o_que_faltou, diferenca_com_mentor, idade,
+              quando_pretende_entrar
        FROM leads_formulario_mentoria
        WHERE RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) = $1
        ORDER BY criado_em DESC
@@ -57,6 +59,7 @@ export async function buscarDadosFormulario(telefone: string): Promise<string> {
       d.plano_b              ? `Plano B: ${d.plano_b}` : null,
       d.disposto_investir    ? `Disposto a investir: ${d.disposto_investir}` : null,
       d.pronto_para_garantir ? `Pronto para garantir: ${d.pronto_para_garantir}` : null,
+      d.quando_pretende_entrar ? `Quando pretende entrar: ${d.quando_pretende_entrar}` : null,
     ].filter(Boolean);
 
     return partes.join(" | ");
