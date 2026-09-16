@@ -55,3 +55,20 @@ describe("pareceDesistirDaSessao", () => {
     expect(pareceDesistirDaSessao("Qual seria o valor?")).toBe(false);
   });
 });
+
+// ── Etiqueta que tira o lead do funil de sessão (16/09/2026) ───────────────────────────────────
+import { trilhaDoLead, ETIQUETA_SEM_SESSAO } from "../../src/lib/funil-call.ts";
+import { env } from "../../src/config/env.ts";
+
+describe("ETIQUETA_SEM_SESSAO", () => {
+  test("com FUNIL_CALL=on, a etiqueta força a trilha antiga", () => {
+    const original = env.FUNIL_CALL;
+    (env as { FUNIL_CALL: string }).FUNIL_CALL = "on";
+    try {
+      expect(trilhaDoLead({ etiquetas: ["medico", "agente-on"], ofertaJaApresentada: false })).toBe("sessao");
+      expect(trilhaDoLead({ etiquetas: ["medico", "agente-on", ETIQUETA_SEM_SESSAO], ofertaJaApresentada: false })).toBe("antigo");
+    } finally {
+      (env as { FUNIL_CALL: string }).FUNIL_CALL = original;
+    }
+  });
+});

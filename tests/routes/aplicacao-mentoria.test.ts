@@ -179,3 +179,14 @@ describe("nomeEhPlaceholderContato", () => {
     expect(nomeEhPlaceholderContato("José 2")).toBe(false);
   });
 });
+
+// ── Etiquetas extras no payload (reenvio em lote, 16/09/2026) ──────────────────────────────────
+import { CHAVE_ETIQUETAS_EXTRAS } from "../../src/routes/aplicacao-mentoria.ts";
+
+describe("etiquetas extras", () => {
+  test("a chave _etiquetas passa pelo parse sem virar coluna nem 'sem mapeamento'", () => {
+    const d = parsearFormulario({ "Qual é o seu nome completo?": "Ana", [CHAVE_ETIQUETAS_EXTRAS]: "sem-sessao" });
+    expect(d[CHAVE_ETIQUETAS_EXTRAS]).toBe("sem-sessao");
+    expect(d.nome_completo).toBe("Ana");
+  });
+});

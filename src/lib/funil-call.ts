@@ -21,9 +21,18 @@ export interface EntradaTrilha {
   ofertaJaApresentada: boolean;
 }
 
+/**
+ * Etiqueta que força a trilha antiga (venda por texto) mesmo com FUNIL_CALL="on". Nasceu em
+ * 16/09/2026 para os 57 médicos de agosto cujo webhook nunca disparou: o Gusthavo quis atendê-los
+ * pelo WhatsApp, sem convite para reunião. Serve para qualquer lead que uma pessoa decida tirar
+ * do funil de sessão — é só pôr a etiqueta na conversa.
+ */
+export const ETIQUETA_SEM_SESSAO = "sem-sessao";
+
 export function trilhaDoLead({ etiquetas, ofertaJaApresentada }: EntradaTrilha): Trilha {
   if (env.FUNIL_CALL === "off") return "antigo";
   if (ofertaJaApresentada) return "antigo";
+  if ((etiquetas ?? []).includes(ETIQUETA_SEM_SESSAO)) return "antigo";
   if (env.FUNIL_CALL === "on") return "sessao";
   // "piloto": só o tier que declarou ter condição de investir vai para a sessão; o resto segue
   // byte a byte no fluxo antigo. Lead sem a etiqueta (formulário antigo, lead orgânico) fica no

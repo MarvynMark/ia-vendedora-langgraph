@@ -5,7 +5,7 @@
 // Cada linha vira o mesmo payload que o n8n manda ({"pergunta": "resposta"}), então o lead passa
 // pelo caminho normal: banco, contato com atributos, conversa, card em "Novo Lead" e abertura.
 //
-//   bun run src/scripts/reenviar-formulario.ts <planilha.csv> [--telefones 5535997754645,5532...] [--enviar]
+//   bun run src/scripts/reenviar-formulario.ts <planilha.csv> [--telefones 5535997754645,5532...] [--etiquetas sem-sessao] [--enviar]
 //
 // Sem --enviar é dry-run: mostra quem seria enviado e não manda nada. Testes (e-mail teste@)
 // são ignorados sempre. Leads que JÁ existem no banco são pulados, a não ser que estejam em
@@ -47,6 +47,8 @@ const [arquivo, ...flags] = process.argv.slice(2);
 if (!arquivo) { console.error("uso: bun run src/scripts/reenviar-formulario.ts <planilha.csv> [--telefones a,b] [--enviar]"); process.exit(1); }
 const enviar = flags.includes("--enviar");
 const incluirIncompletos = flags.includes("--incluir-incompletos");
+const idxEtq = flags.indexOf("--etiquetas");
+const etiquetasExtras = idxEtq >= 0 ? (flags[idxEtq + 1] ?? "") : "";
 const idxTel = flags.indexOf("--telefones");
 const somente = idxTel >= 0 ? new Set((flags[idxTel + 1] ?? "").split(",").map((t) => t.replace(/\D/g, "")).filter(Boolean)) : null;
 
@@ -57,6 +59,9 @@ const colNome = Object.keys(linhas[0] ?? {}).find((c) => /nome completo/i.test(c
 
 const payloadDe = (r: Record<string, string>) =>
   Object.fromEntries(Object.entries(r).filter(([k, v]) => !COLUNAS_IGNORADAS.has(k) && v.trim() !== ""));
+// Etiquetas extras vão numa chave própria do payload (ver CHAVE_ETIQUETAS_EXTRAS na rota); não
+// entram na contagem de campos, que mede o quanto o lead respondeu.
+const corpoDe = (r: Record<string, string>) => ({ ...payloadDe(r), ...(etiquetasExtras ? { _etiquetas: etiquetasExtras } : {}) });
 const telDe = (r: Record<string, string>) => (r[colTel] ?? "").replace(/\D/g, "");
 
 // Um lead, uma linha: quem preencheu duas vezes (ou errou um dígito e refez) fica só com a
@@ -96,7 +101,7 @@ for (const r of porTelefone.values()) {
     console.log(`· incompleto (${Object.keys(payload).length} campos), pulando: ${nome} (${tel})`); resumo.incompletos.push(nome); continue;
   }
   if (!enviar) { console.log(`→ (dry-run) enviaria: ${nome} (${tel}) — ${Object.keys(payload).length} campos, data ${r["Data"]}`); resumo.enviar.push(nome); continue; }
-  const resp = await fetchComTimeout(WEBHOOK, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), timeout: 30_000 });
+  const resp = await fetchComTimeout(WEBHOOK, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpoDe(r)), timeout: 30_000 });
   console.log(`✓ ${nome} (${tel}) → ${resp.status} ${(await resp.text()).slice(0, 120)}`);
   enviados++;
   await Bun.sleep(3000); // um por vez: cada envio cria contato, conversa, card e dispara abertura

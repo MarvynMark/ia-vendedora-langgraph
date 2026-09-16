@@ -82,10 +82,18 @@ export function nomeEhPlaceholderContato(nomeAtual: string | null | undefined): 
 // Schema aceita qualquer objeto com strings — o parse faz o mapeamento
 const formularioSchema = z.record(z.string(), z.string());
 
+/**
+ * Chave OPCIONAL do payload, fora das perguntas do formulário: etiquetas extras para a conversa,
+ * separadas por vírgula (ex.: "sem-sessao"). Usada pelo reenvio em lote (scripts/reenviar-
+ * formulario.ts) para decidir a trilha do lead sem mexer na regra geral. O n8n não manda isso.
+ */
+export const CHAVE_ETIQUETAS_EXTRAS = "_etiquetas";
+
 export function parsearFormulario(raw: Record<string, string>): Record<string, string> {
   const resultado: Record<string, string> = {};
   const naoMapeadas: string[] = [];
   for (const [pergunta, resposta] of Object.entries(raw)) {
+    if (pergunta === CHAVE_ETIQUETAS_EXTRAS) { resultado[CHAVE_ETIQUETAS_EXTRAS] = resposta; continue; }
     const coluna = colunaDaPergunta(pergunta);
     if (coluna && !(coluna in resultado)) {
       resultado[coluna] = resposta;
@@ -250,6 +258,10 @@ async function lancarNoChatwoot(d: Record<string, string>) {
   // aceite/comparecimento/fechamento entre os dois grupos no fim do teste. Ver lib/tier-lead.ts.
   const tier = tierDoLead(d.disposto_investir);
   if (tier) etiquetas.push(ETIQUETA_TIER[tier]);
+
+  for (const extra of (d[CHAVE_ETIQUETAS_EXTRAS] ?? "").split(",").map((e) => e.trim()).filter(Boolean)) {
+    if (!etiquetas.includes(extra)) etiquetas.push(extra);
+  }
 
   // (Labels "sim"/"nao" APOSENTADAS: derivavam da pergunta "disposto a investir", removida do
   // formulário — agora é um fluxo único para todos, com a qualificação feita pela própria IA.
