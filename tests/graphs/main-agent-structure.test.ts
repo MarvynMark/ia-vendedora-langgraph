@@ -74,7 +74,9 @@ describe("main agent prompt", () => {
     // 90k → 92k: a bifurcação do FECHAMENTO (escolheu → link / hesitou → "o que pesa") custou 635
     // caracteres LÍQUIDOS, já descontada a fusão com o antigo bloco ⚡, que virou duplicata dela.
     // São ~160 tokens por chamada contra ~20k de input — o teto é sanidade, não orçamento.
-    expect(prompt.length).toBeLessThan(92000);
+    // 92k → 96k: o bloco da promoção do Dia do Cliente (lib/promocao.ts) só existe em 18/09/2026
+    // e custa ~3,5k; o teste roda com a data real, então o teto precisa caber o dia da promoção.
+    expect(prompt.length).toBeLessThan(96000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
