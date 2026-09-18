@@ -146,6 +146,12 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
     "Oi! Passando pra confirmar nossa conversa de amanhã, às {{1}}. Tá de pé pra você? Se precisar mudar, me avisa com pelo menos 3 horas de antecedência que eu consigo remanejar o horário.",
   sessao_link_1h:
     "Opa! Nossa conversa é daqui a pouco, às {{1}}. É por aqui: {{2}} — te espero!",
+
+  // --- Promoção do Dia do Cliente (18/09/2026, um dia só) — sem variável, texto 1:1 com a Meta ---
+  dia_cliente_quente_v2:
+    "Oi, tudo bem? Aqui é o Walker. Eu tava revendo umas conversas aqui e parei na sua. A gente chegou a falar de valor e não fechou, e eu fiquei com isso na cabeça, porque o seu caso era de quem tinha tudo pra dar certo. Hoje eu consegui fazer a condição única do dia do cliente, nunca feita antes na mentoria: mais de R$ 1.000 a menos, e eu queria que você soubesse antes de acabar, porque é só hoje mesmo. Me responde eu quero que eu te mostro.",
+  dia_cliente_abertura_v2:
+    "Oi, tudo bem? Aqui é o Walker. Você preencheu o meu formulário um tempo atrás e a gente acabou não indo pra frente, e eu não gosto de deixar ninguém pelo caminho. Hoje eu abri a condição única do dia do cliente, nunca feita antes na mentoria: mais de R$ 1.000 a menos, e só vale hoje. Tô mandando isso pra poucas pessoas, não pra base toda. Se você ainda pensa em passar pra perito criminal, me responde eu quero que eu te mostro.",
 };
 
 // Metadados por template aprovado na Meta (idioma e cabeçalho de mídia, quando houver).
@@ -201,4 +207,7 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   // Sessão estratégica — {{1}} = horário; o de 1h leva também {{2}} = link do Meet.
   sessao_confirma_24h: { language: "pt_BR", bodyVars: 1 },
   sessao_link_1h: { language: "pt_BR", bodyVars: 2 },
+
+  dia_cliente_quente_v2: { language: "pt_BR", bodyVars: 0 },
+  dia_cliente_abertura_v2: { language: "pt_BR", bodyVars: 0 },
 };

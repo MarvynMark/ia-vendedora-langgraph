@@ -5,6 +5,8 @@
 //
 // ⚠️ Ao mudar um valor no prompt, mude aqui também — os dois têm que contar a mesma história.
 
+import { valoresPromocionais } from "./promocao.ts";
+
 export type PlanoId =
   | "anual_completo"
   | "anual"
@@ -55,7 +57,9 @@ export const ROTULO_PLANO: Record<PlanoId, string> = Object.fromEntries(
 
 // Todos os valores da tabela, do mais longo pro mais curto: casar "3.997" antes de "997" evita
 // que o prefixo curto roube o match do valor completo.
-const TODOS_VALORES = [...new Set(PLANOS.flatMap((p) => p.valores))].sort((a, b) => b.length - a.length);
+// Os valores promocionais (lib/promocao.ts) entram aqui para as guardas reconhecerem o preço
+// de hoje como preço: sem isso o gate de Kanban não moveria o card e o de material não seguraria.
+const TODOS_VALORES = [...new Set([...PLANOS.flatMap((p) => p.valores), ...valoresPromocionais()])].sort((a, b) => b.length - a.length);
 
 const escapar = (v: string) => v.replace(/\./g, "\\.");
 

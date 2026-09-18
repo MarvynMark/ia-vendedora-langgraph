@@ -8,6 +8,7 @@ import { gerarPromptAgenteSessao } from "./prompt-sessao.ts";
 import { trilhaDoLead, PONTE_PRECO_SESSAO, pareceDesistirDaSessao } from "../../lib/funil-call.ts";
 import { agendaConfigurada, buscarSessaoDoTelefone } from "../../services/google-calendar.ts";
 import { avisarComercial } from "../../lib/lembretes-sessao.ts";
+import { promocaoAtiva, leadVeioDaPromocao, removerLinksDePagamento } from "../../lib/promocao.ts";
 import { rotularDia, rotularHora } from "../../config/agenda.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
@@ -563,7 +564,10 @@ async function executarAgente(state: MainAgentStateType) {
     // Os gates valem só para a PRIMEIRA oferta da conversa. Se o lead já ouviu um valor ou já
     // recebeu um link antes (inclusive nas conversas em andamento no deploy), perguntar de
     // material agora sairia do nada — e travaria um legítimo "quanto era mesmo?".
-    const ofertaJaApresentada = historico.some((m) => m.type === "ai" && ofertaNoTurno(m.content ?? ""));
+    // Quem respondeu ao disparo da promoção veio pelo preço: os gates de material e de situação
+    // segurariam a tabela atrás de duas perguntas, e "só hoje" não tem turno sobrando.
+    const veioDaPromo = promocaoAtiva() && leadVeioDaPromocao(historico.filter((m) => m.type === "ai").map((m) => m.content ?? ""));
+    const ofertaJaApresentada = veioDaPromo || historico.some((m) => m.type === "ai" && ofertaNoTurno(m.content ?? ""));
     const ehMedico = ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato });
     if (
       ofertaNoTurno(outputFinal) &&
@@ -603,6 +607,13 @@ async function executarAgente(state: MainAgentStateType) {
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = RESPOSTA_INELEGIVEL[bloqueioSessao];
+    }
+
+    // PROMOÇÃO — hoje nenhum link sai da IA: os links da tabela são do preço cheio e o
+    // promocional é gerado por uma pessoa (o prompt já manda escalar quando o lead topa).
+    if (promocaoAtiva() && !ehMedico && temLinkDePagamento(outputFinal)) {
+      logger.warn("main-agent", "Link de pagamento removido: promoção ativa, link vem do comercial", { idConversa: state.idConversa });
+      outputFinal = removerLinksDePagamento(outputFinal);
     }
 
     // TRAVA DE ELEGIBILIDADE — a IA não manda embora quem ainda está cursando. O diploma é

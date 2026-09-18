@@ -3,6 +3,7 @@ import { env } from "../../config/env.ts";
 import { primeiroNomeSaudacao, primeiroConcurso } from "../../lib/nome.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
 import { BLOCO_PAPEL, BLOCO_PERSONALIDADE, BLOCO_RAG } from "./prompt-blocos.ts";
+import { promocaoAtiva, blocoPromocao } from "../../lib/promocao.ts";
 
 // Aprendizados destilados das conversas de compradores (gerado por scripts/analisar-compradores.ts
 // e revisado pela equipe). Lido uma vez no load do módulo; se o arquivo não existir, fica vazio.
@@ -52,6 +53,10 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   // não-médico pagava por ela em toda chamada (2 por turno). Como ehMedicoLead é determinístico e
   // roda antes de montar o prompt, os blocos entram só para quem é médico. Quem não é recebe a
   // linha curta abaixo, que preserva a trava (médico nunca recebe plano de Perito Criminal).
+  // Promoção do Dia do Cliente (18/09/2026): só hoje e só na trilha Perito. Médico fica fora — o
+  // disparo dele será outro. Ver lib/promocao.ts.
+  const blocoPromo = !ehMedico && promocaoAtiva() ? blocoPromocao() : "";
+
   const blocoMedicoPitch = ehMedico
     ? `  **GATE DE ROTEAMENTO — decida qual bloco usar ANTES de escrever qualquer preço, nesta ordem:**
   1. Apareceu o alerta **⚠️ ESTE LEAD É MÉDICO** nos DADOS DO LEAD (ou a formação é Medicina / o card tem a label "medico")? → use a trilha **Médico Legista** (bloco logo abaixo) e pare aqui. **Vale mesmo com erro de digitação na formação** (ex.: "Mediciba").
@@ -294,6 +299,7 @@ ${blocoMedicoTratamento}</como-usar-dados>
 
   > Após a confirmação, continue DIRETO para o PITCH DE PREÇO. O "sim" aqui significa "quero ver os planos" — NÃO reenvie o vídeo, o áudio nem a imagem (eles já foram nas etapas anteriores). Reenviar mídia que já foi mandada é erro grave.
 
+${blocoPromo}
   ## PITCH DE PREÇO (após o lead confirmar que é o momento dele)
 
   **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e incluir a linha "status: proposta_apresentada" na descrição da task (mantendo o restante da descrição existente).**
