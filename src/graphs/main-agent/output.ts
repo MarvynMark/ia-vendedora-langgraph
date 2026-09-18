@@ -25,6 +25,7 @@ export const TOOLS_QUE_ENVIAM_TEXTO_AO_LEAD = new Set([
   "Enviar_audio_walker_2",
   "Enviar_video_plataforma",
   "Enviar_imagem_entregaveis",
+  "Mostrar_condicao_dia_cliente",
 ]);
 
 interface MsgLike {

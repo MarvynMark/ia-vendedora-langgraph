@@ -13,6 +13,7 @@ import {
 import { criarToolBuscarContextoSimilar } from "./buscar-contexto-similar.ts";
 import { criarToolAgendarSessao } from "./agendar-sessao.ts";
 import type { MotivoInelegivel } from "../lib/elegibilidade.ts";
+import { criarToolMostrarCondicaoPromocao } from "./mostrar-condicao-promocao.ts";
 import { agendaConfigurada } from "../services/google-calendar.ts";
 
 interface ContextoMainAgent {
@@ -30,6 +31,8 @@ interface ContextoMainAgent {
   concurso?: string;
   /** Lead barrado da sessão (sem graduação / formação não aceita): a tool de agenda recusa marcar. */
   bloqueioSessao?: MotivoInelegivel;
+  /** Promoção do Dia do Cliente ativa para este lead (só hoje, só trilha Perito): ganha a tool da tabela. */
+  promocao?: boolean;
 }
 
 export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): StructuredToolInterface[] {
@@ -53,8 +56,13 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
         })]
       : [];
 
+  const toolsPromocao = contexto.promocao
+    ? [criarToolMostrarCondicaoPromocao({ idConta: contexto.idConta, idConversa: contexto.idConversa, telefone: contexto.telefone })]
+    : [];
+
   return [
     ...toolsAgenda,
+    ...toolsPromocao,
     refletir,
     criarToolEscalarHumano({
       telefone: contexto.telefone,

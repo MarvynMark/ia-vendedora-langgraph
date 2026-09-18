@@ -38,6 +38,10 @@ describe("tabela e bloco", () => {
   test("o bloco manda escalar em vez de mandar link", () => {
     const b = blocoPromocao();
     expect(b).toContain("NÃO ENVIE LINK DE PAGAMENTO HOJE");
+    expect(b).toContain("Mostrar_condicao_dia_cliente");
+    // O bloco não pode conter nada que, copiado ao lead, pareça instrução interna com a tabela.
+    expect(b).not.toContain("SUBSTITUI");
+    expect(b).not.toContain("~12x");
     expect(b).toContain("Escalar_humano");
     expect(b).toContain("🎯 PROMO DIA DO CLIENTE");
   });

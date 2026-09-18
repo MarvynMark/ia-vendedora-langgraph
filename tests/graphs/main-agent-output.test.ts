@@ -117,12 +117,13 @@ describe("montarOutputDoTurno — comportamento geral", () => {
 });
 
 describe("TOOLS_QUE_ENVIAM_TEXTO_AO_LEAD", () => {
-  test("cobre exatamente as 4 tools de mídia", () => {
+  test("cobre as 4 tools de mídia e a tabela da promoção (que também manda texto sozinha)", () => {
     expect([...TOOLS_QUE_ENVIAM_TEXTO_AO_LEAD].sort()).toEqual([
       "Enviar_audio_walker_1",
       "Enviar_audio_walker_2",
       "Enviar_imagem_entregaveis",
       "Enviar_video_plataforma",
+      "Mostrar_condicao_dia_cliente",
     ]);
   });
 });

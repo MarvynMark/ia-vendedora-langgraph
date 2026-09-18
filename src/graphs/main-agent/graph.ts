@@ -415,6 +415,7 @@ async function executarAgente(state: MainAgentStateType) {
     tarefa,
     trilha,
     ...(bloqueioSessao ? { bloqueioSessao } : {}),
+    promocao: trilha === "antigo" && promocaoAtiva() && !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }),
   });
 
   const model = new ChatOpenAI({
@@ -607,6 +608,17 @@ async function executarAgente(state: MainAgentStateType) {
         outputBloqueado: outputFinal.slice(0, 160),
       });
       outputFinal = RESPOSTA_INELEGIVEL[bloqueioSessao];
+    }
+
+    // PROMOÇÃO — nada de instrução interna nem de tabela escrita à mão chega ao lead: a tabela
+    // vai pela tool (conv 3896, 12:32: o modelo copiou "Isto SUBSTITUI a apresentação..." e o
+    // formatador picotou os quatro planos). Linha com cara de prompt ou com valor riscado cai.
+    if (promocaoAtiva() && !ehMedico) {
+      const limpo = outputFinal.split("\n").filter((l) => !/SUBSTITUI|NÃO valem hoje|<\/?promocao>|~12x/i.test(l)).join("\n").trim();
+      if (limpo !== outputFinal) {
+        logger.warn("main-agent", "Promoção: linha de instrução/tabela removida da saída", { idConversa: state.idConversa, removido: outputFinal.slice(0, 160) });
+        outputFinal = limpo;
+      }
     }
 
     // PROMOÇÃO — hoje nenhum link sai da IA: os links da tabela são do preço cheio e o

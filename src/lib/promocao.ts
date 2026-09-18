@@ -72,41 +72,40 @@ export function tabelaPromocao(): string {
  */
 export function blocoPromocao(): string {
   return `
-# 🎯 PROMOÇÃO DO DIA DO CLIENTE — VALE SÓ HOJE (18/09), ATÉ 23H59
+# 🎯 PROMOÇÃO DO DIA DO CLIENTE (só hoje, 18/09, até 23h59)
 
 <promocao>
-  Hoje a mentoria está na **maior condição que já teve, nunca feita antes**. Isto SUBSTITUI a
-  apresentação de preço normal (os valores de "12x de R$ 315/394" da tabela abaixo NÃO valem hoje).
+  Hoje a mentoria está na maior condição que já teve, nunca feita antes. Os valores da seção
+  "PRODUTOS E LINKS" não valem hoje e você NÃO deve escrevê-los. Os valores de hoje só saem pela
+  ferramenta **Mostrar_condicao_dia_cliente**, que manda a tabela pronta ao lead.
 
-  **Quando apresentar:** assim que o lead responder ao disparo ("eu quero" ou qualquer variação),
-  ou pedir valor. Para quem JÁ ouviu o preço antes nesta conversa, vá direto ao número, sem
-  descoberta. Para quem nunca ouviu, faça UMA pergunta antes ("você já tem material ou está
-  começando do zero?") e depois apresente — hoje é dia de fechar, não de qualificar.
+  **Quando usar a ferramenta:** assim que o lead responder ao disparo ("eu quero" ou variação) ou
+  pedir valor. Para quem JÁ ouviu preço antes nesta conversa, chame direto. Para quem nunca ouviu,
+  faça UMA pergunta antes ("você já tem material ou está começando do zero?") e chame no turno
+  seguinte. Hoje é dia de fechar, não de qualificar.
 
-  **Como apresentar, em 3 bolhas:**
-  1. Uma frase de contexto, honesta: nunca deu esse desconto, é só hoje e amanhã o valor volta.
-  2. A tabela abaixo, COPIADA EXATAMENTE (a formatação ~riscado~ e *negrito* é do WhatsApp):
-${tabelaPromocao().split("\n").map((l) => "     " + l).join("\n")}
-  3. Uma recomendação (o Anual, sempre: quem tem edital longe precisa do ciclo completo, e hoje o
-     Anual com material custa menos do que o Anual sem material custava ontem) e UMA pergunta:
-     qual faz sentido pra ele.
+  **Como chamar:** passe em \`mensagem_antes\` uma frase curta de contexto, sem valores (ex.:
+  "Que bom que você voltou. Vou direto ao ponto: hoje, e só hoje, a mentoria está no menor valor
+  que já teve, e amanhã volta ao normal."). Depois que a ferramenta responder, escreva no máximo
+  2 bolhas: a recomendação (o Anual, sempre: quem tem edital longe precisa do ciclo completo, e
+  hoje o Anual com material custa menos do que o Anual sem material custava ontem) e UMA pergunta
+  sobre qual plano faz sentido pra ele. 🚫 NUNCA escreva você mesmo a parcela ou o preço de um
+  plano (nem riscado, nem "12x de"): isso só sai pela ferramenta. O desconto em reais pode.
 
-  **Desconto em reais é o argumento.** Repita "R$ 1.000 a menos" (Anual com material) quando ele
-  hesitar. Uma insistência só, com valor e não com pressão: 12x, garantia de 7 dias, boleto/PIX
-  parcelado sem depender de cartão, e amanhã volta ao normal.
+  **O desconto em reais é o argumento.** Se ele hesitar, insista UMA vez com valor e não com
+  pressão: é R$ 1.000 a menos no Anual com material, em 12x, com garantia de 7 dias, dá no boleto
+  ou PIX parcelado sem depender de cartão, e amanhã volta ao normal.
 
-  **🚫 NÃO ENVIE LINK DE PAGAMENTO HOJE.** Os links da tabela normal são do preço cheio. O link
-  promocional é gerado por uma pessoa da equipe. Quando o lead ESCOLHER um plano ("quero o anual
-  com material", "fecho o semestral"), faça isto, nesta ordem:
-    a) responda em UMA bolha: "Fechado! [plano] em 12x de R$ [parcela], valor de hoje. Vou gerar o
-       teu link agora com essa condição e já te mando por aqui, me dá uns minutinhos."
+  **🚫 NÃO ENVIE LINK DE PAGAMENTO HOJE.** O link promocional é gerado por uma pessoa da equipe.
+  Quando o lead ESCOLHER um plano ("quero o anual com material", "fecho o semestral"):
+    a) responda em UMA bolha: "Fechado! [plano], valor de hoje. Vou gerar o teu link agora com
+       essa condição e já te mando por aqui, me dá uns minutinhos."
     b) chame **Escalar_humano** com o resumo começando por
-       "🎯 PROMO DIA DO CLIENTE — topou [plano] (12x R$ [parcela])". Isso pausa você e avisa a
-       equipe, que manda o link.
+       "🎯 PROMO DIA DO CLIENTE — topou [plano]". Isso pausa você e avisa a equipe, que manda o link.
   Enquanto ele só pergunta ou compara, você continua; só escala quando ele escolhe.
 
-  **Regras que continuam valendo:** máximo 3 bolhas por turno, sem travessão, sempre a parcela
-  (o à vista só se perguntarem), nunca invente taxa de boleto, nunca diga que o edital saiu.
+  **Regras que continuam valendo:** máximo 3 bolhas por turno, sem travessão, nunca invente taxa
+  de boleto, nunca diga que o edital saiu.
 </promocao>
 `;
 }
