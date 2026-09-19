@@ -220,7 +220,7 @@ async function followup(minutos: number, valendo: boolean) {
     `WITH tabela AS (
        SELECT session_id, MIN(created_at) AS enviada_em
        FROM n8n_historico_mensagens
-       WHERE additional_kwargs->>'origem' = 'tool:mostrar-condicao-promocao' AND created_at::date = CURRENT_DATE
+       WHERE additional_kwargs->>'origem' = 'tool:mostrar-condicao-promocao' AND (created_at AT TIME ZONE 'America/Sao_Paulo')::date = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
        GROUP BY session_id
      ),
      ultima AS (
@@ -234,9 +234,13 @@ async function followup(minutos: number, valendo: boolean) {
        AND u.created_at < NOW() - ($1 || ' minutes')::interval
        AND NOT EXISTS (
          SELECT 1 FROM n8n_historico_mensagens f
-         WHERE f.session_id = u.session_id AND f.additional_kwargs->>'origem' = 'promo-followup-garantia'
+         WHERE f.session_id = u.session_id
+           AND (f.additional_kwargs->>'origem' = 'promo-followup-garantia' OR f.content LIKE $2)
        )`,
-    [minutos],
+    // Pelo TEXTO também: quando sai pelo Chatwoot, o webhook grava a mensagem primeiro (como
+    // saida_externa) e a gravação do script é descartada como duplicata — só a marca não bastava
+    // (4 leads receberam duas vezes em 18/09).
+    [minutos, FOLLOWUP_GARANTIA.slice(0, 60) + "%"],
   );
   console.log(`Follow-up de garantia: ${rows.length} lead(s) viram a tabela e não responderam há ${minutos}+ min · ${valendo ? "VALENDO" : "dry-run"}\n`);
   let ok = 0;
