@@ -1,6 +1,7 @@
 import { StateGraph, END } from "@langchain/langgraph";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
+import { avisarComercial } from "../../lib/lembretes-sessao.ts";
 import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, minutosDesdeUltimaMensagemLead, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../lib/nome.ts";
@@ -124,11 +125,14 @@ export async function classificar(state: FollowUpStateType) {
 // toque garantidamente dentro dela é o primeiro (+3h da última mensagem do lead; a janela só
 // fecha em +24h). Do segundo em diante a cadência espaça por dias e já cai fora da janela, onde
 // só o template aprovado pela Meta chega ao lead.
+//
+// CADÊNCIA ENXUTA (21/09/2026), a partir da análise de 4.462 follow-ups de jul–set: a resposta cai
+// de 42% (1º toque) para 17% (3º) e 10% (4º); quem não respondeu ao 1º e voltou, voltou em 73% dos
+// casos no 2º ou 3º. Depois de 4 dias de silêncio a resposta é < 9%. Então: TRÊS mensagens em 72h
+// (t1, t2, encerramento) e pronto — o 4º toque vira lista humana, não mensagem.
 const SEQUENCIA_RECUPERACAO_CONEXAO = [
   "conexao_followup_valor", // t1: +3h, DENTRO da janela — entrega uma ideia, não cobra resposta
   "conexao_followup_1",     // t2: +1 dia — ficou dúvida ou foi questão de tempo?
-  "conexao_followup_2",     // t3: +2 dias — o que travou: valor, tempo ou dúvida?
-  "conexao_followup_3",     // t4: +3 dias — o próximo passo, sem pressão
 ] as const;
 
 // Toque 1 dispara no delay INICIAL da etapa (3h, ver lib/delays-followup.ts) e é o único que cai
@@ -137,13 +141,14 @@ const SEQUENCIA_RECUPERACAO_CONEXAO = [
 // agendarMaximizandoJanela puxava o toque 2 pra dentro da janela grátis, o que colocava DOIS
 // toques no mesmo dia (conv 6675: 08h21 e 19h33). Aqui o espaçamento vale mais que a economia do
 // template — por isso esta sequência agenda com proximoHorarioComercial, sem "espremer".
-const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 2 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
+const DELAYS_CONEXAO_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const; // t1→t2 +1d, t2→encerramento +1d
 
 // Fallback pago (fora da janela 24h), por posição do contador — ângulo de dúvida/reabertura.
 // O t1 quase nunca usa o seu (sai a +3h, dentro da janela); quando usar, vai o conexao_duvida,
 // que é o único destes com texto local — conexao_1 e conexao_2 estão aprovados na Meta mas não
 // têm o texto em CONTEUDO_TEMPLATES, então o registro da conversa não reflete o que o lead leu.
-const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_1", "conexao_2", "conexao_duvida"] as const;
+// conexao_2 (22% de resposta) no lugar de conexao_1 (15%) e conexao_duvida (10%) — dados de jul–set.
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_2"] as const;
 
 // Sequência pós-preço (viu o pitch e sumiu — está em "Aguardando Pagamento" sem "link enviado"):
 // cutucada de reforço → versão enxuta 6 meses → parcelado → garantia → prova social (D+7) →
@@ -151,11 +156,12 @@ const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_1", "conexao_2", "
 // maior vazamento do funil e a recuperação antes morria em 24-48h (diagnóstico).
 // Quem viu o preço e sumiu recebia 10,4 mensagens da IA (diagnóstico de agosto). Insistir com
 // quem parou de responder não recupera, queima: a cadência caiu para QUATRO toques, espaçando.
+// Enxuta em 21/09/2026 (ver nota da SEQUENCIA_RECUPERACAO_CONEXAO): garantia, áudio, encerramento.
+// Os toques de +4 e +10 dias caíam na faixa de < 9% de resposta. Quem ouviu o preço e sumiu é
+// o lead onde o "tá aí?" HUMANO rende 30% — por isso o encerramento pós-preço avisa o comercial.
 const SEQUENCIA_POS_PRECO = [
   "pos_preco_garantia",      // t1: +1h — a garantia de 7 dias, o argumento que resolve a hesitação
   "pos_preco_audio_walker",  // t2: +1 dia — ÁUDIO do Walker (só dentro da janela de 24h)
-  "pos_preco_followup_2",    // t3: +4 dias — o parcelado sem limite
-  "pos_preco_prova_social",  // t4: +10 dias — alguém com a mesma dúvida que entrou
 ] as const;
 
 // Marcador do toque de áudio (não é um template de texto — enviado por enviarAudioPorUrl).
@@ -164,11 +170,11 @@ const TOQUE_AUDIO_POSPRECO = "pos_preco_audio_walker";
 // t1 sai no delay inicial da etapa (1h, ver lib/delays-followup.ts). Depois: áudio no dia
 // seguinte, parcelado em +4 dias, prova social em +10, encerramento +10. Espaçado de propósito —
 // a cadência antiga somava 10 toques e o lead que sumiu não volta por insistência.
-const DELAYS_POS_PRECO_MS = [24 * 60 * 60 * 1000, 4 * 24 * 60 * 60 * 1000, 10 * 24 * 60 * 60 * 1000, 10 * 24 * 60 * 60 * 1000] as const;
+const DELAYS_POS_PRECO_MS = [24 * 60 * 60 * 1000, 2 * 24 * 60 * 60 * 1000] as const; // t1→t2 +1d, t2→encerramento +2d
 // Fallbacks pagos (fora da janela 24h), por posição. O áudio (t2) não pode ser template Meta →
 // fora da janela cai em recuperacao_enxuta (abre o Semestral em texto). Toques novos (prova
 // social/última chamada) também caem em fallback aprovado (duvida/urgencia).
-const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta", "pos_preco_duvida", "pos_preco_urgencia"] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["pos_preco_reforco", "recuperacao_enxuta"] as const;
 
 async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
@@ -235,6 +241,14 @@ async function agenteFollowup(state: FollowUpStateType) {
       }
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento:", e);
+    }
+    // Lead que ouviu o preço e não respondeu a 3 mensagens: a IA para, mas ele não é lead frio —
+    // é onde o "Olá, tá por aí?" do Pedro responde 30% e precede compras (análise de 21/09).
+    if (isPosPreco) {
+      await avisarComercial(
+        `👋 VALE UM "TÁ AÍ?" — ${state.title} (${state.telefone ?? "?"}) ouviu o preço, recebeu 3 toques e não respondeu. A IA encerrou; um toque humano aqui rende.\n` +
+          `${env.CHATWOOT_BASE_URL}/app/accounts/${state.accountId}/conversations/${state.conversationId}`,
+      );
     }
     await encerrarParaNutrir(state);
     return { respostaAgente: "" };
@@ -313,11 +327,12 @@ async function agenteFollowup(state: FollowUpStateType) {
 }
 
 // Sequência lembrete (link enviado): cutucada (o link tá ativo) → (se sumir) versão enxuta → travou em quê.
-const SEQUENCIA_LEMBRETE = ["lembrete_1", "recuperacao_enxuta", "lembrete_2"] as const;
-// Toque 1 dispara no delay INICIAL da etapa (20min). Depois: t1→t2 3h (mesmo dia), t2→t3 dia seguinte.
-const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
+// Enxuta em 21/09/2026: cutucada (+20min), versão enxuta (+3h), encerramento (+1 dia). Três e pronto.
+const SEQUENCIA_LEMBRETE = ["lembrete_1", "recuperacao_enxuta"] as const;
+// Toque 1 dispara no delay INICIAL da etapa (20min). Depois: t1→t2 3h (mesmo dia), t2→encerramento dia seguinte.
+const DELAYS_LEMBRETE_MS = [3 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fallback pago (fora da janela 24h), por posição do contador.
-const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "recuperacao_enxuta", "lembrete_2"] as const;
+const TEMPLATE_FALLBACK_LEMBRETE = ["lembrete_acesso", "recuperacao_enxuta"] as const;
 
 // Silêncio mínimo antes do lembrete de checkout. O toque 1 sai 20min depois do link, prazo curto
 // de propósito (abandono de carrinho se resolve rápido) — mas 20min de RELÓGIO não são 20min de
@@ -477,7 +492,9 @@ const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup3_urgencia"] as const;
 // Dentro da janela 24h (lead chegou a responder): toques mais próximos, encerramento depois.
 const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Fora da janela (lead frio, quase sempre): reforço → urgência em ~2 dias, encerramento no Dia 3 seguinte.
-const DELAYS_FORA_JANELA_MS = [2 * 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000] as const;
+// 21/09/2026: era [2d, 3d] (t1 D+1, t2 D+3, encerramento D+6). Depois de 4 dias de silêncio a
+// resposta é < 9%; agora tudo cabe em 72h: t1 D+1, t2 D+2, encerramento D+3.
+const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
 // Follow-ups sempre dentro do horário comercial (9h-18h SP), inclusive dentro da janela de 24h.
 const HORA_MAX_FOLLOWUP_JANELA = 20;
 
@@ -612,10 +629,13 @@ function atualizarContadorNutrir(description: string, novoValor: number): string
 // Nutrir dispara SEMPRE fora da janela de 24h (leads frios, delays de dias/semanas), então usa
 // template Meta aprovado — texto livre do LLM não pode ser enviado fora da janela (era o bug:
 // gerava a mensagem e o enviarMensagemNo bloqueava por estar fora da janela, sem fallback).
+//
+// 21/09/2026: só o e-book. Na análise de jul–set o nutrir mandou 863 templates com 2% de resposta e
+// nenhuma compra atribuível (vídeo 0,6%, reabertura 3,8%). Base parada não volta por gotejamento;
+// volta por AÇÃO com oferta (o Dia do Cliente teve 7% de resposta e 7 vendas em um dia). O que
+// resta aqui é um único toque de valor; o resto vira campanha mensal, disparada à mão.
 const SEQUENCIA_NUTRIR = [
-  { abordagem: "ebook",               template: "nutrir_ebook",          proximoDelayDias: 7 },
-  { abordagem: "video_aprovada",      template: "nutrir_video_aprovada", proximoDelayDias: 14 },
-  { abordagem: "reabertura",          template: "nutrir_reabertura",     proximoDelayDias: 30 },
+  { abordagem: "ebook",               template: "nutrir_ebook",          proximoDelayDias: 90 },
 ] as const;
 
 async function agenteNutrir(state: FollowUpStateType) {

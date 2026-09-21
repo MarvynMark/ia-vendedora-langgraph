@@ -10,8 +10,12 @@ const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 const HORA_ABERTURA = 8;
 const MINUTO_ABERTURA = 20;
 const HORA_FECHAMENTO = 20;
-const HORA_REABERTURA = 8; // hora para reagendar quando cai fora do intervalo permitido
-const MINUTO_REABERTURA = 20;
+// TESTE DE HORÁRIO (21/09/2026, duas semanas): o que cai fora do expediente era reagendado para
+// 08:20 e virava um lote — 64% dos templates saíam nessa faixa, com 10% de resposta contra 20%
+// entre 10h e 13h. Reagendar para 10:05 espalha o lote pela manhã de quem já acordou. A janela
+// útil continua abrindo às 08:20 (o que já está agendado dentro dela não muda).
+const HORA_REABERTURA = 10; // hora para reagendar quando cai fora do intervalo permitido
+const MINUTO_REABERTURA = 5;
 
 // Janela do PRIMEIRO contato (intro do Walker e template de abertura) — mais larga e TODOS OS DIAS.
 // Ela é diferente da janela de follow-up de propósito: o lead acabou de preencher o formulário e

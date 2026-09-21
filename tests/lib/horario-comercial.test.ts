@@ -7,36 +7,38 @@ function sp(date: Date) {
   return { hora: d.getUTCHours(), dia: d.getUTCDay(), min: d.getUTCMinutes() };
 }
 
-describe("proximoHorarioComercial (fuso SP, janela 08h20-20h)", () => {
-  test("alvo às 01:00 SP (madrugada) vira 08:20 SP, NUNCA 01:00", () => {
+// Reagendamento para 10:05 desde 21/09/2026 (teste de horário: o lote das 08:20 respondia 10%,
+// a faixa 10h–13h respondia 20%). A janela útil continua abrindo às 08:20.
+describe("proximoHorarioComercial (fuso SP, janela 08h20-20h, reagenda para 10:05)", () => {
+  test("alvo às 01:00 SP (madrugada) vira 10:05 SP, NUNCA 01:00", () => {
     // 2026-07-15 04:00 UTC = 01:00 SP
     const agora = new Date(Date.UTC(2026, 6, 15, 4, 0, 0));
     const c = sp(proximoHorarioComercial(agora, 0));
-    expect(c.hora).toBe(8);
-    expect(c.min).toBe(20);
+    expect(c.hora).toBe(10);
+    expect(c.min).toBe(5);
   });
 
-  test("alvo às 08:00 SP (antes da abertura) vira 08:20 no mesmo dia", () => {
+  test("alvo às 08:00 SP (antes da abertura) vira 10:05 no mesmo dia", () => {
     // 2026-07-15 11:00 UTC = 08:00 SP (quarta)
     const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 15, 11, 0, 0)), 0));
-    expect(c.hora).toBe(8);
-    expect(c.min).toBe(20);
+    expect(c.hora).toBe(10);
+    expect(c.min).toBe(5);
   });
 
-  test("alvo às 20h SP (fechamento) vira 08:20 de um dia útil", () => {
+  test("alvo às 20h SP (fechamento) vira 10:05 de um dia útil", () => {
     // 2026-07-15 23:00 UTC = 20:00 SP (limite exclusivo da janela → cai pro próximo dia)
     const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 15, 23, 0, 0)), 0));
-    expect(c.hora).toBe(8);
-    expect(c.min).toBe(20);
+    expect(c.hora).toBe(10);
+    expect(c.min).toBe(5);
     expect(c.dia).toBeGreaterThanOrEqual(1);
     expect(c.dia).toBeLessThanOrEqual(5);
   });
 
-  test("fim de semana vira dia útil (segunda-sexta) às 08:20", () => {
+  test("fim de semana vira dia útil (segunda-sexta) às 10:05", () => {
     // 2026-07-18 é sábado. 15:00 UTC = 12:00 SP
     const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)), 0));
-    expect(c.hora).toBe(8);
-    expect(c.min).toBe(20);
+    expect(c.hora).toBe(10);
+    expect(c.min).toBe(5);
     expect(c.dia).toBeGreaterThanOrEqual(1);
     expect(c.dia).toBeLessThanOrEqual(5);
   });
