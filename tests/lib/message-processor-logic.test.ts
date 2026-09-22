@@ -86,7 +86,7 @@ describe("processarMensagem", () => {
       attachments: [{ id: 2, file_type: "image", data_url: "https://example.com/photo.jpg" }],
     });
     const result = await processarMensagem(payload);
-    expect(result.mensagemProcessada).toBe("Segue a foto\n<usuario enviou uma imagem. peca que envie a informacao por audio ou texto>");
+    expect(result.mensagemProcessada).toBe("Segue a foto\n<o lead enviou uma imagem>");
   });
 
   test("imagem sem texto - só notificação", async () => {
@@ -95,7 +95,7 @@ describe("processarMensagem", () => {
       attachments: [{ id: 2, file_type: "image", data_url: "https://example.com/photo.jpg" }],
     });
     const result = await processarMensagem(payload);
-    expect(result.mensagemProcessada).toBe("<usuario enviou uma imagem. peca que envie a informacao por audio ou texto>");
+    expect(result.mensagemProcessada).toBe("<o lead enviou uma imagem>");
   });
 
   test("content null sem anexos - fallback mensagem não suportada", async () => {

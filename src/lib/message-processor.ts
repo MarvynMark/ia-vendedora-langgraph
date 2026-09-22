@@ -63,7 +63,11 @@ export async function processarMensagem(payload: ChatwootWebhookPayload): Promis
       mensagemProcessada = "<erro na transcrição do áudio>";
     }
   } else if (tipoArquivo === "image") {
-    mensagemProcessada = `${mensagemProcessada}\n<usuario enviou uma imagem. peca que envie a informacao por audio ou texto>`.trim();
+    // Marcação NEUTRA: a antiga ("peca que envie a informacao por audio ou texto") virava resposta
+    // robótica — na conv 4014 o lead mandou um print e ouviu "Parece que você está tentando me
+    // mostrar algo. Se puder, descreva em texto ou áudio", e na mensagem seguinte percebeu que
+    // falava com uma IA. Como reagir é decisão do prompt (bloco IMAGEM DO LEAD), não da marcação.
+    mensagemProcessada = `${mensagemProcessada}\n<o lead enviou uma imagem>`.trim();
   } else if (tipoArquivo && tipoArquivo !== "audio") {
     mensagemProcessada = `${mensagemProcessada}\n<usuario enviou um arquivo do tipo ${tipoArquivo}>`.trim();
   }

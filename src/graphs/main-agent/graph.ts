@@ -9,6 +9,7 @@ import { trilhaDoLead, PONTE_PRECO_SESSAO, pareceDesistirDaSessao } from "../../
 import { agendaConfigurada, buscarSessaoDoTelefone } from "../../services/google-calendar.ts";
 import { avisarComercial } from "../../lib/lembretes-sessao.ts";
 import { promocaoAtiva, leadVeioDaPromocao, removerLinksDePagamento } from "../../lib/promocao.ts";
+import { removerAnuncioDeEscalacao } from "../../lib/escalonamento-silencioso.ts";
 import { rotularDia, rotularHora } from "../../config/agenda.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
@@ -771,6 +772,34 @@ async function executarAgente(state: MainAgentStateType) {
           `Atendimento pausado antes do envio: defina com ele a forma de pagamento e mande o link certo.`,
       );
       return { outputAgente: "" };
+    }
+
+    // ESCALAÇÃO SILENCIOSA — o lead nunca sabe que foi transferido (conv 4014: logo depois de ele
+    // dizer "tá respondendo via IA", o modelo escreveu "vou passar para um humano da equipe",
+    // confirmando a suspeita). O prompt já proibia; aqui a frase é removida antes de sair.
+    const semAnuncio = removerAnuncioDeEscalacao(outputFinal);
+    if (semAnuncio !== outputFinal) {
+      logger.warn("main-agent", "Anúncio de escalação removido da saída", {
+        idConversa: state.idConversa,
+        removido: outputFinal.slice(0, 200),
+      });
+      outputFinal = semAnuncio;
+      // Anunciou transferência sem chamar a tool: a intenção era escalar, então escala de fato —
+      // senão o turno ficaria mudo e ninguém assumiria a conversa.
+      if (!toolsChamadas.has("Escalar_humano")) {
+        await escalarParaHumano(
+          {
+            telefone: state.telefone,
+            nome: state.nome,
+            idConta: state.idConta,
+            idConversa: state.idConversa,
+            idInbox: state.idInbox,
+            ultimaMensagem: mensagemOriginal,
+          },
+          "A IA ia dizer ao lead que passaria o atendimento para um humano (frase removida antes do envio). " +
+            "Assuma a conversa: o ponto que ela não conseguiu resolver está na última mensagem do lead.",
+        );
+      }
     }
 
     // GUARD DETERMINÍSTICO — mover pra "Aguardando Pagamento" ao apresentar o preço.

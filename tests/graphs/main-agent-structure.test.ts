@@ -76,7 +76,8 @@ describe("main agent prompt", () => {
     // São ~160 tokens por chamada contra ~20k de input — o teto é sanidade, não orçamento.
     // 92k → 96k: o bloco da promoção do Dia do Cliente (lib/promocao.ts) só existe em 18/09/2026
     // e custa ~3,5k; o teste roda com a data real, então o teto precisa caber o dia da promoção.
-    expect(prompt.length).toBeLessThan(96000);
+    // 96k → 97k: bloco "O LEAD MANDOU UMA IMAGEM" (conv 4014), ~900 caracteres.
+    expect(prompt.length).toBeLessThan(97000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
