@@ -10,12 +10,13 @@ import { agendaConfigurada, buscarSessaoDoTelefone } from "../../services/google
 import { avisarComercial } from "../../lib/lembretes-sessao.ts";
 import { promocaoAtiva, leadVeioDaPromocao, removerLinksDePagamento } from "../../lib/promocao.ts";
 import { removerAnuncioDeEscalacao } from "../../lib/escalonamento-silencioso.ts";
+import { iaEstaPausada } from "../../lib/pausa-ia.ts";
 import { rotularDia, rotularHora } from "../../config/agenda.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
-import { buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
+import { buscarConversa, buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
 import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
 import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
@@ -778,12 +779,12 @@ async function executarAgente(state: MainAgentStateType) {
     // dizer "tá respondendo via IA", o modelo escreveu "vou passar para um humano da equipe",
     // confirmando a suspeita). O prompt já proibia; aqui a frase é removida antes de sair.
     const semAnuncio = removerAnuncioDeEscalacao(outputFinal);
-    if (semAnuncio !== outputFinal) {
+    if (semAnuncio.removidas.length > 0) {
       logger.warn("main-agent", "Anúncio de escalação removido da saída", {
         idConversa: state.idConversa,
-        removido: outputFinal.slice(0, 200),
+        removidas: semAnuncio.removidas,
       });
-      outputFinal = semAnuncio;
+      outputFinal = semAnuncio.texto;
       // Anunciou transferência sem chamar a tool: a intenção era escalar, então escala de fato —
       // senão o turno ficaria mudo e ninguém assumiria a conversa.
       if (!toolsChamadas.has("Escalar_humano")) {
@@ -833,6 +834,22 @@ async function executarAgente(state: MainAgentStateType) {
 
 async function verificarNovasMsgs(state: MainAgentStateType) {
   try {
+    // A IA foi pausada DURANTE este turno? O webhook checa a label na entrada, mas um turno que
+    // já estava rodando seguia enviando por cima do humano que assumiu — e o turno que escala a
+    // si mesmo chegava aqui com a label já removida (conv 8660). Checa de novo antes de enviar.
+    try {
+      const conversa = (await buscarConversa(state.idConta, state.idConversa)) as { labels?: string[] };
+      if (iaEstaPausada(conversa.labels)) {
+        logger.warn("main-agent", "IA pausada durante o turno — resposta descartada antes do envio", {
+          idConversa: state.idConversa,
+          outputDescartado: (state.outputAgente ?? "").slice(0, 160),
+        });
+        return { novasMensagens: false, outputAgente: "" };
+      }
+    } catch (e) {
+      logger.warn("main-agent", "Não deu para reconferir a pausa antes de enviar", e);
+    }
+
     const ultima = await buscarUltimaMensagem(state.telefone);
     const novas = ultima !== null;
     logger.info("main-agent", "verificarNovasMsgs:", novas);

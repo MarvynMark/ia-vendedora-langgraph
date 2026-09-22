@@ -35,18 +35,30 @@ export function anunciaEscalacao(linha: string): boolean {
  * Remove do texto as frases que revelam a escalação. Trabalha por FRASE, não por linha: o modelo
  * costuma emendar o anúncio no meio de uma bolha útil ("Entendi sua dúvida. Vou passar para a
  * equipe."), e descartar o turno inteiro deixaria o lead sem resposta nenhuma.
+ *
+ * Devolve TAMBÉM o que foi removido, e quem chama deve olhar `removidas` — nunca comparar o texto
+ * de volta com o original. A primeira versão fazia essa comparação e, como a limpeza normaliza
+ * espaços, qualquer espaço duplo do modelo parecia "anúncio removido": na conv 8660 um parágrafo
+ * separado por "\n \n" escalou a conversa de uma lead que estava conversando normalmente.
  */
-export function removerAnuncioDeEscalacao(texto: string): string {
-  return (texto ?? "")
+export function removerAnuncioDeEscalacao(texto: string): { texto: string; removidas: string[] } {
+  const removidas: string[] = [];
+  const original = texto ?? "";
+  const limpo = original
     .split("\n")
     .map((linha) => {
       if (!linha.trim()) return linha;
       const frases = linha.split(/(?<=[.!?])\s+/);
-      const limpas = frases.filter((f) => !anunciaEscalacao(f));
-      return limpas.join(" ").trim();
+      const limpas = frases.filter((f) => {
+        if (!anunciaEscalacao(f)) return true;
+        removidas.push(f.trim());
+        return false;
+      });
+      // Sem remoção, a linha volta INTACTA (nada de normalizar espaçamento à toa).
+      return limpas.length === frases.length ? linha : limpas.join(" ").trim();
     })
-    .filter((linha, i, todas) => linha.trim() !== "" || (i > 0 && i < todas.length - 1))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+    .join("\n");
+  // Só arruma quebras e pontas quando realmente mexemos no texto.
+  const texto_ = removidas.length ? limpo.replace(/\n{3,}/g, "\n\n").trim() : original;
+  return { texto: texto_, removidas };
 }

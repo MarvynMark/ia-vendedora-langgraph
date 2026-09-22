@@ -34,17 +34,31 @@ describe("anunciaEscalacao", () => {
 
 describe("removerAnuncioDeEscalacao", () => {
   test("tira só a frase que entrega a escalação e mantém o resto da bolha", () => {
-    const saida = "Entendi a sua dúvida sobre o valor. Vou passar essa questão para um humano da equipe te ajudar.";
-    expect(removerAnuncioDeEscalacao(saida)).toBe("Entendi a sua dúvida sobre o valor.");
+    const r = removerAnuncioDeEscalacao("Entendi a sua dúvida sobre o valor. Vou passar essa questão para um humano da equipe te ajudar.");
+    expect(r.texto).toBe("Entendi a sua dúvida sobre o valor.");
+    expect(r.removidas).toHaveLength(1);
   });
 
   test("turno que era SÓ anúncio fica vazio (nada é enviado ao lead)", () => {
-    const saida = "Vou passar essa questão para um humano da equipe te ajudar diretamente com isso.\nEles vão entrar em contato com você em breve.";
-    expect(removerAnuncioDeEscalacao(saida)).toBe("");
+    const r = removerAnuncioDeEscalacao("Vou passar essa questão para um humano da equipe te ajudar diretamente com isso.\nEles vão entrar em contato com você em breve.");
+    expect(r.texto).toBe("");
+    expect(r.removidas).toHaveLength(2);
   });
 
-  test("texto sem anúncio passa intacto", () => {
-    const saida = "São 12x de R$ 315 no cartão.\nQuer que eu te mande o link?";
-    expect(removerAnuncioDeEscalacao(saida)).toBe(saida);
+  // Regressão conv 8660 (22/09): a versão que comparava o texto limpo com o original escalava
+  // quando a limpeza só normalizava espaçamento. Formatação do modelo NÃO é anúncio.
+  test("espaçamento variado não conta como remoção e o texto sai intacto", () => {
+    for (const saida of [
+      "Uma frase.  Outra frase.",
+      "Frase final.   ",
+      " Começa com espaço.",
+      "Compreendo, Amanda. A organização é essencial.\n \nVou te mandar um vídeo que mostra como funciona.",
+      "Linha um.\n\n\n\nLinha dois.",
+      "São 12x de R$ 315 no cartão.\nQuer que eu te mande o link?",
+    ]) {
+      const r = removerAnuncioDeEscalacao(saida);
+      expect(r.removidas).toHaveLength(0);
+      expect(r.texto).toBe(saida);
+    }
   });
 });
