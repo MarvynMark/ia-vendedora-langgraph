@@ -77,6 +77,23 @@ async function encerrarParaNutrir(state: FollowUpStateType): Promise<void> {
   logger.info("follow-up", `Encerrado → Nutrir (step ${destino}), contador zerado, próximo nurturing em 7d`);
 }
 
+/**
+ * Aguardando Pagamento NÃO vai para Nutrir quando os follow-ups acabam (decisão do Gusthavo,
+ * 22/09/2026): quem ouviu o preço ou recebeu o link é o lead mais valioso do funil e fica onde o
+ * comercial olha. O card ganha a marca "follow-ups concluídos" na descrição e sai da fila do cron
+ * (due_date longe); se o lead responder, o fluxo normal retoma.
+ */
+async function sinalizarFollowupsConcluidos(state: FollowUpStateType, quantos: number): Promise<void> {
+  const data = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const marca = `✅ - Follow-ups concluídos (${quantos}/${quantos}) em ${data}, sem resposta`;
+  const semMarca = (state.description ?? "").split("\n").filter((l) => !/^✅ - Follow-ups concluídos/.test(l)).join("\n");
+  await atualizarKanbanTask(state.accountId, state.taskId, {
+    description: `${semMarca}\n${marca}`.trim(),
+    due_date: proximoHorarioComercial(new Date(), 90 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+  logger.info("follow-up", `Aguardando Pagamento: follow-ups concluídos, card mantido na etapa (sinalizado)`);
+}
+
 export async function classificar(state: FollowUpStateType) {
   // Se tipoFollowup já foi definido pelo chamador (verificar-followups.ts), usa direto
   if (state.tipoFollowup && state.tipoFollowup !== "ignorar") {
@@ -246,11 +263,13 @@ async function agenteFollowup(state: FollowUpStateType) {
     // é onde o "Olá, tá por aí?" do Pedro responde 30% e precede compras (análise de 21/09).
     if (isPosPreco) {
       await avisarComercial(
-        `👋 VALE UM "TÁ AÍ?" — ${state.title} (${state.telefone ?? "?"}) ouviu o preço, recebeu 3 toques e não respondeu. A IA encerrou; um toque humano aqui rende.\n` +
+        `👋 VALE UM "TÁ AÍ?" — ${state.title} (${state.telefone ?? "?"}) ouviu o preço, recebeu 3 toques e não respondeu. A IA parou; o card segue em Aguardando Pagamento.\n` +
           `${env.CHATWOOT_BASE_URL}/app/accounts/${state.accountId}/conversations/${state.conversationId}`,
       );
+      await sinalizarFollowupsConcluidos(state, sequencia.length + 1);
+    } else {
+      await encerrarParaNutrir(state);
     }
-    await encerrarParaNutrir(state);
     return { respostaAgente: "" };
   }
 
@@ -388,7 +407,8 @@ async function agenteLembrete(state: FollowUpStateType) {
     } catch (e) {
       logger.error("follow-up", "Erro ao enviar encerramento lembrete:", e);
     }
-    await encerrarParaNutrir(state);
+    // Recebeu o link e não pagou: fica em Aguardando Pagamento, sinalizado, para o comercial.
+    await sinalizarFollowupsConcluidos(state, SEQUENCIA_LEMBRETE.length + 1);
     return { respostaAgente: "" };
   }
 
