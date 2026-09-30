@@ -32,12 +32,41 @@
       "Bash(sort:*)",
       "Bash(comm:*)",
       "Bash(which:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(bun run relatorio *)",
+      "Bash(gh auth status)",
+      "Bash(curl -s --max-time * /health)",
+      "mcp__chatwoot__messages_list",
+      "mcp__chatwoot__contacts_search",
+      "mcp__chatwoot__contacts_conversations",
+      "mcp__chatwoot__contacts_get",
+      "mcp__chatwoot__contacts_filter",
+      "mcp__chatwoot__conversations_get",
+      "mcp__chatwoot__conversations_list",
+      "mcp__chatwoot__conversations_meta",
+      "mcp__chatwoot__inboxes_list",
+      "mcp__chatwoot__kanban_boards_list",
+      "mcp__chatwoot__kanban_boards_get",
+      "mcp__chatwoot__kanban_tasks_list",
+      "mcp__chatwoot__kanban_tasks_get",
+      "mcp__chatwoot__automation_rules_list",
+      "mcp__chatwoot__webhooks_list",
+      "mcp__chatwoot__profile_get",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__list_connected_browsers",
+      "mcp__claude_ai_Google_Drive__get_file_metadata",
+      "mcp__claude_ai_Google_Drive__search_files",
+      "mcp__claude_ai_Google_Drive__read_file_content"
     ],
     "deny": [
       "Bash(rm -rf:*)",
       "Read(./.env)",
       "Read(./.env.*)"
-    ]
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }

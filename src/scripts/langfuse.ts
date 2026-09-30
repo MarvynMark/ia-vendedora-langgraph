@@ -146,7 +146,8 @@ async function sessoes(n = 20) {
 }
 
 async function conversa(sessionId: string) {
-  const traces = await buscarTraces(`sessionId=${encodeURIComponent(sessionId)}`, 4);
+  // Sem janela de data o Langfuse recusa a consulta (422) quando a base cresce.
+  const traces = await buscarTraces(`sessionId=${encodeURIComponent(sessionId)}&${desdeDias(30)}`, 4);
   if (!traces.length) {
     console.log(`\nNenhum trace para a sessão "${sessionId}". Confira o formato (+5511999999999).\n`);
     return;
