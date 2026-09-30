@@ -33,8 +33,8 @@ describe("delayInicialMs", () => {
     const COM_LINK = "🟣 - Concurso: PCDF\n🔁 - Follow-ups: 0\n👤 - Descrição: link enviado";
     const SEM_LINK = "🟣 - Concurso: PCDF\n🔁 - Follow-ups: 0\n👤 - Descrição: em negociação";
 
-    test("sem link enviado → pós-preço, 1h (o lead precisa de tempo com o preço)", () => {
-      expect(delayInicialMs("Aguardando Pagamento", SEM_LINK)).toBe(1 * HORA);
+    test("sem link enviado → pós-preço, 2h (o lead precisa de tempo com o preço)", () => {
+      expect(delayInicialMs("Aguardando Pagamento", SEM_LINK)).toBe(2 * HORA);
     });
 
     test("com link enviado → lembrete, 20min (provável abandono de checkout)", () => {
@@ -42,8 +42,8 @@ describe("delayInicialMs", () => {
     });
 
     test("descrição vazia é tratada como pós-preço", () => {
-      expect(delayInicialMs("Aguardando Pagamento")).toBe(1 * HORA);
-      expect(delayInicialMs("Aguardando Pagamento", "")).toBe(1 * HORA);
+      expect(delayInicialMs("Aguardando Pagamento")).toBe(2 * HORA);
+      expect(delayInicialMs("Aguardando Pagamento", "")).toBe(2 * HORA);
     });
 
     test("reconhece variações de espaçamento em 'link enviado'", () => {

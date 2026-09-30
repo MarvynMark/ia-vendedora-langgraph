@@ -34,16 +34,28 @@ describe("proximoHorarioComercial (fuso SP, janela 08h20-20h, reagenda para 10:0
     expect(c.dia).toBeLessThanOrEqual(5);
   });
 
-  test("fim de semana vira dia útil (segunda-sexta) às 10:05", () => {
+  test("sábado dentro do expediente sai na hora (sábado entrou em 30/09/2026)", () => {
     // 2026-07-18 é sábado. 15:00 UTC = 12:00 SP
-    const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)), 0));
-    expect(c.hora).toBe(10);
-    expect(c.min).toBe(5);
-    expect(c.dia).toBeGreaterThanOrEqual(1);
-    expect(c.dia).toBeLessThanOrEqual(5);
+    const agora = new Date(Date.UTC(2026, 6, 18, 15, 0, 0));
+    expect(proximoHorarioComercial(agora, 0).getTime()).toBe(agora.getTime());
   });
 
-  test("INVARIANTE: qualquer instante da semana → sempre dia útil, 08h20-20h", () => {
+  test("domingo vira segunda às 10:05", () => {
+    // 2026-07-19 é domingo. 15:00 UTC = 12:00 SP
+    const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 19, 15, 0, 0)), 0));
+    expect(c.hora).toBe(10);
+    expect(c.min).toBe(5);
+    expect(c.dia).toBe(1);
+  });
+
+  test("sábado depois das 20h pula o domingo e vai pra segunda", () => {
+    // 2026-07-18 23:30 UTC = sábado 20:30 SP
+    const c = sp(proximoHorarioComercial(new Date(Date.UTC(2026, 6, 18, 23, 30, 0)), 0));
+    expect(c.dia).toBe(1);
+    expect(c.hora).toBe(10);
+  });
+
+  test("INVARIANTE: qualquer instante da semana → sempre seg-sáb, 08h20-20h", () => {
     const base = new Date(Date.UTC(2026, 6, 13, 0, 0, 0));
     for (let h = 0; h < 168; h++) {
       const c = sp(proximoHorarioComercial(new Date(base.getTime() + h * 3_600_000), 0));
@@ -51,7 +63,7 @@ describe("proximoHorarioComercial (fuso SP, janela 08h20-20h, reagenda para 10:0
       expect(c.hora * 60 + c.min).toBeGreaterThanOrEqual(8 * 60 + 20);
       expect(c.hora).toBeLessThan(20);
       expect(c.dia).toBeGreaterThanOrEqual(1);
-      expect(c.dia).toBeLessThanOrEqual(5);
+      expect(c.dia).toBeLessThanOrEqual(6);
     }
   });
 
@@ -81,8 +93,9 @@ describe("estaDentroDaJanela (gate de disparos imediatos: abertura/intro)", () =
   test("fechamento (20:00 SP) → false", () => {
     expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 15, 23, 0, 0)))).toBe(false);   // 20:00 SP (limite exclusivo)
   });
-  test("fim de semana (sábado 12:00 SP) → false", () => {
-    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)))).toBe(false);   // sábado
+  test("sábado 12:00 SP → true; domingo 12:00 SP → false", () => {
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 18, 15, 0, 0)))).toBe(true);    // sábado
+    expect(estaDentroDaJanela(new Date(Date.UTC(2026, 6, 19, 15, 0, 0)))).toBe(false);   // domingo
   });
 });
 
@@ -107,9 +120,9 @@ describe("estaDentroDaJanelaPrimeiroContato (intro/abertura: 07h-23h59, TODOS os
     expect(estaDentroDaJanelaPrimeiroContato(new Date(Date.UTC(2026, 6, 15, 10, 0, 0)))).toBe(true);   // 07:00 SP
   });
   test("é mais larga que a janela de follow-up (não a substitui)", () => {
-    const sabado = new Date(Date.UTC(2026, 6, 18, 15, 0, 0));
-    expect(estaDentroDaJanela(sabado)).toBe(false);                  // follow-up: não
-    expect(estaDentroDaJanelaPrimeiroContato(sabado)).toBe(true);    // primeiro contato: sim
+    const domingo = new Date(Date.UTC(2026, 6, 19, 15, 0, 0));
+    expect(estaDentroDaJanela(domingo)).toBe(false);                 // follow-up: não
+    expect(estaDentroDaJanelaPrimeiroContato(domingo)).toBe(true);   // primeiro contato: sim
   });
 });
 

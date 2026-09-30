@@ -2,7 +2,9 @@
 // Convenção: horário SP = horário UTC + SP_OFFSET_MS (offset negativo).
 const SP_OFFSET_MS = -3 * 60 * 60 * 1000;
 
-// Janela de envio de follow-ups: 08h20 às 20h (horário de São Paulo), seg-sex.
+// Janela de envio de follow-ups: 08h20 às 20h (horário de São Paulo), segunda a SÁBADO.
+// Sábado entrou em 30/09/2026: o lead que conversa na sexta à noite tem a janela grátis de 24h
+// fechando no sábado, e sem sábado o toque 2 virava template pago na segunda. Domingo segue fora.
 // A abertura às 08:20 é o horário em que o Pedro (comercial) já consegue acompanhar,
 // então o primeiro follow-up da manhã sai a partir daí. O fechamento às 20h permite
 // recuperar no mesmo dia quem some no fim da tarde (a janela grátis de 24h do WhatsApp
@@ -37,8 +39,8 @@ function getComponentesSP(date: Date): { hora: number; minuto: number; diaSemana
   };
 }
 
-function ehFimDeSemana(diaSemana: number): boolean {
-  return diaSemana === 0 || diaSemana === 6;
+function ehDiaSemFollowup(diaSemana: number): boolean {
+  return diaSemana === 0; // domingo
 }
 
 // Antes da abertura da janela (08:20)?
@@ -46,13 +48,13 @@ function antesDaAbertura(hora: number, minuto: number): boolean {
   return hora < HORA_ABERTURA || (hora === HORA_ABERTURA && minuto < MINUTO_ABERTURA);
 }
 
-// Dentro da janela útil (>= 08:20 e < horaFechamento), em dia útil?
+// Dentro da janela útil (>= 08:20 e < horaFechamento), de segunda a sábado?
 function dentroDaJanela(hora: number, minuto: number, diaSemana: number, horaFechamento: number): boolean {
-  return !ehFimDeSemana(diaSemana) && !antesDaAbertura(hora, minuto) && hora < horaFechamento;
+  return !ehDiaSemFollowup(diaSemana) && !antesDaAbertura(hora, minuto) && hora < horaFechamento;
 }
 
 /**
- * A data cai DENTRO da janela de envio (seg-sex, 08h20-20h, fuso SP)?
+ * A data cai DENTRO da janela de envio (seg-sáb, 08h20-20h, fuso SP)?
  * Use para decidir se uma mensagem iniciada pela IA (abertura, intro do Walker) pode sair
  * AGORA ou deve esperar a próxima passada do cron dentro do expediente — evita disparos de
  * madrugada. Os follow-ups já respeitam o horário via `proximoHorarioComercial` no agendamento;
@@ -76,8 +78,8 @@ export function estaDentroDaJanelaPrimeiroContato(date: Date = new Date()): bool
 
 /**
  * Dado um momento e um delay em ms, retorna quando a mensagem deve ser
- * enviada respeitando horário comercial (seg-sex, 08h20-18h, fuso SP).
- * Se o alvo cair fora desse intervalo, avança para o próximo dia útil às 08:20.
+ * enviada respeitando horário comercial (seg-sáb, 08h20-20h, fuso SP).
+ * Se o alvo cair fora desse intervalo, avança para o próximo dia permitido às 10:05.
  *
  * @param horaFechamento - hora máxima (padrão 18).
  */
@@ -93,15 +95,15 @@ export function proximoHorarioComercial(agora: Date, delayMs: number, horaFecham
   // Trabalhar na "hora de parede SP" (UTC + offset) para manipular os componentes direto.
   const spTime = new Date(alvo.getTime() + SP_OFFSET_MS);
 
-  if (!ehFimDeSemana(diaSemana) && antesDaAbertura(hora, minuto)) {
+  if (!ehDiaSemFollowup(diaSemana) && antesDaAbertura(hora, minuto)) {
     // Antes do expediente: mesmo dia às 08:20
     spTime.setUTCHours(HORA_REABERTURA, MINUTO_REABERTURA, 0, 0);
   } else {
     // Após o expediente ou fim de semana: próximo dia às 08:20
     spTime.setUTCDate(spTime.getUTCDate() + 1);
     spTime.setUTCHours(HORA_REABERTURA, MINUTO_REABERTURA, 0, 0);
-    // Pular sábado e domingo
-    while (ehFimDeSemana(spTime.getUTCDay())) {
+    // Pular domingo
+    while (ehDiaSemFollowup(spTime.getUTCDay())) {
       spTime.setUTCDate(spTime.getUTCDate() + 1);
     }
   }

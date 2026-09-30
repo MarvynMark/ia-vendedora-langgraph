@@ -6,7 +6,7 @@
 // mudar um número só.
 //
 // Os intervalos ENTRE os toques seguintes de cada sequência continuam em graphs/follow-up/graph.ts
-// (DELAYS_CONEXAO_MS, DELAYS_POS_PRECO_MS, DELAYS_LEMBRETE_MS...).
+// (agendarProximoToque em lib/followup-toques.ts).
 
 const MIN = 60 * 1000;
 const HORA = 60 * MIN;
@@ -19,8 +19,9 @@ export const DELAY_INICIAL = {
   primeiraMensagem: 1 * DIA,
   /** Conexão: conversou e parou. 1h chegava no meio da conversa de quem responde em blocos. */
   conexao: 3 * HORA,
-  /** Aguardando Pagamento SEM link enviado — viu o preço e não respondeu. */
-  posPreco: 1 * HORA,
+  /** Aguardando Pagamento SEM link enviado — viu o preço e não respondeu. Algumas horas, como os
+   *  outros toques de quem já conversou (30/09/2026): 1h chegava enquanto o lead ainda pensava. */
+  posPreco: 2 * HORA,
   /** Aguardando Pagamento COM link enviado — provável abandono de checkout, socorro rápido resolve. */
   lembrete: 20 * MIN,
   /** Nutrir / Perdido: esteira longa. */
