@@ -17,6 +17,12 @@ for (const variavel of obrigatorias) {
   }
 }
 
+// Sem barra no fim, venha como vier do Coolify: com "https://chat.stkd.site/" o link montado nos
+// alertas do grupo comercial saía "chat.stkd.site//app/accounts/..." e o WhatsApp não abria.
+export function semBarraFinal(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
 export const env = {
   PORT: Number(process.env["PORT"] ?? "3000"),
   DATABASE_URL: process.env["DATABASE_URL"]!,
@@ -25,7 +31,7 @@ export const env = {
   OPENAI_MODEL: process.env["OPENAI_MODEL"] ?? "gpt-5.2",
   OPENAI_MODEL_MINI: process.env["OPENAI_MODEL_MINI"] ?? "gpt-4.1-mini",
 
-  CHATWOOT_BASE_URL: process.env["CHATWOOT_BASE_URL"]!,
+  CHATWOOT_BASE_URL: semBarraFinal(process.env["CHATWOOT_BASE_URL"]!),
   CHATWOOT_API_TOKEN: process.env["CHATWOOT_API_TOKEN"]!,
   CHATWOOT_ACCOUNT_ID: process.env["CHATWOOT_ACCOUNT_ID"]!,
   // Usuário do Chatwoot com que o app envia. Serve para distinguir a fala do agente
@@ -50,9 +56,12 @@ export const env = {
   TZ: process.env["TZ"] ?? "America/Sao_Paulo",
 
   DEBOUNCE_DELAY_MS: Number(process.env["DEBOUNCE_DELAY_MS"] ?? "25000"),
-  LOCK_MAX_RETRIES: Number(process.env["LOCK_MAX_RETRIES"] ?? "5"),
+  // 12 x 16s ≈ 3,2 min de espera: cobre o turno de áudio (bolhas + ~1 min "gravando"). Com 5, a
+  // mensagem que o lead mandava durante a gravação desistia da trava antes de o turno acabar, e o
+  // turno descartava a própria resposta ao ver a mensagem nova: ninguém respondia.
+  LOCK_MAX_RETRIES: Number(process.env["LOCK_MAX_RETRIES"] ?? "12"),
   LOCK_RETRY_DELAY_MS: Number(process.env["LOCK_RETRY_DELAY_MS"] ?? "16000"),
-  LOCK_TTL_MINUTES: Number(process.env["LOCK_TTL_MINUTES"] ?? "5"),
+  LOCK_TTL_MINUTES: Number(process.env["LOCK_TTL_MINUTES"] ?? "8"),
 
   LANGFUSE_SECRET_KEY: process.env["LANGFUSE_SECRET_KEY"] ?? "",
   LANGFUSE_PUBLIC_KEY: process.env["LANGFUSE_PUBLIC_KEY"] ?? "",

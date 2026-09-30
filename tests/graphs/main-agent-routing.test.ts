@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { rotaStale, rotaLock, rotaNovasMsgs, rotaColeta } from "../../src/graphs/main-agent/graph.ts";
 import type { MainAgentStateType } from "../../src/graphs/main-agent/state.ts";
+import { env } from "../../src/config/env.ts";
 
 function makeState(overrides: Partial<MainAgentStateType>): MainAgentStateType {
   return {
@@ -75,8 +76,8 @@ describe("rotaLock", () => {
   });
 
   test("bloqueado, tentativas esgotadas → end", () => {
-    // LOCK_MAX_RETRIES defaults to 5 in test env
-    expect(rotaLock(makeState({ locked: true, lockTentativas: 5 }))).toBe("end");
+    // LOCK_MAX_RETRIES = env (12 por padrão)
+    expect(rotaLock(makeState({ locked: true, lockTentativas: env.LOCK_MAX_RETRIES }))).toBe("end");
   });
 
   test("bloqueado, tentativas não esgotadas → esperar_retry", () => {

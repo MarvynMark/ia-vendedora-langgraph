@@ -27,6 +27,11 @@ const URLS_AUDIO: Record<1 | 2 | 3, string> = {
 // Se ficar VAZIA, a cadência pós-preço NÃO envia áudio e cai no fallback de texto (recuperacao_enxuta).
 export const AUDIO_WALKER_POSPRECO_URL: string = "https://s3.stkd.site/arquivosclientes/Vestigium/audio%20-%2004.opus";
 
+// Duração de cada áudio. Antes de mandar, a IA fica "gravando" esse tempo, como uma pessoa que
+// grava uma nota de voz de 1 minuto: o áudio chegava 3s depois do texto e denunciava a IA.
+// Se trocar o arquivo, remeça (ffprobe) e atualize aqui.
+const DURACAO_AUDIO_MS: Record<1 | 2 | 3, number> = { 1: 64_000, 2: 61_000, 3: 51_000 };
+
 // Dedupe por (conversa, número do áudio): um Set único cobre os 3 áudios sem um bloquear o outro.
 const audiosEnviados = new Set<string>();
 
@@ -54,6 +59,8 @@ export async function enviarAudioWalker(
   // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e deixa
   // a apresentação do áudio personalizada, para não parecer um áudio gravado solto.
   await enviarMensagemAntes(idConta, idConversa, mensagemAntes, "tool:enviar-audio-walker");
+
+  await pausaComDigitando(idConta, idConversa, DURACAO_AUDIO_MS[numero], "recording");
 
   const url = URLS_AUDIO[numero];
   try {

@@ -567,9 +567,11 @@ export function blocoVazaJargaoInterno(bloco: string): boolean {
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.
-export function calcularDelayDigitando(texto: string, minMs = 3000, maxMs = 12000): number {
+export function calcularDelayDigitando(texto: string, minMs = 4000, maxMs = 15000): number {
   const chars = (texto ?? "").length;
-  const CHARS_POR_SEGUNDO = 12; // ritmo de digitação humana perceptível (não instantâneo)
+  // Ritmo de quem digita no celular. Era 12 (3-12s): as bolhas saíam rápido demais e, junto com
+  // o áudio chegando logo em seguida, denunciavam que era IA.
+  const CHARS_POR_SEGUNDO = 8;
   const ms = Math.round((chars / CHARS_POR_SEGUNDO) * 1000);
   return Math.min(Math.max(ms, minMs), maxMs);
 }
@@ -582,12 +584,13 @@ export async function pausaComDigitando(
   accountId: string | number,
   conversationId: string | number,
   ms = 5000,
+  status: true | "recording" = true,
 ) {
   let restante = ms;
   const intervalo = 4000; // renova o "digitando" antes de expirar
   while (restante > 0) {
     try {
-      await atualizarPresenca(accountId, conversationId, true);
+      await atualizarPresenca(accountId, conversationId, status);
     } catch { /* se a presença falhar, ainda respeita o delay */ }
     const espera = Math.min(restante, intervalo);
     await new Promise(r => setTimeout(r, espera));
