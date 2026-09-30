@@ -113,10 +113,10 @@ describe("conferirFormaDePagamento", () => {
   });
 
   test("Semestral Premium não tem parcelado — sinaliza em vez de inventar URL", () => {
-    const r = conferirFormaDePagamento(`${PROMESSA} https://peritowalker.com.br/mentoriaperitosemestralpremium`);
+    const r = conferirFormaDePagamento(`${PROMESSA} https://peritowalker.com.br/mentoriaperitosemestralpremium1`);
     expect(r.semParcelado).toEqual(["semestral_premium"]);
     expect(r.corrigidos).toEqual([]);
-    expect(r.texto).toContain("mentoriaperitosemestralpremium"); // não inventa link
+    expect(r.texto).toContain("mentoriaperitosemestralpremium1"); // não inventa link
   });
 
   test("link que JÁ é o de parcelado passa intacto", () => {

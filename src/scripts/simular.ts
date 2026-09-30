@@ -140,8 +140,13 @@ async function main() {
     .filter((s) => s.trim().length > 0)
     .join("\n\n") || "(só enviou mídia via ferramenta, sem texto adicional neste turno)";
 
-  // Persiste o turno
+  // Persiste o turno. Como no executarAgente, o mensagem_antes de cada mídia entra no histórico
+  // como fala da IA: sem isso o modelo não sabe que o áudio/vídeo já foi e o repete.
   historico.push({ type: "human", content: userMessage });
+  for (const c of chamadas) {
+    const antes = (c.args as { mensagem_antes?: string } | null)?.mensagem_antes;
+    if (antes) historico.push({ type: "ai", content: antes });
+  }
   historico.push({ type: "ai", content: resposta });
   salvarHistorico(historico);
 

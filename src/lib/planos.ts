@@ -44,7 +44,7 @@ const PLANOS: Plano[] = [
   // porque "premium" e "completo" precisam ganhar do rótulo genérico "semestral".
   // ⚠️ É o ÚNICO plano de Perito sem link de parcelado — ver conferirFormaDePagamento.
   { id: "semestral_premium", rotulo: "Semestral Premium",       valores: ["2.497", "246"],            nome: /semestral premium|premium semestral|perito criminal premium/i,
-    slug: "mentoriaperitosemestralpremium", slugParcelado: null },
+    slug: "mentoriaperitosemestralpremium1", slugParcelado: null },
   { id: "semestral",        rotulo: "Semestral",                valores: ["1.997", "197", "206"],     nome: /semestral/i,
     slug: "mentoriaperito",                slugParcelado: "mentoriaperitoparcelado" },
   { id: "trimestral",       rotulo: "Trimestral",               valores: ["997", "98,35", "103,11"],  nome: /trimestral/i,
