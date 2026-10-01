@@ -53,7 +53,7 @@ export const CASOS_APROVADOS: readonly CasoAprovado[] = [
   {
     id: "natalia-medicina",
     formacao: MEDICINA,
-    legenda: "Essa é a Natália, médica como você, já aprovada em 3 concursos de médico legista.",
+    legenda: "Essa é a Dra. Natália, médica como você, aprovada em 3 concursos de médico legista e que hoje está à frente dos médicos da mentoria.",
     urls: [`${BASE}/natalia-medicina.jpg`],
   },
   {
