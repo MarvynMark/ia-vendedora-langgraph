@@ -45,6 +45,7 @@ import { enviarAudioWalker } from "../../tools/enviar-audio-walker.ts";
 import { obterCheckpointer } from "../../db/checkpointer.ts";
 import { logger } from "../../lib/logger.ts";
 import { criarLangfuseHandler, finalizarLangfuseHandler } from "../../lib/langfuse.ts";
+import { normalizarPedidoDeLink } from "../../lib/pedido-link.ts";
 
 // --- Nós do grafo ---
 
@@ -899,7 +900,9 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu do
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
-  const frasesBrutas = dividirMensagem(formatado).flatMap((bloco) => dividirEmFrases(bloco));
+  // O anúncio curto de link ("Vou gerar o link pra você... Pode ser?") vira a pergunta do roteiro
+  // ANTES dos filtros: sozinho, o filtro de anúncio derrubava a frase e sobrava "Pode ser?" (conv 9360).
+  const frasesBrutas = normalizarPedidoDeLink(dividirMensagem(formatado).flatMap((bloco) => dividirEmFrases(bloco)));
   // Trava de cardápio: no máximo UM plano com preço por turno (ver blocoIntroduzSegundoPlano).
   iniciarTurnoDePreco(state.idConversa);
   let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f) && !blocoIntroduzSegundoPlano(state.idConversa, f) && !blocoPerguntaEscolhaDeCardapio(state.idConversa, f));
