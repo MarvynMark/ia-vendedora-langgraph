@@ -5,7 +5,8 @@ import { salvarMensagem } from "../db/memoria.ts";
 import { logger } from "./logger.ts";
 import { CONTEUDO_TEMPLATES } from "./templates.ts";
 import { primeiroNomeSaudacao, substituirNome } from "./nome.ts";
-import { estaDentroDaJanelaPrimeiroContato } from "./horario-comercial.ts";
+import { estaDentroDaJanelaPrimeiroContato, proximoHorarioComercial } from "./horario-comercial.ts";
+import { delayInicialMs } from "./delays-followup.ts";
 
 export async function verificarTemplatesPendentes() {
   if (env.MODO_TESTE) {
@@ -114,8 +115,12 @@ export async function verificarTemplatesPendentes() {
             s.name.toLowerCase().includes("primeira mensagem")
           );
           if (stepPrimeiraMensagem) {
+            // O due_date PRECISA ir junto (igual ao agenteTemplateInicial do follow-up). Sem ele o
+            // card herdava o vencimento do Novo Lead (+5min, já passado) e o fup1 saía 4 minutos
+            // depois da abertura (conv 9486).
             await atualizarKanbanTask(row.account_id, task.id, {
               board_step_id: stepPrimeiraMensagem.id,
+              due_date: proximoHorarioComercial(new Date(), delayInicialMs(stepPrimeiraMensagem.name)).toISOString(),
             });
             logger.info("template-timer", `Card movido para "Primeira mensagem" — conversa: ${row.conversation_id}`);
           }

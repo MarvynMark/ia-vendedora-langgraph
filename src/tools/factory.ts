@@ -35,6 +35,11 @@ interface ContextoMainAgent {
   bloqueioSessao?: MotivoInelegivel;
   /** Promoção do Dia do Cliente ativa para este lead (só hoje, só trilha Perito): ganha a tool da tabela. */
   promocao?: boolean;
+  /**
+   * Turno de abertura (intro depois do grupo de espera): sem ferramentas de mídia. A tool roda antes
+   * do texto, então um áudio chamado aqui chegava ANTES do "Olá, aqui é o Perito Walker" (conv 9476).
+   */
+  semMidia?: boolean;
 }
 
 export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): StructuredToolInterface[] {
@@ -62,7 +67,8 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
     ? [criarToolMostrarCondicaoPromocao({ idConta: contexto.idConta, idConversa: contexto.idConversa, telefone: contexto.telefone })]
     : [];
 
-  return [
+  const NOMES_MIDIA = new Set(["Enviar_video_plataforma", "Enviar_imagem_entregaveis", "Enviar_audio_walker_1", "Enviar_audio_walker_2", "Enviar_prova_social"]);
+  const todas: StructuredToolInterface[] = [
     ...toolsAgenda,
     ...toolsPromocao,
     refletir,
@@ -110,6 +116,7 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       ? [criarToolEnviarProvaSocial({ idConta: contexto.idConta, idConversa: contexto.idConversa, telefone: contexto.telefone })]
       : []),
   ];
+  return contexto.semMidia ? todas.filter((t) => !NOMES_MIDIA.has(t.name)) : todas;
 }
 
 interface ContextoFollowUp {

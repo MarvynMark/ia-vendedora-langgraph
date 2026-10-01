@@ -419,6 +419,8 @@ async function executarAgente(state: MainAgentStateType) {
     trilha,
     ...(bloqueioSessao ? { bloqueioSessao } : {}),
     promocao: trilha === "antigo" && promocaoAtiva() && !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }),
+    // Abertura disparada pelo cron da intro: só a Mensagem 1, sem mídia (conv 9476).
+    semMidia: String(state.idMensagem).startsWith("intro_"),
   });
 
   const model = new ChatOpenAI({
@@ -533,12 +535,15 @@ async function executarAgente(state: MainAgentStateType) {
     }
     // Recebe o texto COMPLETO (inclusive o preâmbulo descartado): esta guarda detecta por regex
     // "a IA narrou o envio mas não chamou a tool", e perder o preâmbulo abriria um buraco nela.
-    await garantirMidiaEntregue(
-      [output, ...preambulosDescartados].join("\n"),
-      toolsChamadas,
-      state.idConta,
-      state.idConversa,
-    );
+    // Na abertura não sai mídia nenhuma, nem pela guarda (conv 9476).
+    if (!String(state.idMensagem).startsWith("intro_")) {
+      await garantirMidiaEntregue(
+        [output, ...preambulosDescartados].join("\n"),
+        toolsChamadas,
+        state.idConta,
+        state.idConversa,
+      );
+    }
 
     // Persiste no histórico os textos de apresentação de mídia (mensagem_antes) enviados neste
     // turno. As tools de mídia mandam esse texto direto pro WhatsApp mas NÃO o salvavam no

@@ -32,6 +32,29 @@ export const AUDIO_WALKER_POSPRECO_URL: string = "https://s3.stkd.site/arquivosc
 // Se trocar o arquivo, remeça (ffprobe) e atualize aqui.
 const DURACAO_AUDIO_MS: Record<1 | 2 | 3, number> = { 1: 64_000, 2: 61_000, 3: 51_000 };
 
+// Print de um cronograma real da plataforma (aluno Vitor), enviado logo depois do áudio 2.
+export const IMAGEM_CRONOGRAMA_URL = "https://s3.stkd.site/arquivosclientes/Vestigium/cronograma-exemplo.jpg";
+const FRASE_CRONOGRAMA = "Olha como fica o cronograma de um aluno meu na plataforma, semana a semana.";
+
+// Nunca derruba o áudio: se a imagem falhar, só registra e segue (o áudio já foi).
+async function enviarImagemCronograma(idConta: string, idConversa: string): Promise<boolean> {
+  try {
+    const res = await fetchComTimeout(IMAGEM_CRONOGRAMA_URL, { method: "GET", timeout: 30_000 });
+    if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) {
+      throw new Error(`Download falhou: ${res.status} ${res.headers.get("content-type")}`);
+    }
+    const dados = new Uint8Array(await res.arrayBuffer());
+    await enviarMensagemAntes(idConta, idConversa, FRASE_CRONOGRAMA, "tool:enviar-audio-walker");
+    await enviarArquivo(idConta, idConversa, dados, "cronograma-exemplo.jpg", "image/jpeg");
+    registrarMidiaEnviada(idConversa, "imagem do cronograma");
+    await pausaComDigitando(idConta, idConversa, 5000);
+    return true;
+  } catch (e) {
+    logger.error("tool:enviar-audio-walker", "Erro ao enviar a imagem do cronograma (áudio 2 já foi):", e);
+    return false;
+  }
+}
+
 // Dedupe por (conversa, número do áudio): um Set único cobre os 3 áudios sem um bloquear o outro.
 const audiosEnviados = new Set<string>();
 
@@ -87,6 +110,13 @@ export async function enviarAudioWalker(
     // mensagem — o áudio demora mais que o texto para ser entregue, então sem essa pausa a
     // pergunta seguinte chega antes do áudio.
     await pausaComDigitando(idConta, idConversa, 8000);
+
+    // Junto com o áudio 2 vai o print de um cronograma real da plataforma (pedido do Gusthavo,
+    // 01/10/2026): o áudio fala de método e organização, e a imagem mostra como isso fica na prática.
+    if (numero === 2) {
+      const cronograma = await enviarImagemCronograma(idConta, idConversa);
+      if (cronograma) return `Áudio 2 do Walker e imagem do cronograma enviados com sucesso. NÃO descreva a imagem nem repita a frase dela; siga com a sua próxima pergunta.`;
+    }
 
     return `Áudio ${numero} do Walker enviado com sucesso.`;
   } catch (e) {

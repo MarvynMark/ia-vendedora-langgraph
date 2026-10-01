@@ -99,3 +99,19 @@ describe("tool factory - follow-up", () => {
     expect(tools[0]!.name).toBe("Atualizar_tarefa");
   });
 });
+
+// Conv 9476: no turno de abertura a IA chamou o áudio 1 e ele chegou antes do "Olá, aqui é o
+// Perito Walker". Na abertura, nenhuma ferramenta de mídia fica disponível.
+describe("criarToolsAgenteVestigium — turno de abertura sem mídia", () => {
+  test("semMidia tira áudio, vídeo, imagem e print, e mantém o resto", () => {
+    const base = { idMensagem: "intro_1", idConta: "1", idConversa: "1", idContato: "1", idInbox: "1", telefone: "+5511999999999", nome: "Ana", mensagem: "", tarefa: {} };
+    const normal = criarToolsAgenteVestigium(base).map((t) => t.name);
+    const abertura = criarToolsAgenteVestigium({ ...base, semMidia: true }).map((t) => t.name);
+    expect(normal).toContain("Enviar_audio_walker_1");
+    for (const n of ["Enviar_audio_walker_1", "Enviar_audio_walker_2", "Enviar_video_plataforma", "Enviar_imagem_entregaveis", "Enviar_prova_social"]) {
+      expect(abertura).not.toContain(n);
+    }
+    expect(abertura).toContain("Atualizar_tarefa");
+    expect(abertura).toContain("Escalar_humano");
+  });
+});

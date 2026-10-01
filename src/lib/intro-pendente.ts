@@ -60,6 +60,13 @@ async function dispararIntro(row: {
 
   const g = await obterGrafo();
   const idMensagemIntro = `intro_${row.telefone}_${Date.now()}`;
+  // É ESTE texto que chega ao modelo (mensagemProcessada). Antes ele recebia só "Lead preencheu o
+  // formulário de aplicação." e, sem rumo, fez as Mensagens 1, 2 e 3 num turno só, com o áudio 1
+  // saindo antes da apresentação e a dificuldade repetida duas vezes (conv 9476).
+  const instrucaoAbertura =
+    "[SISTEMA: O lead acabou de pedir o grupo de espera e já recebeu o link. Inicie a conversa de vendas com a MENSAGEM 1 do roteiro e SÓ ela: " +
+    "se apresente como o Perito Walker, cite UMA coisa do formulário e termine com \"Tá podendo falar?\". Neste turno NÃO envie áudio, vídeo nem imagem " +
+    "e NÃO faça a pergunta da Mensagem 3: espere o lead responder. Se JÁ houver histórico seu com ele, não se reapresente: dê as boas-vindas de volta e retome de onde pararam.]";
   await g.invoke({
     messages: [],
     idMensagem: idMensagemIntro,
@@ -70,7 +77,7 @@ async function dispararIntro(row: {
     idInbox: row.inbox_id,
     telefone: row.telefone,
     nome: row.nome,
-    mensagem: "[SISTEMA: O lead pediu o grupo de espera e você já mandou o link. Agora INICIE a conversa de vendas. Se você NUNCA falou com esse lead antes (sem histórico seu na conversa), apresente-se em 1ª pessoa como o Perito Walker, diga que recebeu o formulário e comece pela Mensagem 1 do roteiro. Se JÁ houver histórico seu com ele (lead que está voltando), NÃO se reapresente: dê as boas-vindas de volta de forma natural e retome de onde pararam.]",
+    mensagem: instrucaoAbertura,
     mensagemDeAudio: false,
     timestamp: new Date().toISOString(),
     tipoArquivo: null,
@@ -82,7 +89,7 @@ async function dispararIntro(row: {
     dadosFormulario,
     tarefa,
     funil,
-    mensagemProcessada: "[SISTEMA: Lead preencheu o formulário de aplicação.]",
+    mensagemProcessada: instrucaoAbertura,
     mensagemReferenciada: null,
     mensagensAgregadas: "",
     stale: false,

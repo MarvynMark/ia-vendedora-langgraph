@@ -54,7 +54,9 @@ if (cenarioPath && existsSync(cenarioPath)) {
 }
 
 const INTRO_SISTEMA =
-  "[SISTEMA: O lead pediu o grupo de espera e você já mandou o link. Agora INICIE a conversa de vendas. Se você NUNCA falou com esse lead antes (sem histórico seu na conversa), apresente-se em 1ª pessoa como o Perito Walker, diga que recebeu o formulário e comece pela Mensagem 1 do roteiro. Se JÁ houver histórico seu com ele (lead que está voltando), NÃO se reapresente: dê as boas-vindas de volta de forma natural e retome de onde pararam.]";
+  "[SISTEMA: O lead acabou de pedir o grupo de espera e já recebeu o link. Inicie a conversa de vendas com a MENSAGEM 1 do roteiro e SÓ ela: " +
+  "se apresente como o Perito Walker, cite UMA coisa do formulário e termine com \"Tá podendo falar?\". Neste turno NÃO envie áudio, vídeo nem imagem " +
+  "e NÃO faça a pergunta da Mensagem 3: espere o lead responder. Se JÁ houver histórico seu com ele, não se reapresente: dê as boas-vindas de volta e retome de onde pararam.]";
 
 type Turn = { type: "human" | "ai"; content: string };
 
@@ -102,6 +104,7 @@ async function main() {
     idMensagem: "sim", idConta: String(env.CHATWOOT_ACCOUNT_ID), idConversa: "0",
     idContato: "0", idInbox: String(env.CHATWOOT_INBOX_ID), telefone: "+550000000000",
     nome: CENARIO.nomeLead, mensagem: userMessage, tarefa: CENARIO.tarefa,
+    semMidia: ehStart, // igual à produção: abertura sem mídia
   });
   const mockTools = realTools.map((t) => new DynamicStructuredTool({
     name: t.name,

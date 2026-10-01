@@ -508,6 +508,9 @@ export function blocoTemFraseProibida(bloco: string): boolean {
     // "estou aqui/por aqui (para ajudar…)" — sinal de disponibilidade passiva
     /\bestou (aqui|por aqui)\b/,
     /\bconte comigo\b/,
+    // "Dá uma olhada com calma e me avisa" (conv 9380, logo depois do preço): devolve a decisão
+    // pro lead e mata a urgência que o roteiro pede depois do preço.
+    /\b(d[áa] uma olhada|olha|olhar|pensa|pensar|v[êe]r?|analisa|analisar|decide|decidir)\s+com calma\b/,
     // Família "se precisar/qualquer dúvida … me avisa / é só me avisar / estou aqui". Exige a
     // ABERTURA passiva + um VERBO DE OFERTA na mesma frase (as frases já vêm divididas). Assim NÃO
     // pega CTAs ativos como "me avisa quando finalizar" (sem abertura passiva) nem respostas
