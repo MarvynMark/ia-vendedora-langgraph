@@ -6,6 +6,8 @@ import { criarToolAtualizarTarefa, criarToolAtualizarTarefaFollowup } from "./at
 import { criarToolReagirMensagem } from "./reagir-mensagem.ts";
 import { criarToolEnviarVideo } from "./enviar-video.ts";
 import { criarToolEnviarImagemEntregaveis } from "./enviar-imagem-entregaveis.ts";
+import { criarToolEnviarProvaSocial } from "./enviar-prova-social.ts";
+import { CASOS_APROVADOS } from "../lib/prova-social.ts";
 import {
   criarToolEnviarAudioWalker1,
   criarToolEnviarAudioWalker2,
@@ -103,6 +105,10 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idConversa: contexto.idConversa,
     }),
     criarToolBuscarContextoSimilar(),
+    // Só entra quando há print cadastrado: sem catálogo, a tool só gastaria uma chamada à toa.
+    ...(CASOS_APROVADOS.length > 0
+      ? [criarToolEnviarProvaSocial({ idConta: contexto.idConta, idConversa: contexto.idConversa, telefone: contexto.telefone })]
+      : []),
   ];
 }
 

@@ -17,7 +17,7 @@ const CONTEXTO_BASE = {
 describe("tool factory - main agent", () => {
   test("cria 10 tools", () => {
     const tools = criarToolsAgenteVestigium(CONTEXTO_BASE);
-    expect(tools.length).toBe(10);
+    expect(tools.length).toBe(11);
   });
 
   test("tools têm nomes corretos (incluindo os 2 áudios do Walker e o Alertar_gestor)", () => {
@@ -31,6 +31,7 @@ describe("tool factory - main agent", () => {
       "Enviar_audio_walker_1",
       "Enviar_audio_walker_2",
       "Enviar_imagem_entregaveis",
+      "Enviar_prova_social",
       "Enviar_video_plataforma",
       "Escalar_humano",
       "Reagir_mensagem",
