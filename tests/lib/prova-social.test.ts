@@ -18,17 +18,28 @@ describe("escolherCaso — print de aprovado da mesma graduação do lead", () =
   });
 
   test("biomedicina não é medicina, e veterinária não cai no médico", () => {
-    expect(escolherCaso("Biomedicina")?.formacao.source).toBe(".");
+    expect(escolherCaso("Biomedicina")?.id.startsWith("geral-")).toBe(true);
     expect(escolherCaso("Medicina Veterinária", 1)?.id).toBe("beatriz-fernanda-medvet");
   });
 
-  test("graduação sem caso próprio ou desconhecida recebe os DOIS prints gerais (legenda sem formação)", () => {
+  test("sem caso da área: dois alunos distintos, sem graduação na legenda e sem médico", () => {
+    const vistos = new Set<string>();
     for (const f of ["Direito", "Biologia", null, ""]) {
-      const caso = escolherCaso(f, 7)!;
-      expect(caso.id).toBe("thaynara-rafael-geral");
-      expect(caso.urls).toHaveLength(2);
-      expect(caso.legenda).not.toContain("como você");
+      for (let c = 0; c < 40; c++) {
+        const caso = escolherCaso(f, c)!;
+        expect(caso.id.startsWith("geral-")).toBe(true);
+        expect(caso.urls).toHaveLength(2);
+        expect(new Set(caso.urls).size).toBe(2);
+        expect(caso.legenda).not.toMatch(/como você|veterin|farmac|comput|quimic|medic|legista/i);
+        expect(caso.urls.join(" ")).not.toMatch(/medicina|natalia/);
+        vistos.add(caso.id);
+      }
     }
+    expect(vistos.size).toBeGreaterThan(5); // varia de verdade entre conversas
+  });
+
+  test("a mesma conversa recebe sempre a mesma dupla", () => {
+    expect(escolherCaso("Direito", 9360)?.id).toBe(escolherCaso("Biologia", "9360")?.id);
   });
 
   test("todo print vem do MinIO, nunca do repositório (o repo é público)", () => {

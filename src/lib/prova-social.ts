@@ -16,26 +16,32 @@ const BASE = "https://s3.stkd.site/arquivosclientes/Vestigium/prova-social";
 
 export interface CasoAprovado {
   id: string;
-  /** Casa com a graduação do lead (texto normalizado: minúsculo e sem acento). */
-  formacao: RegExp;
-  /** O que o Walker escreve antes dos prints. */
+  /** Casa com a graduação do lead (texto normalizado: minúsculo e sem acento). null = só entra no sorteio geral. */
+  formacao: RegExp | null;
+  /** O que o Walker escreve antes dos prints quando a graduação BATE (pode dizer "como você"). */
   legenda: string;
-  /** URLs públicas dos prints no MinIO, na ordem de envio (1 ou 2). */
+  /**
+   * O resultado sem falar de graduação ("o Pedro, aprovado e já nomeado perito em Goiás"), usado no
+   * sorteio de quem não tem caso da própria área. Sem este campo, o caso não entra no sorteio.
+   */
+  resultado?: string;
+  /** URLs públicas dos prints no MinIO, na ordem de envio (1 ou 2). A primeira é a do sorteio. */
   urls: readonly string[];
 }
 
 const VET = /veterin|med vet|\bvet\b/;
 const MEDICINA = /\bmedic/;
-const GERAL = /./;
 
 // Autorizados pelo Gusthavo em 01/10/2026. A ordem importa: a primeira graduação que casar vence,
-// então Veterinária vem antes de Medicina e o caso geral (sem formação) fica por último. Casos com
-// a MESMA regex formam um grupo e se alternam por conversa.
+// então Veterinária vem antes de Medicina. Casos com a MESMA regex se alternam por conversa.
+// Médicos ficam fora do sorteio geral (sem `resultado`): o cargo deles é de médico legista, e isso
+// não serve de espelho pra quem é de biologia ou direito.
 export const CASOS_APROVADOS: readonly CasoAprovado[] = [
   {
     id: "beatriz-fernanda-medvet",
     formacao: VET,
     legenda: "Olha a Beatriz e a Fernanda, veterinárias como você, no resultado da PCI-SC, a Beatriz em 6º lugar.",
+    resultado: "a Beatriz, 6º lugar na PCI-SC",
     urls: [`${BASE}/beatriz-medvet.jpg`, `${BASE}/medvet-lista-pcisc.jpg`],
   },
   {
@@ -54,44 +60,72 @@ export const CASOS_APROVADOS: readonly CasoAprovado[] = [
     id: "najla-farmacia",
     formacao: /farmac/,
     legenda: "Essa é a Najla, farmacêutica como você, no dia em que viu o nome dela na lista.",
+    resultado: "a Najla, que viu o nome dela na lista de aprovados",
     urls: [`${BASE}/najla-farmacia.jpg`],
   },
   {
     id: "gusthavo-computacao",
     formacao: /comput|informat|sistemas|software|tecnologia da informacao|\bti\b|\bads\b/,
     legenda: "Esse é o Gusthavo, da computação como você, aprovado pra perito em Goiás com menos de 6 meses de estudo.",
+    resultado: "o Gusthavo, aprovado pra perito em Goiás com menos de 6 meses de estudo",
     urls: [`${BASE}/gusthavo-computacao.jpg`],
   },
   {
     id: "pedro-quimica",
     formacao: /quimic/,
     legenda: "Esse é o Pedro, da química como você, aprovado e já nomeado perito criminal em Goiás.",
+    resultado: "o Pedro, aprovado e já nomeado perito criminal em Goiás",
     urls: [`${BASE}/pedro-quimica.jpg`],
   },
-  // Caso geral: a legenda não fala de formação, então serve pra qualquer lead sem caso da área dele.
-  // Vão dois resultados juntos (decisão do Gusthavo): quem não se vê na graduação vê volume.
   {
-    id: "thaynara-rafael-geral",
-    formacao: GERAL,
-    legenda: "Olha dois alunos meus: a Thaynara, 2º lugar no primeiro concurso de perito com 2 meses e meio de estudo e trabalhando 44 horas por semana, e o Rafael, 1º lugar na área dele.",
-    urls: [`${BASE}/thaynara-geral.jpg`, `${BASE}/rafael-geral.jpg`],
+    id: "thaynara",
+    formacao: null,
+    legenda: "",
+    resultado: "a Thaynara, 2º lugar no primeiro concurso de perito, com 2 meses e meio de estudo e trabalhando 44 horas por semana",
+    urls: [`${BASE}/thaynara-geral.jpg`],
+  },
+  {
+    id: "rafael",
+    formacao: null,
+    legenda: "",
+    resultado: "o Rafael, 1º lugar na área dele",
+    urls: [`${BASE}/rafael-geral.jpg`],
   },
 ];
 
 /**
- * O caso da mesma graduação do lead. Sem graduação conhecida (lead orgânico, formulário vazio),
- * vai um caso geral. Havendo mais de um caso pra mesma graduação, `semente` (o id da conversa)
- * escolhe qual, sempre o mesmo pra mesma conversa.
+ * O caso da mesma graduação do lead (havendo mais de um, `semente` — o id da conversa — escolhe,
+ * sempre o mesmo pra mesma conversa). Sem caso da área ou sem graduação conhecida, sorteia DOIS
+ * alunos pela semente e monta uma legenda só com o resultado deles, sem falar de graduação.
  */
 export function escolherCaso(
   formacao: string | null | undefined,
   semente: string | number = 0,
   casos: readonly CasoAprovado[] = CASOS_APROVADOS,
 ): CasoAprovado | null {
-  const f = normalizar(formacao ?? "") || " ";
-  const primeiro = casos.find((c) => c.formacao.test(f));
-  if (!primeiro) return null;
-  const grupo = casos.filter((c) => c.formacao.source === primeiro.formacao.source);
+  const f = normalizar(formacao ?? "");
   const n = Number(String(semente).replace(/\D/g, "")) || 0;
-  return grupo[n % grupo.length]!;
+
+  const primeiro = f ? casos.find((c) => c.formacao?.test(f)) : undefined;
+  if (primeiro) {
+    const grupo = casos.filter((c) => c.formacao?.source === primeiro.formacao!.source);
+    return grupo[n % grupo.length]!;
+  }
+
+  const sorteio = casos.filter((c) => c.resultado);
+  if (sorteio.length === 0) return null;
+  if (sorteio.length === 1) {
+    const a = sorteio[0]!;
+    return { id: `geral-${a.id}`, formacao: null, legenda: `Olha ${a.resultado}.`, urls: [a.urls[0]!] };
+  }
+  // Dois distintos e estáveis por conversa: i pela semente, j "pula" um passo que também varia.
+  const i = n % sorteio.length;
+  const j = (i + 1 + (Math.floor(n / sorteio.length) % (sorteio.length - 1))) % sorteio.length;
+  const [a, b] = [sorteio[i]!, sorteio[j]!];
+  return {
+    id: `geral-${a.id}-${b.id}`,
+    formacao: null,
+    legenda: `Olha dois alunos meus: ${a.resultado}, e ${b.resultado}.`,
+    urls: [a.urls[0]!, b.urls[0]!],
+  };
 }
