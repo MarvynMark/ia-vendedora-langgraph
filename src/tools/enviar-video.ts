@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando, registrarMidiaEnviada } from "../services/chatwoot.ts";
 import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
@@ -44,6 +44,7 @@ export async function enviarVideoPlataforma(idConta: string, idConversa: string,
 
     logger.info("tool:enviar-video", `Enviando vídeo (${dados.length} bytes)...`);
     await enviarArquivo(idConta, idConversa, dados, "apresentacao-plataforma.mp4", "video/mp4");
+    registrarMidiaEnviada(idConversa, "vídeo da plataforma");
 
     // Pausa com "digitando" para o vídeo carregar antes da próxima mensagem
     await pausaComDigitando(idConta, idConversa, 5000);

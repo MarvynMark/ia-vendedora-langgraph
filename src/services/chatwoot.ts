@@ -365,6 +365,14 @@ export function registrarTextoMidia(idConversa: string | number, texto: string):
   registrarTextoMidiaNaoEnviado(idConversa, orig);
   acrescentarComCap(textosMidiaOriginaisPorConversa, chave, orig);
 }
+// Registro de que uma MÍDIA saiu (áudio, vídeo, imagem). O histórico só guardava o mensagem_antes,
+// então a IA não sabia que o áudio 2 já tinha ido e o reofereceu junto com o vídeo (simulação de
+// 01/10/2026). A linha entra no histórico como fala da IA; o prompt explica o que ela é e o filtro
+// de jargão impede que ela chegue ao lead se o modelo copiar.
+export const MARCA_MIDIA_ENVIADA = "[enviado ao lead:";
+export function registrarMidiaEnviada(idConversa: string | number, rotulo: string): void {
+  registrarTextoMidia(idConversa, `${MARCA_MIDIA_ENVIADA} ${rotulo}]`);
+}
 // Registra um texto que NÃO foi enviado ao lead (descartado por já ter sido dito, ou preâmbulo de
 // tool que o LLM duplicou no output). Entra só nos registros de FILTRO — nunca no histórico, senão
 // gravaríamos uma mensagem fantasma que o lead nunca viu.
@@ -557,6 +565,10 @@ const JARGAO_INTERNO = [
   /\bprova social\b/,
   /\bgatilho(s)?\s+menta(l|is)\b/,
   /\bquebra\s+de\s+obje[çc][ãa]o/,
+  /\[enviado ao lead/,
+  // Anotação de bastidor entre colchetes ("[print enviado: aprovado da Farmácia]"): o modelo imita
+  // o registro de mídia do histórico com outras palavras. Bolha que é SÓ isso nunca vai ao lead.
+  /^\[[^\]]{0,80}\]$/,
 ];
 export function blocoVazaJargaoInterno(bloco: string): boolean {
   const b = normalizarTextoMidia(bloco);

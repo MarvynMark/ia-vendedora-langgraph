@@ -143,9 +143,16 @@ async function main() {
   // Persiste o turno. Como no executarAgente, o mensagem_antes de cada mídia entra no histórico
   // como fala da IA: sem isso o modelo não sabe que o áudio/vídeo já foi e o repete.
   historico.push({ type: "human", content: userMessage });
+  const ROTULO_MIDIA: Record<string, string> = {
+    Enviar_audio_walker_1: "áudio 1 do Walker", Enviar_audio_walker_2: "áudio 2 do Walker",
+    Enviar_video_plataforma: "vídeo da plataforma", Enviar_imagem_entregaveis: "imagem dos entregáveis",
+    Enviar_prova_social: "print de aprovado",
+  };
   for (const c of chamadas) {
     const antes = (c.args as { mensagem_antes?: string } | null)?.mensagem_antes;
     if (antes) historico.push({ type: "ai", content: antes });
+    // Mesma marca que registrarMidiaEnviada grava em produção.
+    if (ROTULO_MIDIA[c.tool]) historico.push({ type: "ai", content: `[enviado ao lead: ${ROTULO_MIDIA[c.tool]}]` });
   }
   historico.push({ type: "ai", content: resposta });
   salvarHistorico(historico);

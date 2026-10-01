@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, pausaComDigitando, registrarMidiaEnviada } from "../services/chatwoot.ts";
 import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { buscarCamposFormulario } from "../db/formulario.ts";
 import { escolherCaso } from "../lib/prova-social.ts";
@@ -43,6 +43,7 @@ export async function enviarProvaSocial(ctx: ContextoProvaSocial): Promise<strin
     for (const [i, dados] of imagens.entries()) {
       await enviarArquivo(ctx.idConta, ctx.idConversa, dados, `aprovado-${caso.id}-${i + 1}.jpg`, "image/jpeg");
     }
+    registrarMidiaEnviada(ctx.idConversa, "print de aprovado");
     await pausaComDigitando(ctx.idConta, ctx.idConversa, 5000);
     logger.info("tool:enviar-prova-social", "Print enviado", { caso: caso.id, formacao: campos?.formacao });
     return `Print enviado com a legenda: "${caso.legenda}". NÃO repita a legenda nem descreva o print; siga com a sua próxima frase.`;

@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { enviarArquivo, enviarMensagem, pausaComDigitando } from "../services/chatwoot.ts";
+import { enviarArquivo, enviarMensagem, pausaComDigitando, registrarMidiaEnviada } from "../services/chatwoot.ts";
 import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
@@ -81,6 +81,7 @@ export async function enviarAudioWalker(
     await enviarArquivo(idConta, idConversa, dados, `walker-audio-0${numero}.ogg`, "audio/ogg", {
       isRecordedAudio: true,
     });
+    registrarMidiaEnviada(idConversa, `áudio ${numero} do Walker`);
 
     // Pausa maior para a nota de voz (PTT) terminar de subir no WhatsApp antes da próxima
     // mensagem — o áudio demora mais que o texto para ser entregue, então sem essa pausa a
