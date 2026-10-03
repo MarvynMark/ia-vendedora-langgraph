@@ -164,6 +164,64 @@ export async function listarMensagens(
   return res.json();
 }
 
+/**
+ * Todas as mensagens da conversa, da mais antiga para a mais nova. O endpoint devolve só a página
+ * mais recente (~20); as anteriores vêm com `?before=<id da mais antiga>` até a página vir vazia.
+ */
+export async function listarTodasMensagens<T extends { id: number } = { id: number }>(
+  accountId: string | number,
+  conversationId: string | number,
+  maxPaginas = 100,
+): Promise<T[]> {
+  const todas: T[] = [];
+  let antes: number | undefined;
+  for (let i = 0; i < maxPaginas; i++) {
+    const qs = antes ? `?before=${antes}` : "";
+    const res = await comRetry(() => fetchComTimeout(
+      `${urlConta(accountId)}/conversations/${conversationId}/messages${qs}`,
+      { method: "GET", headers: headers(), timeout: 20_000 },
+    ), 3, 500);
+    if (!res.ok) throw new Error(`[chatwoot] listarTodasMensagens falhou (${res.status}): ${await res.text()}`);
+    const pagina = ((await res.json()) as { payload?: T[] }).payload ?? [];
+    if (pagina.length === 0) break;
+    todas.push(...pagina);
+    const menorId = Math.min(...pagina.map((m) => m.id));
+    if (antes !== undefined && menorId >= antes) break;
+    antes = menorId;
+  }
+  const unicas = new Map(todas.map((m) => [m.id, m]));
+  return [...unicas.values()].sort((a, b) => a.id - b.id);
+}
+
+/** Conversas com a etiqueta (payload cru do Chatwoot), paginando o endpoint de filtro. */
+export async function listarConversasComLabel(
+  accountId: string | number,
+  label: string,
+  maxPaginas = 40,
+): Promise<any[]> {
+  const out: any[] = [];
+  for (let page = 1; page <= maxPaginas; page++) {
+    let convs: any[] = [];
+    try {
+      const res = await fetchComTimeout(`${urlConta(accountId)}/conversations/filter?page=${page}`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          payload: [{ attribute_key: "labels", filter_operator: "equal_to", values: [label], query_operator: null }],
+        }),
+        timeout: 20_000,
+      });
+      if (!res.ok) break;
+      convs = ((await res.json()) as { payload?: any[] }).payload ?? [];
+    } catch {
+      break;
+    }
+    if (convs.length === 0) break;
+    out.push(...convs);
+  }
+  return out;
+}
+
 export async function buscarMensagemPorId(
   accountId: string | number,
   conversationId: string | number,

@@ -49,10 +49,16 @@ export async function inserirDocumento(doc: NovoRagDocumento): Promise<void> {
   }
 }
 
-export async function limparDocumentosPorTipo(tipo: string): Promise<void> {
+/**
+ * Apaga os documentos do tipo. `soSemOrigem`: só os que vieram de conversa real (sem
+ * metadata.origem), preservando os curados (roteiro_prompt, intervencao_humana), que têm o
+ * próprio script de ingestão.
+ */
+export async function limparDocumentosPorTipo(tipo: string, opts: { soSemOrigem?: boolean } = {}): Promise<void> {
   const client = await pool.connect();
   try {
-    const res = await client.query("DELETE FROM rag_documentos WHERE tipo = $1", [tipo]);
+    const filtro = opts.soSemOrigem ? " AND metadata->>'origem' IS NULL" : "";
+    const res = await client.query(`DELETE FROM rag_documentos WHERE tipo = $1${filtro}`, [tipo]);
     logger.info("rag", `Removidos ${res.rowCount} documentos do tipo "${tipo}"`);
   } finally {
     client.release();

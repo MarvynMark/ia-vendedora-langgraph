@@ -13,7 +13,7 @@ import { pool } from "../db/pool.ts";
 import { criarTabelas } from "../db/setup.ts";
 import { inserirDocumento, limparDocumentosPorTipo, contarDocumentos } from "../db/rag.ts";
 import { gerarEmbedding } from "../services/embeddings.ts";
-import { listarKanbanTasks, listarMensagens } from "../services/chatwoot.ts";
+import { listarKanbanTasks, listarMensagens, listarConversasComLabel } from "../services/chatwoot.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 
 const ACCOUNT_ID = env.CHATWOOT_ACCOUNT_ID;
@@ -82,41 +82,18 @@ interface ConversaComprador {
 
 // Busca todas as conversas que têm a etiqueta informada, paginando o endpoint de filtro do Chatwoot.
 async function buscarConversasComLabel(label: string): Promise<ConversaComprador[]> {
-  const out: ConversaComprador[] = [];
-  for (let page = 1; page <= 40; page++) {
-    let convs: any[] = [];
-    try {
-      const res = await fetchComTimeout(
-        `${env.CHATWOOT_BASE_URL}/api/v1/accounts/${ACCOUNT_ID}/conversations/filter?page=${page}`,
-        {
-          method: "POST",
-          headers: { api_access_token: env.CHATWOOT_API_TOKEN, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            payload: [{ attribute_key: "labels", filter_operator: "equal_to", values: [label], query_operator: null }],
-          }),
-          timeout: 20000,
-        },
-      );
-      if (!res.ok) break;
-      const data = (await res.json()) as { payload?: any[] };
-      convs = data.payload ?? [];
-    } catch {
-      break;
-    }
-    if (convs.length === 0) break;
-    for (const c of convs) {
-      const sender = c.meta?.sender ?? {};
-      const attrs = sender.custom_attributes ?? {};
-      out.push({
-        id: c.id,
-        nome: sender.name ?? "Lead",
-        telefone: sender.phone_number ?? "",
-        labels: c.labels ?? [],
-        concurso: attrs.concurso_interesse ?? attrs.qual_concurso ?? "não informado",
-      });
-    }
-  }
-  return out;
+  const convs = await listarConversasComLabel(ACCOUNT_ID, label);
+  return convs.map((c) => {
+    const sender = c.meta?.sender ?? {};
+    const attrs = sender.custom_attributes ?? {};
+    return {
+      id: c.id,
+      nome: sender.name ?? "Lead",
+      telefone: sender.phone_number ?? "",
+      labels: c.labels ?? [],
+      concurso: attrs.concurso_interesse ?? attrs.qual_concurso ?? "não informado",
+    };
+  });
 }
 
 async function buscarMensagens(conversationId: number): Promise<Mensagem[]> {
@@ -333,8 +310,9 @@ await criarTabelas();
 if (limpar || (!apenasGanhas && !apenasObjecoes)) {
   if (limpar) {
     log("Limpando documentos existentes...");
-    await limparDocumentosPorTipo("conversa_ganha");
-    await limparDocumentosPorTipo("objecao");
+    // Só os casos reais: roteiros e intervenções curadas têm script próprio e sumiriam aqui.
+    await limparDocumentosPorTipo("conversa_ganha", { soSemOrigem: true });
+    await limparDocumentosPorTipo("objecao", { soSemOrigem: true });
   }
 }
 
