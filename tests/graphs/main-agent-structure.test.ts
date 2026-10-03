@@ -77,7 +77,9 @@ describe("main agent prompt", () => {
     // 92k → 96k: o bloco da promoção do Dia do Cliente (lib/promocao.ts) só existe em 18/09/2026
     // e custa ~3,5k; o teste roda com a data real, então o teto precisa caber o dia da promoção.
     // 96k → 97k: bloco "O LEAD MANDOU UMA IMAGEM" (conv 4014), ~900 caracteres.
-    expect(prompt.length).toBeLessThan(97000);
+    // 97k → 98k: Mensagem 7 com ECO/PROBLEMA definidos fora das aspas + exemplo (conv 9486, os
+    // colchetes saíam literais pro lead), ~300 caracteres.
+    expect(prompt.length).toBeLessThan(98000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela

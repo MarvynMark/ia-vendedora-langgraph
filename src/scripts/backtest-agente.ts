@@ -26,6 +26,7 @@ import {
 import { dividirEmFrases } from "../lib/response-formatter.ts";
 import { montarOutputDoTurno } from "../graphs/main-agent/output.ts";
 import { ehRepeticaoDeAlgum } from "../lib/similaridade.ts";
+import { temMarcadorDoRoteiro, marcadoresDoRoteiro } from "../lib/placeholder.ts";
 
 const STEPS = [
   { id: 1, name: "Novo Lead" }, { id: 7, name: "Primeira mensagem" }, { id: 10, name: "Conexao" },
@@ -311,6 +312,7 @@ function bugsDeVazamento(textos: string[]): string[] {
     if (blocoTemFraseProibida(f)) p.push(`Frase proibida: "${f.slice(0, 60)}"`);
     if (blocoVazaJargaoInterno(f)) p.push(`Jargão interno de venda vazado: "${f.slice(0, 60)}"`);
     if (blocoNarraEnvioMidia(CONV, f)) p.push(`Narração de envio de mídia: "${f.slice(0, 60)}"`);
+    if (temMarcadorDoRoteiro(f)) p.push(`Marcador do roteiro vazado: ${marcadoresDoRoteiro(f).join(", ")}`);
   }
   // Repetição de algo já dito ao lead (duplicação das convs 5385/5525), inclusive parafraseada.
   for (let i = 0; i < frases.length; i++) {

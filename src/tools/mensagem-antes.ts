@@ -23,6 +23,7 @@ import {
 import { dividirEmFrases } from "../lib/response-formatter.ts";
 import { ehRepeticaoDeAlgum } from "../lib/similaridade.ts";
 import { logger } from "../lib/logger.ts";
+import { temMarcadorDoRoteiro, removerMarcadoresDoRoteiro } from "../lib/placeholder.ts";
 
 export async function enviarMensagemAntes(
   idConta: string,
@@ -31,6 +32,17 @@ export async function enviarMensagemAntes(
   origem: string,
 ): Promise<void> {
   if (!mensagemAntes || !mensagemAntes.trim()) return;
+
+  // Aqui não há como pedir reescrita (a tool já está enviando): marcador do roteiro entre
+  // colchetes é arrancado antes de sair, mesmo motivo da trava do executarAgente (conv 9486).
+  if (temMarcadorDoRoteiro(mensagemAntes)) {
+    logger.warn(origem, "mensagem_antes com marcador do roteiro — colchetes removidos", {
+      idConversa,
+      original: mensagemAntes.slice(0, 160),
+    });
+    mensagemAntes = removerMarcadoresDoRoteiro(mensagemAntes);
+    if (!mensagemAntes) return;
+  }
 
   const frases = dividirEmFrases(mensagemAntes);
   const jaDitas = saidasRecentes(idConversa);

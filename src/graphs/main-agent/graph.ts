@@ -24,6 +24,7 @@ import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { ehMedicoLead } from "../../lib/medico.ts";
 import { descobertaMaterialFeita, materialDeclaradoPeloLead, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_MATERIAL, PERGUNTA_DESCOBERTA_SITUACAO } from "../../lib/gate-material.ts";
 import { respostaIgnoraOLead, instrucaoReescrita } from "../../lib/eco.ts";
+import { temMarcadorDoRoteiro, marcadoresDoRoteiro, removerMarcadoresDoRoteiro, instrucaoPreencherMarcadores } from "../../lib/placeholder.ts";
 import {
   negaElegibilidadePorGraduacao,
   RESPOSTA_ELEGIBILIDADE,
@@ -696,6 +697,35 @@ async function executarAgente(state: MainAgentStateType) {
         }
       } catch (e) {
         logger.warn("main-agent", "Falha ao reescrever — mantendo a resposta original:", e);
+      }
+    }
+
+    // TRAVA DE MARCADOR DO ROTEIRO — vem DEPOIS da trava do eco para conferir também a reescrita.
+    // Mesmo esquema: reinvoca UMA vez pedindo o colchete preenchido; se ainda vier com marcador,
+    // arranca os colchetes. Fica aqui, e não no envio, porque o turno pode virar ÁUDIO e o TTS
+    // leria o marcador em voz alta (conv 9486: Mensagem 7 saiu com "[eco curto da dor dele]").
+    if (temMarcadorDoRoteiro(outputFinal)) {
+      logger.warn("main-agent", "Marcador do roteiro na resposta — reescrevendo", {
+        idConversa: state.idConversa,
+        marcadores: marcadoresDoRoteiro(outputFinal),
+      });
+      try {
+        const retry = await agent.invoke(
+          { messages: [...messages, new AIMessage(outputFinal), new HumanMessage(instrucaoPreencherMarcadores(outputFinal))] },
+          langfuseHandler ? { callbacks: [langfuseHandler] } : undefined,
+        );
+        const novas = (retry.messages ?? []).slice(messages.length + 2);
+        const { output: reescrito } = montarOutputDoTurno(novas as never);
+        if (reescrito.trim()) outputFinal = reescrito;
+      } catch (e) {
+        logger.warn("main-agent", "Falha ao reescrever marcador — removendo os colchetes:", e);
+      }
+      if (temMarcadorDoRoteiro(outputFinal)) {
+        logger.error("main-agent", "Reescrita manteve o marcador — colchetes removidos", {
+          idConversa: state.idConversa,
+          marcadores: marcadoresDoRoteiro(outputFinal),
+        });
+        outputFinal = removerMarcadoresDoRoteiro(outputFinal);
       }
     }
 

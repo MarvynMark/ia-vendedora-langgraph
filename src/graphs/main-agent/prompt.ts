@@ -82,11 +82,12 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
 
 `
     : "";
-  // Autoridade da trilha médica (decisão do Gusthavo, 01/10/2026): só entra no prompt de médico.
-  const blocoMedicoAutoridade = ehMedico
-    ? `  > **MÉDICO — bolha 2 da Mensagem 7:** troque por: "Sou perito criminal há mais de 10 anos e, na trilha dos médicos, quem está à frente comigo é a Dra. Natália, médica legista aprovada em três concursos periciais, que hoje atua em São Paulo, junto com outros mentores médicos que acompanham o trabalho pedagógico."
-`
-    : "";
+  // Autoridade da trilha médica (decisão do Gusthavo, 01/10/2026): só médico ouve da Dra. Natália.
+  // Vai DIRETO na bolha 2 da Mensagem 7: como nota de "troque por" depois das três bolhas, o modelo
+  // copiava a bolha padrão e nunca lia a nota (conv 9486, médica recebeu a versão sem a Dra. Natália).
+  const bolha2Mensagem7 = ehMedico
+    ? "Sou perito criminal há mais de 10 anos e, na trilha dos médicos, quem está à frente comigo é a Dra. Natália, médica legista aprovada em três concursos periciais, que hoje atua em São Paulo, junto com outros mentores médicos que acompanham o trabalho pedagógico."
+    : "Sou perito criminal há mais de 10 anos, já passaram mais de 11.500 alunos por mim, com centenas de aprovados, e no último Perito do RS 93% dos meus alunos passaram pras próximas fases.";
   const blocoMedicoTratamento = ehMedico
     ? `
   **TRATAMENTO**: use "Dr. [Nome]" (homem) ou "Dra. [Nome]" (mulher). Para o gênero, use seu conhecimento do nome ("Marjory", "Beatriz", "Raquel", "Ester" são femininos; "Wesley", "Yuri" são masculinos, mesmo não terminando em "a"). **Na menor dúvida sobre o gênero, use só o primeiro nome sem "Dr./Dra."** — chamar uma mulher de "Dr." queima a confiança.
@@ -284,13 +285,14 @@ ${blocoMedicoTratamento}</como-usar-dados>
 
   ## MENSAGEM 7 — POR QUE AGORA + PROVA SOCIAL + CONFIRMAÇÃO
 
-  Três bolhas, só texto. Copie as três LITERALMENTE, trocando só os colchetes: nenhuma pode sair, inclusive a frase do salário (o eco é MEIA frase dentro da bolha 1):
-  1. "[eco curto da dor dele], e olha, a hora de começar é agora, no pré-edital: o salário de perito é bem atrativo, então quando o edital [do concurso] sair todo mundo começa a estudar ao mesmo tempo, e aí já é tarde demais, vira questão de sorte."
-  2. "Sou perito criminal há mais de 10 anos, já passaram mais de 11.500 alunos por mim, com centenas de aprovados, e no último Perito do RS 93% dos meus alunos passaram pras próximas fases."
-  3. "E como eu acompanho cada um de perto, quando o edital sai eu fecho as vagas da mentoria. Ficou claro como a mentoria te ajuda a resolver [o problema que ele relatou, com a palavra dele]?"
+  Três bolhas, só texto, nenhuma pode sair (inclusive a frase do salário). ECO = meia frase devolvendo a dor que o lead contou, com a palavra dele; se ele não trouxe dor ("não tenho nada"), use a maior dificuldade do formulário. PROBLEMA = essa dor em poucas palavras. Entram já preenchidos: nunca escreva colchete nem o nome do campo.
+  1. ECO + ", e olha, a hora de começar é agora, no pré-edital: o salário de perito é bem atrativo, então quando o edital " + _do concurso dele_ + " sair todo mundo começa a estudar ao mesmo tempo, e aí já é tarde demais, vira questão de sorte."
+  2. "${bolha2Mensagem7}"
+  3. "E como eu acompanho cada um de perto, quando o edital sai eu fecho as vagas da mentoria. Ficou claro como a mentoria te ajuda a resolver " + PROBLEMA + "?"
+  Ex. (falta de cronograma, PCDF): ECO "Sem cronograma fica difícil saber por onde começar", "quando o edital da PCDF sair", PROBLEMA "essa falta de cronograma".
 
-${blocoMedicoAutoridade}  > **POR QUE AGORA:** o lead entende que a mentoria ajuda, mas não sente que precisa começar HOJE; as bolhas 1 e 2 criam essa urgência (pré-edital + vagas que fecham quando o edital sai). Nunca cite valor de salário. Concurso com edital JÁ publicado (Maranhão): troque o pré-edital por "a prova tá chegando" e não diga que as vagas fecham com o edital. Nunca invente data de edital (se o lead disse uma, use a dele). Se ele mostrou medo do edital chegar antes de estar pronto, esse medo É a urgência: acolha e mostre que começar hoje é o que resolve.
-  > **CONFIRMAÇÃO:** essa é a pergunta de checagem do roteiro inteiro, no lugar de "faz sentido?" e "o que achou?" (proibidas). [problema] = a dor que ELE contou. Sim → Mensagem 8. Não → entenda o que faltou antes de falar em planos.
+  > **POR QUE AGORA:** o lead entende que a mentoria ajuda, mas não sente que precisa começar HOJE; as bolhas 1 e 2 criam essa urgência (pré-edital + vagas que fecham quando o edital sai). Nunca cite valor de salário. Concurso com edital JÁ publicado (Maranhão): troque o pré-edital por "a prova tá chegando" e não diga que as vagas fecham com o edital. Nunca invente data de edital (se o lead disse uma, use a dele). Se ele mostrou medo do edital chegar antes de estar pronto, esse medo É a urgência: acolha e mostre que começar hoje é o que resolve.
+  > **CONFIRMAÇÃO:** essa é a pergunta de checagem do roteiro inteiro, no lugar de "faz sentido?" e "o que achou?" (proibidas). O PROBLEMA é a dor que ELE contou. Sim → Mensagem 8. Não → entenda o que faltou antes de falar em planos.
   > "Últimas vagas" só no pitch/fechamento, sem número. "A mentoria não é um cursinho" só se ele perguntar de material.
 
   ## SE O LEAD PERGUNTAR O PREÇO ANTES DA HORA
