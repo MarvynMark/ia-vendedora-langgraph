@@ -1,8 +1,9 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test";
 import type { FollowUpStateType } from "../../src/graphs/follow-up/state.ts";
 
-// Cadência da etapa "Primeira mensagem" (03/10/2026, conv 9560): com janela aberta, dois toques
-// grátis no primeiro dia (reforço + "Oiii"); sem janela, a régua antiga de template por dia.
+// Cadência da etapa "Primeira mensagem" (03/10/2026, conv 9560): com janela aberta, três toques
+// grátis no primeiro dia (reforço, áudio mudo + "O que você acha?", comprovante PIX); sem janela,
+// a régua antiga de template por dia.
 const HORA = 60 * 60 * 1000;
 
 let msJanela = 0;
@@ -10,6 +11,7 @@ let msDesdeAbertura = Infinity;
 const textos: string[] = [];
 const templates: string[] = [];
 const updates: Array<{ description?: string; due_date?: string }> = [];
+const curiosidade: string[] = [];
 
 const chatwootReal = await import("../../src/services/chatwoot.ts");
 mock.module("../../src/services/chatwoot.ts", () => ({
@@ -20,7 +22,13 @@ mock.module("../../src/services/chatwoot.ts", () => ({
   msRestantesJanela24h: async () => msJanela,
   msDesdePrimeiraSaida: async () => msDesdeAbertura,
   atualizarKanbanTask: async (_c: unknown, _t: unknown, dados: { description?: string; due_date?: string }) => { updates.push(dados); },
+  // Áudio mudo e comprovante PIX saem como arquivo; o nome identifica qual foi.
+  enviarArquivo: async (_c: unknown, _i: unknown, _d: unknown, nome: string) => { curiosidade.push(nome); },
+  pausaComDigitando: async () => {},
 }));
+const fetchReal = globalThis.fetch;
+globalThis.fetch = (async () => new Response(new Uint8Array([1]), { headers: { "content-type": "application/octet-stream" } })) as unknown as typeof fetch;
+afterAll(() => { globalThis.fetch = fetchReal; });
 mock.module("../../src/db/memoria.ts", () => ({
   salvarMensagem: async () => {},
   buscarHistorico: async () => [],
@@ -47,7 +55,7 @@ function state(contador: number): FollowUpStateType {
 }
 
 beforeEach(() => {
-  textos.length = 0; templates.length = 0; updates.length = 0;
+  textos.length = 0; templates.length = 0; updates.length = 0; curiosidade.length = 0;
   msJanela = 0; msDesdeAbertura = Infinity;
 });
 
@@ -60,13 +68,21 @@ describe("Primeira mensagem COM janela (pediu o grupo de espera)", () => {
     expect(updates.at(-1)?.description).toContain("followup-templates: 1");
   });
 
-  test("toque 2: o \"Oiii\" curto, ainda grátis, agendado antes de a janela fechar", async () => {
-    msJanela = 6 * HORA;
+  test("toque 2: áudio mudo, grátis", async () => {
+    msJanela = 16 * HORA;
     await agenteTemplateAbertura(state(1));
     expect(templates).toEqual([]);
-    expect(textos).toHaveLength(1);
-    expect(textos[0]!.length).toBeLessThan(60);
+    expect(curiosidade).toEqual(["audio.ogg"]);
+    expect(textos).toEqual(["O que você acha?"]);
     expect(updates.at(-1)?.description).toContain("followup-templates: 2");
+  });
+
+  test("toque 3: comprovante PIX, grátis", async () => {
+    msJanela = 4 * HORA;
+    await agenteTemplateAbertura(state(2));
+    expect(templates).toEqual([]);
+    expect(curiosidade).toEqual(["COMPROVANTE-PIX.pdf"]);
+    expect(updates.at(-1)?.description).toContain("followup-templates: 3");
   });
 });
 
@@ -86,15 +102,16 @@ describe("Primeira mensagem SEM janela (lead só de formulário)", () => {
     expect(templates).toEqual(["fup1_reforco"]);
   });
 
-  test("posição do \"Oiii\" sem janela: pula direto pra urgência (nenhum template a mais)", async () => {
+  test("posições de curiosidade sem janela: pula direto pra urgência (nenhum template a mais)", async () => {
     await agenteTemplateAbertura(state(1));
     expect(templates).toEqual(["fup3_urgencia"]);
     expect(textos).toEqual([]);
-    expect(updates.at(-1)?.description).toContain("followup-templates: 3");
+    expect(curiosidade).toEqual([]);
+    expect(updates.at(-1)?.description).toContain("followup-templates: 4");
   });
 
   test("depois da urgência: encerramento", async () => {
-    await agenteTemplateAbertura(state(3));
+    await agenteTemplateAbertura(state(4));
     expect(templates).toEqual(["encerramento"]);
   });
 });

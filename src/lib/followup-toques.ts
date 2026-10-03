@@ -12,6 +12,10 @@
 //   toque 4 — encerramento, 2 dias depois: template aprovado
 //
 // Os toques 1 e 2 são grátis (texto livre dentro da janela); só o 3 e o 4 pagam template.
+//
+// 03/10/2026: em Conexão, pós-preço e Primeira mensagem o toque 2 virou DOIS toques de
+// curiosidade (áudio mudo + "O que você acha?", depois o PDF de "comprovante PIX"), ver
+// lib/followup-curiosidade.ts. O lembrete (link enviado) segue com o toque 2 curto daqui.
 
 import { ChatOpenAI } from "@langchain/openai";
 import { env } from "../config/env.ts";
@@ -48,16 +52,25 @@ export function escolherToque2(idConversa: string | number): string {
 }
 
 /**
- * Quando sai o próximo toque, dado o índice do que ACABOU de sair.
- * - depois do 1: perto do fim da janela de 24h (ainda grátis); se não couber, segue a régua normal
- * - depois do 2: no dia seguinte (já fora da janela → template)
- * - depois do 3: encerramento 2 dias depois
+ * Quando sai o próximo toque, dado o índice do que ACABOU de sair. `toquesNaJanela` = quantos
+ * toques da sequência cabem na janela grátis (2 no lembrete; 3 onde entram os de curiosidade,
+ * ver lib/followup-curiosidade.ts).
+ * - toque intermediário da janela: ~3h depois (ainda dentro dela)
+ * - último toque da janela: perto de ela fechar (ainda grátis); se não couber, segue a régua normal
+ * - depois do último da janela: no dia seguinte (já fora → template)
+ * - depois desse: encerramento 2 dias depois
  */
-export function agendarProximoToque(indiceEnviado: number, msRestantesJanela: number, agora = new Date()): Date {
-  if (indiceEnviado === 0) {
+export function agendarProximoToque(indiceEnviado: number, msRestantesJanela: number, agora = new Date(), toquesNaJanela = 2): Date {
+  const ultimoNaJanela = toquesNaJanela - 1;
+  if (indiceEnviado < ultimoNaJanela - 1) {
+    // 3h e não "metade da janela": a metade costuma cair de madrugada, o horário comercial empurra
+    // pra perto de a janela fechar e não sobra espaço pro último toque grátis.
+    return agendarMaximizandoJanela(agora, msRestantesJanela > 0 ? 3 * HORA : 20 * HORA, msRestantesJanela, { minGapMs: HORA });
+  }
+  if (indiceEnviado < ultimoNaJanela) {
     return agendarMaximizandoJanela(agora, 20 * HORA, msRestantesJanela, { minGapMs: HORA });
   }
-  if (indiceEnviado === 1) return proximoHorarioComercial(agora, 24 * HORA);
+  if (indiceEnviado === ultimoNaJanela) return proximoHorarioComercial(agora, 24 * HORA);
   return proximoHorarioComercial(agora, 48 * HORA);
 }
 

@@ -58,6 +58,26 @@ describe("agendarProximoToque — toques 1 e 2 na janela grátis, 3 no dia segui
   });
 });
 
+describe("agendarProximoToque com 3 toques na janela (pergunta da IA + curiosidade)", () => {
+  const agora = new Date(Date.UTC(2026, 6, 15, 16, 0, 0));
+  const restante = 21 * HORA;
+  const fecha = agora.getTime() + restante;
+
+  test("o áudio cai no meio da janela e o PIX ainda antes de ela fechar", () => {
+    const t2 = agendarProximoToque(0, restante, agora, 3);
+    expect(t2.getTime()).toBeGreaterThanOrEqual(agora.getTime() + HORA);
+    expect(t2.getTime()).toBeLessThan(fecha - HORA);
+    const t3 = agendarProximoToque(1, fecha - t2.getTime(), t2, 3);
+    expect(t3.getTime()).toBeGreaterThan(t2.getTime());
+    expect(t3.getTime()).toBeLessThan(fecha);
+  });
+
+  test("depois do PIX, o template sai ~1 dia depois e o encerramento ~2 dias", () => {
+    expect(agendarProximoToque(2, 0, agora, 3).getTime() - agora.getTime()).toBeGreaterThanOrEqual(24 * HORA);
+    expect(agendarProximoToque(3, 0, agora, 3).getTime() - agora.getTime()).toBeGreaterThanOrEqual(48 * HORA);
+  });
+});
+
 describe("tirarNomeDoInicio — mensagem que abre com o nome é cara de disparo", () => {
   test("tira o nome (e o oi) do começo e recapitaliza", () => {
     expect(tirarNomeDoInicio("Lucas, qual matéria você precisa focar?", "Lucas")).toBe("Qual matéria você precisa focar?");

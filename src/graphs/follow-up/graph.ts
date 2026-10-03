@@ -9,6 +9,7 @@ import { buscarCamposFormulario } from "../../db/formulario.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { delayInicialMs } from "../../lib/delays-followup.ts";
 import { TOQUE_IA, TOQUE_PUXAR, escolherToque2, gerarToque1, agendarProximoToque, type EtapaToque } from "../../lib/followup-toques.ts";
+import { TOQUE_AUDIO_MUDO, TOQUE_PIX, ehToqueCuriosidade, enviarToqueCuriosidade } from "../../lib/followup-curiosidade.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
 // da janela de 24h (economiza envios pagos à Meta sem parecer spam).
@@ -136,12 +137,18 @@ export async function classificar(state: FollowUpStateType) {
 // ("Oiii, consegue responder agora?") dentro da janela grátis de 24h; toque 3 no dia seguinte por
 // template; encerramento 2 dias depois. Saíram o áudio pós-preço e o "caminho mais leve": na
 // conv 9280 o downsell automático atropelou a condição que a equipe tinha acabado de oferecer.
-const SEQUENCIA_RECUPERACAO_CONEXAO = [TOQUE_IA, TOQUE_PUXAR, "conexao_2"] as const;
-const SEQUENCIA_POS_PRECO = [TOQUE_IA, TOQUE_PUXAR, "pos_preco_duvida"] as const;
-// Template (fora da janela) por posição. Os toques 1 e 2 quase sempre saem dentro dela; quando
-// não saem (lead que falou tarde da noite, domingo), vai a pergunta curta aprovada.
-const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_duvida", "conexao_2"] as const;
-const TEMPLATE_FALLBACK_POS_PRECO = ["conexao_duvida", "conexao_duvida", "pos_preco_duvida"] as const;
+// 03/10/2026: o "Oiii, consegue responder agora?" deu lugar a dois toques de curiosidade dentro
+// da janela (áudio mudo + "O que você acha?", depois o PDF de comprovante PIX), ver
+// lib/followup-curiosidade.ts. Fora da janela essas posições são puladas.
+const SEQUENCIA_RECUPERACAO_CONEXAO = [TOQUE_IA, TOQUE_AUDIO_MUDO, TOQUE_PIX, "conexao_2"] as const;
+const SEQUENCIA_POS_PRECO = [TOQUE_IA, TOQUE_AUDIO_MUDO, TOQUE_PIX, "pos_preco_duvida"] as const;
+// Toques que cabem na janela grátis nessas sequências (pergunta da IA + os dois de curiosidade).
+const TOQUES_NA_JANELA_CURIOSIDADE = 3;
+// Template (fora da janela) por posição. O toque 1 quase sempre sai dentro dela; quando não sai
+// (lead que falou tarde da noite, domingo), vai a pergunta curta aprovada. As posições de
+// curiosidade nunca usam template (são puladas sem janela).
+const TEMPLATE_FALLBACK_CONEXAO = ["conexao_duvida", "conexao_duvida", "conexao_duvida", "conexao_2"] as const;
+const TEMPLATE_FALLBACK_POS_PRECO = ["conexao_duvida", "conexao_duvida", "conexao_duvida", "pos_preco_duvida"] as const;
 // Encerramento de todas as sequências: curto, aprovado na Meta com {{1}} = nome.
 const NOME_ENCERRAMENTO = "encerramento";
 
@@ -154,10 +161,11 @@ async function montarToque(
 ): Promise<string> {
   if (nome === TOQUE_IA) return gerarToque1({ etapa, telefone: state.telefone, nome: primeiroNomeSaudacao(state.title) });
   if (nome === TOQUE_PUXAR) return substituirNome(escolherToque2(state.conversationId), state.title);
+  if (ehToqueCuriosidade(nome)) return "";
   return substituirCampos(CONTEUDO_TEMPLATES[nome] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
 }
 
-async function agenteFollowup(state: FollowUpStateType) {
+export async function agenteFollowup(state: FollowUpStateType) {
   logger.info("follow-up", "executando follow-up Conexão...");
 
   // Se a última mensagem da conversa foi do lead (ele respondeu após o agente), apenas reagenda
@@ -175,7 +183,7 @@ async function agenteFollowup(state: FollowUpStateType) {
 
   const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
   const dentroJanela = msRestantes > 0;
-  const contador = lerContadorNutrir(state.description ?? "");
+  let contador = lerContadorNutrir(state.description ?? "");
   const primeiroNome = primeiroNomeSaudacao(state.title);
   // Pós-preço = está em "Aguardando Pagamento" (viu o pitch) e ainda NÃO recebeu link.
   // Antes dependia só de "status: proposta_apresentada" (que o agente nem sempre grava), por
@@ -193,6 +201,12 @@ async function agenteFollowup(state: FollowUpStateType) {
   const fallbacks: readonly string[] = isPosPreco ? TEMPLATE_FALLBACK_POS_PRECO : TEMPLATE_FALLBACK_CONEXAO;
 
   logger.info("follow-up", `Modo: ${isPosPreco ? "pós-preço" : "conexão"}, contador: ${contador}`);
+
+  // Áudio mudo e comprovante PIX só existem dentro da janela; fora dela pula pro próximo toque.
+  while (!dentroJanela && ehToqueCuriosidade(sequencia[contador])) {
+    logger.info("follow-up", `Janela fechada — ${sequencia[contador]} pulado`);
+    contador++;
+  }
 
   // Após N mensagens sem resposta: encerramento → Perdido
   if (contador >= sequencia.length) {
@@ -250,6 +264,8 @@ async function agenteFollowup(state: FollowUpStateType) {
   try {
     if (ehDuplicata) {
       // idêntico ao último envio — não reenvia
+    } else if (ehToqueCuriosidade(nomeMsg)) {
+      await enviarToqueCuriosidade(nomeMsg, state.accountId, state.conversationId, state.telefone);
     } else if (dentroJanela) {
       await enviarMensagem(state.accountId, state.conversationId, conteudo);
       if (state.telefone) {
@@ -267,7 +283,7 @@ async function agenteFollowup(state: FollowUpStateType) {
   let descricaoAtualizada = atualizarContadorNutrir(state.description ?? "", novoContador);
   // Remove o marcador "retomar:" após usá-lo, pra o acknowledge do combinado não repetir a cada toque.
   if (temRetomarAgendado) descricaoAtualizada = descricaoAtualizada.replace(/[^\S\n]*retomar:[^\n]*\n?/i, "").trimEnd();
-  const proxima = agendarProximoToque(contador, msRestantes);
+  const proxima = agendarProximoToque(contador, msRestantes, new Date(), TOQUES_NA_JANELA_CURIOSIDADE);
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,
     due_date: proxima.toISOString(),
@@ -424,14 +440,15 @@ async function agenteBoasVindas(state: FollowUpStateType) {
 // Sequência de recuperação para leads em "Primeira mensagem" (abertura enviada, sem resposta).
 // 03/10/2026 (conv 9560): o 1º toque saía só 24h depois, já fora da janela, e o lead que pediu o
 // grupo de espera passava o primeiro dia inteiro sem nenhum follow-up. Agora, com janela aberta,
-// são DOIS toques grátis no primeiro dia: o reforço (+3h) e o "Oiii, consegue responder agora?"
-// perto de a janela fechar; a urgência vai por template no dia seguinte e o encerramento depois.
-// Sem janela (lead só de formulário, que recebeu a abertura por template) o toque 2 é pulado e a
-// régua continua a de antes: reforço D+1, urgência D+2, encerramento D+3, sem template a mais.
+// são TRÊS toques grátis no primeiro dia: o reforço (+3h), o áudio mudo + "O que você acha?" e o
+// PDF de comprovante PIX perto de a janela fechar (ver lib/followup-curiosidade.ts); a urgência
+// vai por template no dia seguinte e o encerramento depois.
+// Sem janela (lead só de formulário, que recebeu a abertura por template) os de curiosidade são
+// pulados e a régua continua a de antes: reforço D+1, urgência D+2, encerramento D+3.
 // NOTA: a prova social (fup2_prova_social) ficou FORA por ora — a versão persuasiva dela usa
 // mídia (imagem/vídeo) no template, que o Chatwoot 4.15.1 não repassa à Meta (bug #13159).
 // Texto pronto em templates.ts pra reativar quando houver caminho de mídia (Cloud API direta).
-const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", TOQUE_PUXAR, "fup3_urgencia"] as const;
+const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", TOQUE_AUDIO_MUDO, TOQUE_PIX, "fup3_urgencia"] as const;
 // Sem janela, o 1º toque não sai antes disso desde a abertura (o delay inicial de 3h é pra quem
 // tem janela; quem não tem continua recebendo o reforço só no dia seguinte, como antes).
 const ESPERA_PM_SEM_JANELA_MS = 24 * 60 * 60 * 1000;
@@ -501,9 +518,9 @@ export async function agenteTemplateAbertura(state: FollowUpStateType) {
     }
   }
 
-  // O "Oiii, consegue responder agora?" só existe dentro da janela; fora dela pula pra urgência.
-  if (SEQUENCIA_RECUPERACAO_PM[contador] === TOQUE_PUXAR && !dentroJanela) {
-    logger.info("follow-up", "Primeira mensagem: janela fechada — toque 2 pulado, segue pra urgência");
+  // Áudio mudo e comprovante PIX só existem dentro da janela; fora dela pula pra urgência.
+  while (!dentroJanela && ehToqueCuriosidade(SEQUENCIA_RECUPERACAO_PM[contador])) {
+    logger.info("follow-up", `Primeira mensagem: janela fechada — ${SEQUENCIA_RECUPERACAO_PM[contador]} pulado`);
     contador++;
   }
 
@@ -534,11 +551,13 @@ export async function agenteTemplateAbertura(state: FollowUpStateType) {
   // Personaliza com concurso do formulário — só chega ao lead na janela aberta (fora, a Meta usa
   // o template com só {{1}}); substituirCampos garante que nenhum [[...]] cru vaze no conteúdo.
   const campos = await buscarCamposFormulario(state.telefone);
-  const conteudo = nomeMsg === TOQUE_PUXAR
-    ? substituirNome(escolherToque2(state.conversationId), state.title)
+  const conteudo = ehToqueCuriosidade(nomeMsg)
+    ? ""
     : substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   try {
-    if (dentroJanela && conteudo) {
+    if (ehToqueCuriosidade(nomeMsg)) {
+      await enviarToqueCuriosidade(nomeMsg, state.accountId, state.conversationId, state.telefone);
+    } else if (dentroJanela && conteudo) {
       logger.info("follow-up", `Janela 24h ativa — mensagem normal: ${nomeMsg}`);
       await enviarMensagem(state.accountId, state.conversationId, conteudo);
       if (state.telefone) {
@@ -557,10 +576,10 @@ export async function agenteTemplateAbertura(state: FollowUpStateType) {
   const descricaoAtualizada = atualizarContadorTemplates(state.description ?? "", novoContador);
 
   // Próximo toque. Com janela: mesma régua dos toques curtos (lib/followup-toques.ts) — depois do
-  // reforço, o "Oiii" perto de a janela fechar; depois dele, a urgência no dia seguinte; depois
-  // dela, o encerramento. Sem janela: um dia entre cada um.
+  // reforço, o áudio mudo no meio do que sobra da janela e o PIX perto de ela fechar; depois, a
+  // urgência no dia seguinte e o encerramento. Sem janela: um dia entre cada um.
   const proximaData = dentroJanela
-    ? agendarProximoToque(contador, msRestantes)
+    ? agendarProximoToque(contador, msRestantes, new Date(), TOQUES_NA_JANELA_CURIOSIDADE)
     : proximoHorarioComercial(new Date(), DELAY_FORA_JANELA_PM_MS, 18);
 
   await atualizarKanbanTask(state.accountId, state.taskId, {
