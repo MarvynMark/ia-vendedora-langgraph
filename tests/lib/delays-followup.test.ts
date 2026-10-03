@@ -10,8 +10,8 @@ describe("delayInicialMs", () => {
     expect(delayInicialMs("Novo Lead")).toBe(5 * MIN);
   });
 
-  test("Primeira mensagem espera o dia seguinte", () => {
-    expect(delayInicialMs("Primeira mensagem")).toBe(1 * DIA);
+  test("Primeira mensagem sai em 3h, dentro da janela de quem pediu o grupo", () => {
+    expect(delayInicialMs("Primeira mensagem")).toBe(3 * HORA);
   });
 
   test("Conexão espera 3h (era 1h — chegava no meio da conversa do lead)", () => {

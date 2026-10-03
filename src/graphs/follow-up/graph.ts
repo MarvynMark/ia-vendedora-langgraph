@@ -2,11 +2,11 @@ import { StateGraph, END } from "@langchain/langgraph";
 import { FollowUpState, type FollowUpStateType } from "./state.ts";
 import { env } from "../../config/env.ts";
 import { avisarComercial } from "../../lib/lembretes-sessao.ts";
-import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, minutosDesdeUltimaMensagemLead, ultimaMensagemAgente, atualizarKanbanTask } from "../../services/chatwoot.ts";
+import { buscarKanbanBoard, enviarMensagem, enviarTemplate, contarMensagensIncoming, verificarJanela24h, msRestantesJanela24h, verificarLeadRespondeuUltimo, minutosDesdeUltimaMensagemLead, ultimaMensagemAgente, atualizarKanbanTask, msDesdePrimeiraSaida } from "../../services/chatwoot.ts";
 import { CONTEUDO_TEMPLATES } from "../../lib/templates.ts";
 import { primeiroNomeSaudacao, substituirNome, substituirCampos } from "../../lib/nome.ts";
 import { buscarCamposFormulario } from "../../db/formulario.ts";
-import { proximoHorarioComercial, agendarMaximizandoJanela } from "../../lib/horario-comercial.ts";
+import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { delayInicialMs } from "../../lib/delays-followup.ts";
 import { TOQUE_IA, TOQUE_PUXAR, escolherToque2, gerarToque1, agendarProximoToque, type EtapaToque } from "../../lib/followup-toques.ts";
 
@@ -421,22 +421,25 @@ async function agenteBoasVindas(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
-// Sequência de recuperação para leads em "Primeira mensagem" (template inicial já enviado).
-// 2 toques com ângulo novo: reforço → urgência.
+// Sequência de recuperação para leads em "Primeira mensagem" (abertura enviada, sem resposta).
+// 03/10/2026 (conv 9560): o 1º toque saía só 24h depois, já fora da janela, e o lead que pediu o
+// grupo de espera passava o primeiro dia inteiro sem nenhum follow-up. Agora, com janela aberta,
+// são DOIS toques grátis no primeiro dia: o reforço (+3h) e o "Oiii, consegue responder agora?"
+// perto de a janela fechar; a urgência vai por template no dia seguinte e o encerramento depois.
+// Sem janela (lead só de formulário, que recebeu a abertura por template) o toque 2 é pulado e a
+// régua continua a de antes: reforço D+1, urgência D+2, encerramento D+3, sem template a mais.
 // NOTA: a prova social (fup2_prova_social) ficou FORA por ora — a versão persuasiva dela usa
 // mídia (imagem/vídeo) no template, que o Chatwoot 4.15.1 não repassa à Meta (bug #13159).
 // Texto pronto em templates.ts pra reativar quando houver caminho de mídia (Cloud API direta).
-const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", "fup3_urgencia"] as const;
+const SEQUENCIA_RECUPERACAO_PM = ["fup1_reforco", TOQUE_PUXAR, "fup3_urgencia"] as const;
+// Sem janela, o 1º toque não sai antes disso desde a abertura (o delay inicial de 3h é pra quem
+// tem janela; quem não tem continua recebendo o reforço só no dia seguinte, como antes).
+const ESPERA_PM_SEM_JANELA_MS = 24 * 60 * 60 * 1000;
 
-// Delays para agendar A PRÓXIMA ação após enviar a mensagem N (índice = contador atual).
-// Dentro da janela 24h (lead chegou a responder): toques mais próximos, encerramento depois.
-const DELAYS_DENTRO_JANELA_MS = [2 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-// Fora da janela (lead frio, quase sempre): reforço → urgência em ~2 dias, encerramento no Dia 3 seguinte.
+// Fora da janela (lead frio): reforço → urgência em ~2 dias, encerramento no Dia 3 seguinte.
 // 21/09/2026: era [2d, 3d] (t1 D+1, t2 D+3, encerramento D+6). Depois de 4 dias de silêncio a
 // resposta é < 9%; agora tudo cabe em 72h: t1 D+1, t2 D+2, encerramento D+3.
-const DELAYS_FORA_JANELA_MS = [24 * 60 * 60 * 1000, 24 * 60 * 60 * 1000] as const;
-// Follow-ups sempre dentro do horário comercial (9h-18h SP), inclusive dentro da janela de 24h.
-const HORA_MAX_FOLLOWUP_JANELA = 20;
+const DELAY_FORA_JANELA_PM_MS = 24 * 60 * 60 * 1000;
 
 function lerContadorTemplates(description: string): number {
   const match = description.match(/followup-templates:\s*(\d+)/i);
@@ -451,7 +454,7 @@ function atualizarContadorTemplates(description: string, novoValor: number): str
   return description ? `${description}\n${linha}` : linha;
 }
 
-async function agenteTemplateAbertura(state: FollowUpStateType) {
+export async function agenteTemplateAbertura(state: FollowUpStateType) {
   logger.info("follow-up", "executando sequência Primeira mensagem...");
   const primeiroNome = primeiroNomeSaudacao(state.title);
 
@@ -484,9 +487,27 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
 
   const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
   const dentroJanela = msRestantes > 0;
-  const contador = lerContadorTemplates(state.description ?? "");
+  let contador = lerContadorTemplates(state.description ?? "");
 
-  // Contador >= 3: todas as mensagens enviadas → enviar encerramento e mover para Nutrir
+  // Sem janela, o reforço espera completar 24h da abertura: o delay inicial (3h) existe pra
+  // aproveitar a janela de quem pediu o grupo, não pra adiantar template pago de lead frio.
+  if (contador === 0 && !dentroJanela) {
+    const desdeAbertura = await msDesdePrimeiraSaida(state.accountId, state.conversationId);
+    if (desdeAbertura < ESPERA_PM_SEM_JANELA_MS - MIN_GAP_JANELA_MS) {
+      const adiada = proximoHorarioComercial(new Date(), ESPERA_PM_SEM_JANELA_MS - desdeAbertura);
+      logger.info("follow-up", `Primeira mensagem sem janela — reforço adiado para ${adiada.toISOString()}`);
+      await atualizarKanbanTask(state.accountId, state.taskId, { due_date: adiada.toISOString() });
+      return { respostaAgente: "" };
+    }
+  }
+
+  // O "Oiii, consegue responder agora?" só existe dentro da janela; fora dela pula pra urgência.
+  if (SEQUENCIA_RECUPERACAO_PM[contador] === TOQUE_PUXAR && !dentroJanela) {
+    logger.info("follow-up", "Primeira mensagem: janela fechada — toque 2 pulado, segue pra urgência");
+    contador++;
+  }
+
+  // Contador >= tamanho da sequência: todas as mensagens enviadas → encerramento e Nutrir
   if (contador >= SEQUENCIA_RECUPERACAO_PM.length) {
     logger.info("follow-up", "Sequência Primeira mensagem esgotada — enviando encerramento");
     const conteudoEnc = substituirNome(CONTEUDO_TEMPLATES["encerramento_03"] ?? "", state.title);
@@ -513,7 +534,9 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   // Personaliza com concurso do formulário — só chega ao lead na janela aberta (fora, a Meta usa
   // o template com só {{1}}); substituirCampos garante que nenhum [[...]] cru vaze no conteúdo.
   const campos = await buscarCamposFormulario(state.telefone);
-  const conteudo = substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
+  const conteudo = nomeMsg === TOQUE_PUXAR
+    ? substituirNome(escolherToque2(state.conversationId), state.title)
+    : substituirCampos(CONTEUDO_TEMPLATES[nomeMsg] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade });
   try {
     if (dentroJanela && conteudo) {
       logger.info("follow-up", `Janela 24h ativa — mensagem normal: ${nomeMsg}`);
@@ -533,14 +556,12 @@ async function agenteTemplateAbertura(state: FollowUpStateType) {
   const novoContador = contador + 1;
   const descricaoAtualizada = atualizarContadorTemplates(state.description ?? "", novoContador);
 
-  // Calcular próxima data com timing diferente por status da janela
-  const delays = dentroJanela ? DELAYS_DENTRO_JANELA_MS : DELAYS_FORA_JANELA_MS;
-  const delayMs = delays[contador] ?? (dentroJanela ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000);
-  // Encerramento (após a última msg da sequência): usa horário padrão 18h. Msgs do mesmo dia: max 20h
-  const isEncerramentoAgendado = dentroJanela && contador === SEQUENCIA_RECUPERACAO_PM.length - 1;
-  const horaMax = (!isEncerramentoAgendado && dentroJanela) ? HORA_MAX_FOLLOWUP_JANELA : 18;
-  // Espreme o próximo toque pra dentro da janela grátis quando possível (economiza template pago).
-  const proximaData = agendarMaximizandoJanela(new Date(), delayMs, msRestantes, { minGapMs: MIN_GAP_JANELA_MS, horaFechamento: horaMax });
+  // Próximo toque. Com janela: mesma régua dos toques curtos (lib/followup-toques.ts) — depois do
+  // reforço, o "Oiii" perto de a janela fechar; depois dele, a urgência no dia seguinte; depois
+  // dela, o encerramento. Sem janela: um dia entre cada um.
+  const proximaData = dentroJanela
+    ? agendarProximoToque(contador, msRestantes)
+    : proximoHorarioComercial(new Date(), DELAY_FORA_JANELA_PM_MS, 18);
 
   await atualizarKanbanTask(state.accountId, state.taskId, {
     description: descricaoAtualizada,

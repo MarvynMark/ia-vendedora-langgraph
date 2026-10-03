@@ -15,8 +15,10 @@ const DIA = 24 * HORA;
 export const DELAY_INICIAL = {
   /** Novo Lead: o template de abertura sai quase imediato. */
   novoLead: 5 * MIN,
-  /** Primeira mensagem: lead frio que acabou de receber a abertura e não respondeu. */
-  primeiraMensagem: 1 * DIA,
+  /** Primeira mensagem: recebeu a abertura e não respondeu. 3h para o reforço sair dentro da
+   *  janela grátis de quem pediu o grupo (03/10/2026, conv 9560: o 1º dia passava sem toque).
+   *  Sem janela o grafo de follow-up segura o reforço até completar 24h da abertura. */
+  primeiraMensagem: 3 * HORA,
   /** Conexão: conversou e parou. 1h chegava no meio da conversa de quem responde em blocos. */
   conexao: 3 * HORA,
   /** Aguardando Pagamento SEM link enviado — viu o preço e não respondeu. Algumas horas, como os

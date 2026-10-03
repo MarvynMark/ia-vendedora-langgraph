@@ -804,6 +804,27 @@ export async function ultimaMensagemAgente(
   }
 }
 
+// Há quanto tempo saiu a PRIMEIRA mensagem nossa nesta conversa (a abertura, para um card em
+// "Primeira mensagem"). Considera só a página que a API devolve. Sem saída → Infinity, para quem
+// usa isto como "ainda é cedo?" seguir o fluxo normal.
+export async function msDesdePrimeiraSaida(
+  accountId: string | number,
+  conversationId: string | number,
+): Promise<number> {
+  try {
+    const data = await listarMensagens(accountId, conversationId) as {
+      payload?: Array<{ message_type: number; created_at: number }>;
+    };
+    const saidas = (data.payload ?? []).filter(m => m.message_type === 1);
+    if (saidas.length === 0) return Infinity;
+    const primeira = Math.min(...saidas.map(m => m.created_at));
+    return Date.now() - primeira * 1000;
+  } catch (e) {
+    logger.warn("chatwoot", "msDesdePrimeiraSaida erro:", e);
+    return Infinity;
+  }
+}
+
 // Verifica se o lead enviou mensagem nas últimas 24h (janela ativa do WhatsApp)
 export async function verificarJanela24h(
   accountId: string | number,
