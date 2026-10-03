@@ -15,7 +15,10 @@ import { rotularDia, rotularHora } from "../../config/agenda.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
-import { buscarHistorico, salvarMensagem } from "../../db/memoria.ts";
+import { buscarHistorico, salvarMensagem, houveAiRecente } from "../../db/memoria.ts";
+
+// Intro de reaplicação: a IA falou com o lead há menos que isso → conversa em andamento, sem intro.
+const JANELA_CONVERSA_QUENTE_MIN = 12 * 60;
 import { buscarConversa, buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
 import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
@@ -442,11 +445,15 @@ async function executarAgente(state: MainAgentStateType) {
     userMessage = `<mensagem-referenciada>\n${state.mensagemReferenciada}\n</mensagem-referenciada>\n\n${userMessage}`;
   }
 
-  // Bloquear execução se for trigger SISTEMA e a conversa já foi iniciada
-  // (cobre o caso de dois timers dispararem simultaneamente — o segundo é descartado após o primeiro salvar no histórico)
+  // Bloquear a intro (trigger SISTEMA) só se a conversa está QUENTE: cobre dois timers disparando
+  // juntos (o segundo é descartado após o primeiro salvar no histórico) e o lead que pede o grupo
+  // de novo no meio de uma conversa. Histórico ANTIGO não bloqueia: antes qualquer fala da IA
+  // bastava, e quem reaplicava dias depois ficava só com o link do grupo, sem intro nenhuma (conv
+  // 3086: a única "fala" era o template de massa do Dia do Cliente, 14 dias antes). Com histórico
+  // antigo a instrução da intro já manda dar as boas-vindas de volta e retomar.
   const mensagemOriginal = state.mensagensAgregadas || state.mensagemProcessada;
-  if (temHistoricoAI && mensagemOriginal.startsWith("[SISTEMA:")) {
-    logger.info("main-agent", "Trigger SISTEMA ignorado: conversa já iniciada, pulando apresentação duplicada");
+  if (temHistoricoAI && mensagemOriginal.startsWith("[SISTEMA:") && (await houveAiRecente(state.telefone, JANELA_CONVERSA_QUENTE_MIN))) {
+    logger.info("main-agent", "Trigger SISTEMA ignorado: a IA falou com o lead nas últimas horas, pulando apresentação duplicada");
     return { outputAgente: "" };
   }
 
