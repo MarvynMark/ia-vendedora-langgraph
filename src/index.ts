@@ -20,6 +20,7 @@ import { verificarLembretesSessao } from "./lib/lembretes-sessao.ts";
 import { agendaConfigurada } from "./services/google-calendar.ts";
 import { limparMensagensProcessadas } from "./db/fila.ts";
 import { iniciarVarreduraFilaOrfa, recuperarConversasTravadasNoBoot } from "./lib/varredura-fila.ts";
+import { recuperarWebhooksPerdidos } from "./lib/webhook-perdido.ts";
 import { verificarNoticias } from "./lib/monitor-noticias.ts";
 import { monitorNoticiasRouter } from "./routes/monitor-noticias.ts";
 import { verificarEditais } from "./lib/monitor-edital.ts";
@@ -124,6 +125,12 @@ setInterval(async () => {
 // Job: varredura de fila órfã — recupera atendimentos travados (deploy/crash deixou lock preso e
 // a mensagem do lead órfã na fila). Reprocessa via grafo. Roda a cada 3 minutos.
 iniciarVarreduraFilaOrfa();
+
+// Job: mensagem de lead que está no Chatwoot mas cujo webhook nunca chegou (03/10, convs 9604 e
+// 9614 ficaram sem resposta). Reenvia ao próprio webhook; a dedup dele evita processar duas vezes.
+setInterval(() => {
+  void recuperarWebhooksPerdidos();
+}, 5 * 60_000);
 
 // Rede de segurança de boot: logo após subir (ex.: fim de um redeploy), recupera conversas
 // travadas por lock preso cuja última mensagem do lead ficou sem resposta — o gap que a

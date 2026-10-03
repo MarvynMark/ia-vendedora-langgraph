@@ -277,6 +277,29 @@ export async function atualizarContatoDados(
   return res.json();
 }
 
+// Conversas de uma inbox com atividade desde `desdeUnix` (segundos), da mais recente pra trás.
+// Para de paginar quando a página já começa a ficar mais velha que o corte.
+export async function listarConversasRecentes(
+  accountId: string | number,
+  inboxId: string | number,
+  desdeUnix: number,
+  maxPaginas = 10,
+): Promise<Array<Record<string, unknown> & { id: number; last_activity_at: number }>> {
+  const todas: Array<Record<string, unknown> & { id: number; last_activity_at: number }> = [];
+  for (let page = 1; page <= maxPaginas; page++) {
+    const res = await fetchComTimeout(
+      `${urlConta(accountId)}/conversations?status=all&inbox_id=${inboxId}&sort_by=last_activity_at_desc&page=${page}`,
+      { method: "GET", headers: headers() },
+    );
+    if (!res.ok) throw new Error(`[chatwoot] listarConversasRecentes falhou (${res.status}): ${await res.text()}`);
+    const data = await res.json() as { data?: { payload?: Array<Record<string, unknown> & { id: number; last_activity_at: number }> } };
+    const pagina = data.data?.payload ?? [];
+    todas.push(...pagina.filter((c) => c.last_activity_at >= desdeUnix));
+    if (pagina.length === 0 || pagina[pagina.length - 1]!.last_activity_at < desdeUnix) break;
+  }
+  return todas;
+}
+
 export async function buscarConversa(
   accountId: string | number,
   conversationId: string | number,
