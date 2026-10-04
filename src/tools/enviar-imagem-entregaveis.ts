@@ -4,6 +4,7 @@ import { enviarArquivo, enviarMensagem, pausaComDigitando, registrarMidiaEnviada
 import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
+import { reivindicarMidia } from "../db/midias.ts";
 
 // Imagem com todos os entregáveis e bônus da mentoria — enviada no PASSO 1 da Mensagem 5C
 export const IMAGEM_ENTREGAVEIS_URL =
@@ -41,6 +42,9 @@ export async function enviarImagemEntregaveis(idConta: string, idConversa: strin
     return "Imagem já enviada nesta conversa.";
   }
   conversasComImagemEnviada.add(idConversa);
+  if (!(await reivindicarMidia(idConversa, "imagem dos entregáveis"))) {
+    return "Imagem já enviada nesta conversa. Não envie de novo.";
+  }
 
   // Envia o texto de apresentação ANTES da imagem (garante a ordem texto -> imagem, que a
   // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e registra o
