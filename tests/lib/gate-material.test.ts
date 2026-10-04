@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { descobertaMaterialFeita, classificarRespostaMaterial, materialDeclaradoPeloLead, falaSubstantiva, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_SITUACAO } from "../../src/lib/gate-material.ts";
+import { descobertaMaterialFeita, classificarRespostaMaterial, materialDeclaradoPeloLead, falaSubstantiva, situacaoDescoberta, descobertaSituacaoFeita, PERGUNTA_DESCOBERTA_SITUACAO, PERGUNTA_DESCOBERTA_MATERIAL } from "../../src/lib/gate-material.ts";
 import { ehMedicoLead, ehMedicoPorFormacao } from "../../src/lib/medico.ts";
 
 const ai = (content: string) => ({ type: "ai", content });
@@ -31,6 +31,19 @@ describe("descobertaMaterialFeita", () => {
         lead("entendi"),
       ]),
     ).toBe(false);
+  });
+
+  test("conv 9619: a IA falou do material do Anual Completo e perguntou outra coisa → não conta", () => {
+    expect(
+      descobertaMaterialFeita([
+        ai("A mentoria é o método e o acompanhamento pra você estudar com direção. O material completo das matérias (videoaulas, PDFs, questões) vem no plano Anual Completo, que já traz a assinatura Premium do Estratégia junto, tudo num lugar só. Quer que eu te mostre como fica?"),
+        lead("Sim, por favor"),
+      ]),
+    ).toBe(false);
+  });
+
+  test("a pergunta padrão do gate conta", () => {
+    expect(descobertaMaterialFeita([ai(PERGUNTA_DESCOBERTA_MATERIAL), lead("já tenho o Estratégia")])).toBe(true);
   });
 
   test("histórico vazio → não concluída", () => {

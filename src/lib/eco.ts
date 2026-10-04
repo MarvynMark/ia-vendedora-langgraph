@@ -74,6 +74,7 @@ export function instrucaoReescrita(falaDoLead: string, jaEnviado = ""): string {
     (p.length ? ` (falou de: ${p.join(", ")})` : "") +
     ". Reescreva devolvendo o fato mais concreto da fala dele — a pessoa, a data, o obstáculo, a " +
     "rotina — com a palavra dele, e só então siga. Não responda com 'claro', 'tranquilo' ou " +
-    "'perfeito' sozinhos." + contexto + "]"
+    "'perfeito' sozinhos, e não devolva a fala dele ('Você mencionou que...', 'Você disse " +
+    "que...'): use a palavra dele numa frase sua, natural, como numa conversa." + contexto + "]"
   );
 }

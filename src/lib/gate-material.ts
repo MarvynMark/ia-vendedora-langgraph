@@ -81,9 +81,21 @@ export function descobertaSituacaoFeita(historico: MensagemHistorico[]): boolean
  * A descoberta já aconteceu? Verdadeiro quando o agente fez a pergunta de material e o lead
  * respondeu alguma coisa depois dela — a classificação do que ele respondeu fica com o LLM.
  */
+// A pergunta precisa ser sobre o que o LEAD tem. Na conv 9619 (03/10/2026) a IA escreveu "O
+// material completo... vem no Anual Completo, que já traz a assinatura Premium do Estratégia. Quer
+// que eu te mostre como fica?" — citava material e terminava em "?", e o gate deu a descoberta por
+// feita. O lead, que já assinava o Estratégia, recebeu o plano com material e só depois o certo.
+const RE_POSSE_DO_LEAD = /\b(j[áa] tem|voc[eê] tem|tu tem|tem algum|tem um|tem uma|t[áa] sem|est[áa] sem|ainda t[áa]|usa algum|estuda (por|com))\b/i;
+
+/** Alguma frase interrogativa do texto pergunta se o lead tem material? */
+export function perguntaSobreMaterialDoLead(texto: string): boolean {
+  const perguntas = (texto ?? "").match(/[^.!?\n]*\?/g) ?? [];
+  return perguntas.some((q) => RE_PERGUNTA_MATERIAL.test(q) && RE_POSSE_DO_LEAD.test(q));
+}
+
 export function descobertaMaterialFeita(historico: MensagemHistorico[]): boolean {
   const iPergunta = historico.findIndex(
-    (m) => m.type === "ai" && RE_PERGUNTA_MATERIAL.test(m.content ?? "") && (m.content ?? "").includes("?"),
+    (m) => m.type === "ai" && perguntaSobreMaterialDoLead(m.content ?? ""),
   );
   if (iPergunta < 0) return false;
   return historico.slice(iPergunta + 1).some((m) => m.type === "human" && (m.content ?? "").trim() !== "");

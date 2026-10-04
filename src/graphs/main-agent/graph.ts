@@ -19,7 +19,7 @@ import { buscarHistorico, salvarMensagem, houveAiRecente } from "../../db/memori
 
 // Intro de reaplicação: a IA falou com o lead há menos que isso → conversa em andamento, sem intro.
 const JANELA_CONVERSA_QUENTE_MIN = 12 * 60;
-import { buscarConversa, buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
+import { buscarConversa, buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, blocoRepeteSaidaRecente, blocoSoEmoji, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
 import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
 import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
@@ -939,7 +939,8 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
     tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [],
   });
   const formatado = formatarTextoFn(state.outputAgente); // determinístico desde o bug das convs 6941/6943
-  // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases que o LLM repetiu do
+  // Cada frase vira uma mensagem separada (bolhas distintas). Remove frases já ditas em turnos
+  // anteriores (blocoRepeteSaidaRecente: se sobra nada, o silêncio é a resposta certa), frases que o LLM repetiu do
   // texto já enviado como apresentação de áudio/vídeo (mensagem_antes), narrações de ação interna,
   // nomes de tool vazados e fechos passivos/robóticos banidos (blocoTemFraseProibida).
   // O anúncio curto de link ("Vou gerar o link pra você... Pode ser?") vira a pergunta do roteiro
@@ -947,12 +948,12 @@ async function enviarTextoComHistorico(state: MainAgentStateType) {
   const frasesBrutas = normalizarPedidoDeLink(dividirMensagem(formatado).flatMap((bloco) => dividirEmFrases(bloco)));
   // Trava de cardápio: no máximo UM plano com preço por turno (ver blocoIntroduzSegundoPlano).
   iniciarTurnoDePreco(state.idConversa);
-  let frases = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f) && !blocoIntroduzSegundoPlano(state.idConversa, f) && !blocoPerguntaEscolhaDeCardapio(state.idConversa, f));
+  let frases = frasesBrutas.filter((f) => !blocoSoEmoji(f) && !blocoRepeteSaidaRecente(state.idConversa, f) && !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoTemFraseProibida(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f) && !blocoIntroduzSegundoPlano(state.idConversa, f) && !blocoPerguntaEscolhaDeCardapio(state.idConversa, f));
   // Salvaguarda: se o filtro esvaziou a mensagem só por causa do fecho passivo (a IA respondeu
   // apenas com um "estou aqui para ajudar"), não ficar em silêncio — relaxa APENAS esse filtro e
   // envia a última frase. Se sobrou só duplicata de mídia / nome de tool, aí sim fica em silêncio.
   if (frases.length === 0 && frasesBrutas.length > 0) {
-    const semFechoPassivo = frasesBrutas.filter((f) => !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f));
+    const semFechoPassivo = frasesBrutas.filter((f) => !blocoSoEmoji(f) && !blocoRepeteSaidaRecente(state.idConversa, f) && !blocoDuplicaMidia(state.idConversa, f) && !blocoNarraEnvioMidia(state.idConversa, f) && !blocoNarraAcaoInterna(f) && !blocoEhNomeDeTool(f) && !blocoVazaJargaoInterno(f));
     if (semFechoPassivo.length > 0) {
       logger.warn("main-agent", "Só fecho passivo sobrou após o filtro — enviando a última frase pra não ficar em silêncio");
       frases = [semFechoPassivo[semFechoPassivo.length - 1]!];

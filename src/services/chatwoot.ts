@@ -503,6 +503,28 @@ export function registrarSaidasRecentes(idConversa: string | number, textos: str
   );
 }
 
+/**
+ * A bolha repete algo que a IA já disse nos turnos anteriores? Na conv 9619 (03/10/2026) o lead
+ * respondeu "Combinado" à despedida e recebeu as MESMAS duas bolhas de novo ("Vou te chamar na
+ * segunda-feira pra ver como ficou." / "Boa reflexão e até segunda!"): o filtro de saída só
+ * comparava com as apresentações de mídia. Link e preço ficam de fora: reenviar a pedido do lead
+ * é legítimo, e descartar deixaria o lead sem o que pediu.
+ */
+export function blocoRepeteSaidaRecente(idConversa: string | number, bloco: string): boolean {
+  if (/https?:\/\/|R\$\s?\d/i.test(bloco)) return false;
+  const anteriores = saidasRecentesPorConversa.get(String(idConversa)) ?? [];
+  return anteriores.length > 0 && ehRepeticaoDeAlgum(bloco, anteriores);
+}
+
+/**
+ * Bolha só de emoji/pontuação ("👍"). O prompt proíbe: pra reagir existe o Reagir_mensagem. Depois
+ * de combinar o retorno, a IA reagia com 👍 E escrevia "👍" como mensagem (simulação da conv 9619).
+ */
+export function blocoSoEmoji(bloco: string): boolean {
+  const t = (bloco ?? "").trim();
+  return t !== "" && t.replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0f\s.,!?…]/gu, "") === "";
+}
+
 /** O que a IA já disse recentemente: histórico do turno + apresentações de mídia deste processo. */
 export function saidasRecentes(idConversa: string | number): string[] {
   const chave = String(idConversa);
@@ -599,6 +621,12 @@ export function blocoTemFraseProibida(bloco: string): boolean {
     // Sem \b ao redor do ".*": em JS, "é"/"ú" não são \w, então \b antes de "é só" / depois de
     // "dúvida" falharia. A exigência de abertura passiva + verbo de oferta já evita falso-positivo.
     /\b(se precisar|se tiver (mais )?(alguma )?d[úu]vida|qualquer (coisa|d[úu]vida)).*(me avis|me cham|[ée] s[óo] (me )?(avis|cham|fal)|estou (aqui|por aqui)|conte comigo)/,
+    // Conv 9619 (03/10/2026), apontadas pelo Gusthavo como "cara de IA, humano nenhum fala isso":
+    // o papagaio que abre devolvendo a fala do lead ("Você mencionou que quer refletir sobre os
+    // valores..."), o "boa reflexão" da despedida e o "é importante se sentir seguro na decisão".
+    /^voc[eê] (mencionou|disse|falou|comentou|me disse|me falou) que\b/,
+    /\bboa reflex[ãa]o\b/,
+    /(^|\s)[ée] importante (voc[eê] )?se sentir segur[oa]\b/,
   ];
   if (proibidas.some((re) => re.test(b))) return true;
 

@@ -82,6 +82,16 @@ export async function criarTabelas() {
         criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      -- Mídia (áudio/vídeo/imagem) já enviada por conversa. Substitui os Sets em memória das tools,
+      -- que zeravam a cada deploy: na conv 9614 o áudio 1 saiu duas vezes porque um deploy caiu
+      -- entre um turno e o outro.
+      CREATE TABLE IF NOT EXISTS midias_enviadas (
+        conversa_id TEXT NOT NULL,
+        midia       TEXT NOT NULL,
+        criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (conversa_id, midia)
+      );
+
       CREATE TABLE IF NOT EXISTS intro_pendente (
         id            SERIAL PRIMARY KEY,
         account_id    TEXT NOT NULL,

@@ -82,7 +82,9 @@ describe("main agent prompt", () => {
     // 98k → 100,5k: padrões das intervenções do Gusthavo e do Pedro nas vendas (revisão de
     // 04/10/2026): parcela ou total na hesitação, lista de entregáveis, link nomeando o plano,
     // "travou ou foi tempo?" depois do link, escalação do que só a equipe faz. ~2k caracteres.
-    expect(prompt.length).toBeLessThan(100500);
+    // 100,5k → 101,5k: conv 9619 (04/10/2026) — pergunta do pitch só na 1ª vez, validação de quem
+    // já tem material, adiamento com data sem papagaio, não repetir despedida. ~1,2k caracteres.
+    expect(prompt.length).toBeLessThan(101500);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela

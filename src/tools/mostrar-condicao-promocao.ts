@@ -5,6 +5,7 @@ import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { salvarMensagem } from "../db/memoria.ts";
 import { tabelaPromocao } from "../lib/promocao.ts";
 import { logger } from "../lib/logger.ts";
+import { reivindicarMidia } from "../db/midias.ts";
 
 // A tabela da promoção do Dia do Cliente vai por ESTA tool, nunca pelo texto do modelo.
 //
@@ -33,6 +34,9 @@ export function criarToolMostrarCondicaoPromocao(ctx: ContextoPromocao) {
         return "A tabela JÁ foi enviada nesta conversa. Não repita os valores: responda o que o lead perguntou e leve para a escolha do plano.";
       }
       conversasComTabela.add(ctx.idConversa);
+      if (!(await reivindicarMidia(ctx.idConversa, "tabela da promoção"))) {
+        return "A tabela JÁ foi enviada nesta conversa. Não repita os valores: responda o que o lead perguntou e leve para a escolha do plano.";
+      }
       try {
         await enviarMensagemAntes(ctx.idConta, ctx.idConversa, mensagem_antes, "tool:mostrar-condicao-promocao");
         const tabela = tabelaPromocao();
