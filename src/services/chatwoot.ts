@@ -691,10 +691,11 @@ export function blocoVazaJargaoInterno(bloco: string): boolean {
 // Calcula um tempo de "digitando" proporcional ao tamanho do texto, simulando a velocidade
 // de digitação de um humano. Assim uma mensagem longa demora mais para "ser digitada" que um
 // "sim" curto. Limitado entre minMs e maxMs para não ficar instantâneo nem eterno.
-export function calcularDelayDigitando(texto: string, minMs = 4000, maxMs = 15000): number {
+export function calcularDelayDigitando(texto: string, minMs = 6000, maxMs = 20000): number {
   const chars = (texto ?? "").length;
   // Ritmo de quem digita no celular. Era 12 (3-12s): as bolhas saíam rápido demais e, junto com
-  // o áudio chegando logo em seguida, denunciavam que era IA.
+  // o áudio chegando logo em seguida, denunciavam que era IA. Piso/teto 4-15s → 6-20s em 04/10/2026,
+  // a pedido do Gusthavo (conv 9614: bolhas em sequência rápida demais).
   const CHARS_POR_SEGUNDO = 8;
   const ms = Math.round((chars / CHARS_POR_SEGUNDO) * 1000);
   return Math.min(Math.max(ms, minMs), maxMs);

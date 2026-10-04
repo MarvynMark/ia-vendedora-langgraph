@@ -16,6 +16,7 @@ import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
 import { buscarHistorico, salvarMensagem, houveAiRecente } from "../../db/memoria.ts";
+import { vincularTelefoneConversa } from "../../db/midias.ts";
 
 // Intro de reaplicação: a IA falou com o lead há menos que isso → conversa em andamento, sem intro.
 const JANELA_CONVERSA_QUENTE_MIN = 12 * 60;
@@ -132,13 +133,18 @@ export async function coletarMensagens(state: MainAgentStateType) {
 // (comportamento observado na conversa 3433). Aqui detectamos a frase de confirmação SEM o tool
 // call e enviamos a mídia deterministicamente, antes do texto de confirmação ir para o WhatsApp.
 // O dedupe interno das tools (Set por conversa) evita envio duplicado.
+// Devolve o texto que ainda falta enviar: quando a guarda manda um áudio, o trecho da resposta até
+// o anúncio ("...Vou te mandar um áudio que explica isso.") vai ANTES dele, como mensagem_antes.
 async function garantirMidiaEntregue(
   output: string,
+  preambulos: string[],
   toolsChamadas: Set<string>,
   idConta: string,
   idConversa: string,
-) {
-  const txt = output.toLowerCase();
+): Promise<{ restante: string; enviadoAntes: string[] }> {
+  const txt = [output, ...preambulos].join("\n").toLowerCase();
+  let restante = output;
+  const enviadoAntes: string[] = [];
 
   // Imagem de entregáveis (5C): "esses são (todos) os entregáveis" = IA acha que já mostrou a imagem
   const confirmouEntregaveis = /esses s[ãa]o (todos )?os entreg[áa]veis/.test(txt);
@@ -164,15 +170,27 @@ async function garantirMidiaEntregue(
     }
   }
 
-  // Áudio 1 do Walker: a IA sempre escreve "vou te mandar um áudio" logo antes de enviá-lo.
-  // Se narrou sem chamar a tool, o áudio nunca chegaria — enviamos deterministicamente.
-  const confirmouAudio1 = /vou te (mandar|enviar|passar) (um )?[áa]udio/.test(txt);
-  if (confirmouAudio1 && !toolsChamadas.has("Enviar_audio_walker_1")) {
-    logger.warn("main-agent", "Guarda de mídia: IA anunciou áudio 1 sem chamar a tool — enviando áudio deterministicamente");
+  // Áudios do Walker: a IA escreve "vou te mandar um áudio" (1) / "outro áudio" (2) logo antes de
+  // enviá-lo. Se narrou sem chamar a tool, o áudio nunca chegaria — enviamos deterministicamente.
+  // O texto até o anúncio sai ANTES do áudio: mandar o áudio aqui e o texto depois, no envio
+  // normal, fazia o áudio chegar antes da frase que o apresenta (conv 9614, 03/10 18:43).
+  const anunciouAudio2 = RE_ANUNCIO_AUDIO_2.test(txt);
+  const audiosAnunciados: Array<[1 | 2, boolean]> = [
+    [2, anunciouAudio2],
+    [1, !anunciouAudio2 && RE_ANUNCIO_AUDIO_1.test(txt)],
+  ];
+  for (const [numero, anunciou] of audiosAnunciados) {
+    if (!anunciou || toolsChamadas.has(`Enviar_audio_walker_${numero}`)) continue;
+    logger.warn("main-agent", `Guarda de mídia: IA anunciou áudio ${numero} sem chamar a tool — enviando áudio deterministicamente`);
+    const { antes, depois } = dividirNoAnuncioDeAudio(restante);
     try {
-      await enviarAudioWalker(1, idConta, idConversa);
+      await enviarAudioWalker(numero, idConta, idConversa, antes || undefined);
+      if (antes) {
+        restante = depois;
+        enviadoAntes.push(antes);
+      }
     } catch (e) {
-      logger.error("main-agent", "garantirMidiaEntregue (áudio 1) erro:", e);
+      logger.error("main-agent", `garantirMidiaEntregue (áudio ${numero}) erro:`, e);
     }
   }
 
@@ -195,6 +213,23 @@ async function garantirMidiaEntregue(
       }
     }
   }
+  return { restante, enviadoAntes };
+}
+
+const RE_ANUNCIO_AUDIO_1 = /vou te (mandar|enviar|passar) (um )?[áa]udio/i;
+const RE_ANUNCIO_AUDIO_2 = /vou te (mandar|enviar|passar) (um )?outro [áa]udio/i;
+
+/**
+ * Separa a resposta no fim da frase que anuncia o áudio: `antes` vai como mensagem_antes (antes do
+ * áudio), `depois` segue no envio normal. Sem anúncio no texto, tudo fica em `depois`.
+ */
+export function dividirNoAnuncioDeAudio(texto: string): { antes: string; depois: string } {
+  const m = RE_ANUNCIO_AUDIO_2.exec(texto) ?? RE_ANUNCIO_AUDIO_1.exec(texto);
+  if (!m) return { antes: "", depois: texto };
+  const resto = texto.slice(m.index);
+  const fim = resto.search(/[.!?…](\s|$)/);
+  const corte = fim === -1 ? texto.length : m.index + fim + 1;
+  return { antes: texto.slice(0, corte).trim(), depois: texto.slice(corte).trim() };
 }
 
 // Etapas do funil de onde o card AINDA pode avançar para "Aguardando Pagamento". Ficar de fora
@@ -291,6 +326,8 @@ async function executarAgente(state: MainAgentStateType) {
   // Zera o registro de textos de mídia deste turno (as tools de áudio o preenchem ao enviar o
   // mensagem_antes, e o envio do output filtra blocos que dupliquem esse texto)
   limparTextosMidia(state.idConversa);
+  // A trava de mídia (db/midias.ts) confere o histórico do lead, que é chaveado pelo telefone.
+  vincularTelefoneConversa(state.idConversa, state.telefone);
 
   const tarefa = state.tarefa ?? {};
   const board = tarefa["board"] as { steps?: Array<{ id: number; name: string }> } | undefined;
@@ -544,13 +581,18 @@ async function executarAgente(state: MainAgentStateType) {
     // Recebe o texto COMPLETO (inclusive o preâmbulo descartado): esta guarda detecta por regex
     // "a IA narrou o envio mas não chamou a tool", e perder o preâmbulo abriria um buraco nela.
     // Na abertura não sai mídia nenhuma, nem pela guarda (conv 9476).
+    let outputAposMidia = output;
     if (!String(state.idMensagem).startsWith("intro_")) {
-      await garantirMidiaEntregue(
-        [output, ...preambulosDescartados].join("\n"),
+      const guarda = await garantirMidiaEntregue(
+        output,
+        preambulosDescartados,
         toolsChamadas,
         state.idConta,
         state.idConversa,
       );
+      outputAposMidia = guarda.restante;
+      // O trecho que a guarda mandou antes do áudio já chegou ao lead: conta como texto do turno.
+      mensagensAntes.push(...guarda.enviadoAntes);
     }
 
     // Persiste no histórico os textos de apresentação de mídia (mensagem_antes) enviados neste
@@ -570,7 +612,7 @@ async function executarAgente(state: MainAgentStateType) {
     // A pergunta de descoberta só acontecia em 20 de 62 conversas que chegaram ao preço; sem ela
     // o agente chuta o plano e depois se corrige com um segundo preço (conv 5929). Médico passa
     // direto: a trilha Médico Legista já inclui o material.
-    let outputFinal = output;
+    let outputFinal = outputAposMidia;
     const historicoComTurnoAtual = [...historico, { type: "human", content: mensagemOriginal }];
     // O que os gates seguram é a OFERTA, não só o número. Enquanto o gatilho era só o preço, um
     // lead quente que pedia pra contratar recebia o LINK direto, sem um único R$ no texto, e
