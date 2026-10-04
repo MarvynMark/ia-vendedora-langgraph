@@ -55,14 +55,11 @@ export const env = {
 
   TZ: process.env["TZ"] ?? "America/Sao_Paulo",
 
-  // 25s → 35s (04/10/2026): lead que manda mensagem picada ainda estava digitando quando a IA
-  // começava a responder (conv 9614). Conta a partir da ÚLTIMA mensagem (verificarStale).
-  DEBOUNCE_DELAY_MS: Number(process.env["DEBOUNCE_DELAY_MS"] ?? "35000"),
+  DEBOUNCE_DELAY_MS: Number(process.env["DEBOUNCE_DELAY_MS"] ?? "25000"),
   // 12 x 16s ≈ 3,2 min de espera: cobre o turno de áudio (bolhas + ~1 min "gravando"). Com 5, a
   // mensagem que o lead mandava durante a gravação desistia da trava antes de o turno acabar, e o
   // turno descartava a própria resposta ao ver a mensagem nova: ninguém respondia.
-  // 12 → 16 (~4,3 min) em 04/10/2026, acompanhando o "digitando" mais lento (6-20s por bolha).
-  LOCK_MAX_RETRIES: Number(process.env["LOCK_MAX_RETRIES"] ?? "16"),
+  LOCK_MAX_RETRIES: Number(process.env["LOCK_MAX_RETRIES"] ?? "12"),
   LOCK_RETRY_DELAY_MS: Number(process.env["LOCK_RETRY_DELAY_MS"] ?? "16000"),
   LOCK_TTL_MINUTES: Number(process.env["LOCK_TTL_MINUTES"] ?? "8"),
 

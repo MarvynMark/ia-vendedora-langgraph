@@ -4,7 +4,6 @@ import { enviarArquivo, enviarMensagem, pausaComDigitando, registrarMidiaEnviada
 import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
-import { reivindicarMidia } from "../db/midias.ts";
 
 // Vídeo de apresentação da plataforma por dentro — enviado durante a VENDA (Etapa 5B, após imagem de entregáveis)
 export const VIDEO_PLATAFORMA_URL = "https://s3.stkd.site/arquivosclientes/Vestigium%2Fplataforma-entregaveis-walker-falando.mp4";
@@ -27,9 +26,6 @@ export async function enviarVideoPlataforma(idConta: string, idConversa: string,
     return "Vídeo já enviado nesta conversa.";
   }
   conversasComVideoEnviado.add(idConversa);
-  if (!(await reivindicarMidia(idConversa, "vídeo da plataforma"))) {
-    return "Vídeo já enviado nesta conversa. Não envie de novo.";
-  }
 
   // Envia o texto de apresentação ANTES do vídeo (garante a ordem texto -> vídeo)
   await enviarMensagemAntes(idConta, idConversa, mensagemAntes, "tool:enviar-video");

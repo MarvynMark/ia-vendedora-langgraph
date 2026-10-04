@@ -4,7 +4,6 @@ import { enviarArquivo, enviarMensagem, pausaComDigitando, registrarMidiaEnviada
 import { enviarMensagemAntes } from "./mensagem-antes.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { logger } from "../lib/logger.ts";
-import { reivindicarMidia } from "../db/midias.ts";
 
 // Áudios pré-gravados do Perito Walker (formato ogg/opus) enviados como nota de voz
 // em pontos específicos da qualificação. Hospedados no S3 (bucket arquivosclientes, prefixo Vestigium/).
@@ -78,9 +77,6 @@ export async function enviarAudioWalker(
     return `Áudio ${numero} já enviado nesta conversa.`;
   }
   audiosEnviados.add(chaveDedupe);
-  if (!(await reivindicarMidia(idConversa, `áudio ${numero} do Walker`))) {
-    return `Áudio ${numero} já enviado nesta conversa. Não envie de novo.`;
-  }
 
   // Envia o texto de contexto ANTES do áudio. Garante a ordem texto -> áudio (que a
   // arquitetura sozinha não garante, pois a tool roda antes do texto de resposta) e deixa

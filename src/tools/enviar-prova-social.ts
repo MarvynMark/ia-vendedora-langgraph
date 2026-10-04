@@ -6,7 +6,6 @@ import { buscarCamposFormulario } from "../db/formulario.ts";
 import { escolherCaso } from "../lib/prova-social.ts";
 import { logger } from "../lib/logger.ts";
 import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
-import { reivindicarMidia } from "../db/midias.ts";
 
 // Print de um aprovado da MESMA graduação do lead (ver lib/prova-social.ts). A escolha e a legenda
 // são determinísticas: o modelo só decide o momento de chamar.
@@ -28,9 +27,6 @@ export async function enviarProvaSocial(ctx: ContextoProvaSocial): Promise<strin
     return "Não tenho print de aprovado da graduação deste lead. Siga sem o print: use a prova social do roteiro (93% no RS) e não comente que faltou.";
   }
   conversasComProvaSocial.add(ctx.idConversa);
-  if (!(await reivindicarMidia(ctx.idConversa, "print de aprovado"))) {
-    return "O print de aprovado já foi enviado nesta conversa. Não envie de novo.";
-  }
 
   try {
     // Baixa TUDO antes de mandar a legenda: se o MinIO falhar, o lead não fica com um "Olha a

@@ -1,7 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { rotaStale, rotaLock, rotaNovasMsgs } from "../../src/graphs/main-agent/graph.ts";
 import type { MainAgentStateType } from "../../src/graphs/main-agent/state.ts";
-import { env } from "../../src/config/env.ts";
 
 /**
  * Integration tests for the debounce → stale → lock → agent → send pipeline.
@@ -79,8 +78,8 @@ describe("debounce → stale → lock → agent → send pipeline", () => {
       expect(rotaLock(state)).toBe("esperar_retry");
     });
 
-    test("locked=true, tentativas esgotadas (LOCK_MAX_RETRIES) → end sem processar", () => {
-      const state = makeState({ locked: true, lockTentativas: env.LOCK_MAX_RETRIES });
+    test("locked=true, tentativas esgotadas (5) → end sem processar", () => {
+      const state = makeState({ locked: true, lockTentativas: 5 });
       expect(rotaLock(state)).toBe("end");
     });
   });
