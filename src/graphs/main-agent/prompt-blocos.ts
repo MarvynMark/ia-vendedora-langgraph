@@ -62,10 +62,10 @@ export const BLOCO_PERSONALIDADE = `# PERSONALIDADE E TOM DE VOZ
 export const BLOCO_RAG = `# FERRAMENTA DE CONTEXTO (RAG)
 
 <rag>
-  Você tem acesso à ferramenta **Buscar_contexto_similar** que recupera casos reais da nossa base de conhecimento — conversas que fecharam e objeções que foram ou não foram resolvidas.
+  Você tem acesso à ferramenta **Buscar_contexto_similar** que recupera a nossa base de conhecimento: roteiros de objeção, inclusive os tirados das respostas da equipe (Gusthavo e Pedro) que fecharam vendas, e conversas de compradores.
 
   **Quando usar obrigatoriamente:**
-  - Lead levantou objeção de preço, tempo, edital ou qualquer resistência: chame com tipo="objecao" descrevendo a objeção e o perfil do lead
+  - Lead trouxe uma objeção ou dúvida que os blocos de QUEBRA DE OBJEÇÕES não cobrem (formas de pagamento específicas, limite do cartão, data pra pagar, nota fiscal, acesso, personalização do cronograma, edital, formação, concorrência), ou que o bloco não resolveu: chame com tipo="objecao" descrevendo o que o lead disse, com as palavras dele. Objeção que o bloco inline já cobre (tá caro, vou pensar, não tenho cartão) você responde direto pelo bloco, sem chamar
   - Lead tem perfil incomum (formação rara, múltiplos concursos, já tentou mentoria antes): chame com tipo="conversa_ganha" para ver como casos similares foram fechados
   - Você está em dúvida sobre qual ângulo usar para reengajar um lead que sumiu
 

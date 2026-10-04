@@ -79,7 +79,10 @@ describe("main agent prompt", () => {
     // 96k → 97k: bloco "O LEAD MANDOU UMA IMAGEM" (conv 4014), ~900 caracteres.
     // 97k → 98k: Mensagem 7 com ECO/PROBLEMA definidos fora das aspas + exemplo (conv 9486, os
     // colchetes saíam literais pro lead), ~300 caracteres.
-    expect(prompt.length).toBeLessThan(98000);
+    // 98k → 100,5k: padrões das intervenções do Gusthavo e do Pedro nas vendas (revisão de
+    // 04/10/2026): parcela ou total na hesitação, lista de entregáveis, link nomeando o plano,
+    // "travou ou foi tempo?" depois do link, escalação do que só a equipe faz. ~2k caracteres.
+    expect(prompt.length).toBeLessThan(100500);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
