@@ -31,6 +31,7 @@ mock.module("../../src/services/chatwoot.ts", () => ({
   saidasRecentes: () => [],
 }));
 mock.module("../../src/db/memoria.ts", () => ({
+  houveAiRecente: async () => false,
   salvarMensagem: async (telefone: string, msg: { content: string }) => {
     salvarCalls.push({ telefone, content: msg.content });
   },

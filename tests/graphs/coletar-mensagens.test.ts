@@ -10,6 +10,7 @@ mock.module("../../src/db/fila.ts", () => ({
 }));
 
 mock.module("../../src/db/memoria.ts", () => ({
+  houveAiRecente: async () => false,
   salvarMensagem: mock(async () => {}),
   buscarHistorico: mock(async () => []),
 }));

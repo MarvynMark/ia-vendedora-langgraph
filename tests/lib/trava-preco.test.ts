@@ -16,7 +16,7 @@ describe("trava de cardápio (blocoIntroduzSegundoPlano)", () => {
       "Maravilha, o plano que faz sentido pro teu momento é o Anual Completo, que já vem com a Premium do Estratégia inclusa",
       "Fica em 12x de R$ 394 no cartão",
       "Tem também o Semestral, 6 meses de acompanhamento, em 12x de R$ 197 no cartão",
-      "Algum desses encaixa pro seu momento? Pode ser transparente comigo",
+      "Qual desses encaixa melhor pro seu momento, o Anual Completo ou o Semestral?",
     ];
     expect(filtrarTurno("t1", frases)).toEqual(frases);
   });
@@ -116,7 +116,7 @@ describe("fecho oficial do pitch", () => {
     blocoIntroduzSegundoPlano("t3", "Tem também o Semestral, 12x de R$ 197");
     expect(blocoIntroduzSegundoPlano("t3", "E o Trimestral por 12x de R$ 98,35")).toBe(true);
     expect(
-      blocoPerguntaEscolhaDeCardapio("t3", "Qual desses encaixa melhor pro seu momento? O Anual Completo ou o Semestral? Pode ser transparente comigo."),
+      blocoPerguntaEscolhaDeCardapio("t3", "Qual desses encaixa melhor pro seu momento, o Anual Completo ou o Semestral Premium?"),
     ).toBe(false);
   });
 

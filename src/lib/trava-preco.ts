@@ -60,11 +60,12 @@ export function blocoIntroduzSegundoPlano(idConversa: string | number, bloco: st
 const RE_ESCOLHA_DE_CARDAPIO =
   /qu(al|ais)\s+(desses|dessas|destes|destas|delas|deles)\b|qual\s+(plano|op[çc][ãa]o)\s+(voc[êe]|faz|encaixa|prefere)/i;
 
-// O fecho OFICIAL do pitch ("Qual desses encaixa melhor pro seu momento? O Anual Completo ou o
-// Semestral? Pode ser transparente comigo.") casa com o regex acima, mas nomeia os dois planos que
-// SOBREVIVEM à trava — nunca é órfão. Sem esta exceção, um turno em que a trava barrasse um
-// terceiro plano deixaria o lead com os preços e sem nenhuma pergunta.
-const RE_FECHO_OFICIAL = /transparente comigo/i;
+// O fecho OFICIAL do pitch ("Qual desses encaixa melhor pro seu momento, o Anual Completo ou o
+// Semestral Premium?") casa com o regex acima, mas nomeia os dois planos que SOBREVIVEM à trava —
+// nunca é órfão. Sem esta exceção, um turno em que a trava barrasse um terceiro plano deixaria o
+// lead com os preços e sem nenhuma pergunta. A assinatura era o "pode ser transparente comigo",
+// que saiu do roteiro em 05/10/2026; agora é a pergunta que nomeia os planos.
+const RE_FECHO_OFICIAL = /encaixa melhor pr[ao] (seu|voc[eê] no) momento[,?]?\s*(o|a)\s+(anual|semestral)/i;
 
 /** True se a frase pede ao lead que escolha entre planos que a trava acabou de remover do turno. */
 export function blocoPerguntaEscolhaDeCardapio(idConversa: string | number, bloco: string): boolean {

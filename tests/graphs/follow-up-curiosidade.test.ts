@@ -28,6 +28,7 @@ mock.module("../../src/services/chatwoot.ts", () => ({
   atualizarKanbanTask: async (_c: unknown, _t: unknown, dados: { description?: string; due_date?: string }) => { updates.push(dados); },
 }));
 mock.module("../../src/db/memoria.ts", () => ({
+  houveAiRecente: async () => false,
   salvarMensagem: async (_t: string, m: { content: string }) => { historico.push(m.content); },
   buscarHistorico: async () => [],
 }));

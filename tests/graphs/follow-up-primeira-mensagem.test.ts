@@ -30,6 +30,7 @@ const fetchReal = globalThis.fetch;
 globalThis.fetch = (async () => new Response(new Uint8Array([1]), { headers: { "content-type": "application/octet-stream" } })) as unknown as typeof fetch;
 afterAll(() => { globalThis.fetch = fetchReal; });
 mock.module("../../src/db/memoria.ts", () => ({
+  houveAiRecente: async () => false,
   salvarMensagem: async () => {},
   buscarHistorico: async () => [],
 }));

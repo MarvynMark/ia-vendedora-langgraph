@@ -22,6 +22,7 @@ mock.module("../../src/services/chatwoot.ts", () => ({
 }));
 
 mock.module("../../src/db/memoria.ts", () => ({
+  houveAiRecente: async () => false,
   buscarHistorico: mock(async () => []),
   salvarMensagem: mock(async () => {}),
 }));

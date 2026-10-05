@@ -17,6 +17,7 @@ mock.module("../../src/services/chatwoot.ts", () => ({
 }));
 
 mock.module("../../src/db/memoria.ts", () => ({
+  houveAiRecente: async () => false,
   salvarMensagem: mockNoOp,
   buscarHistorico: mock(async () => []),
 }));
@@ -79,6 +80,22 @@ describe("moverParaAguardandoPagamento", () => {
     expect(dados.board_step_id).toBe(8);
     expect(dados.description).toContain("Descrição: em negociação");
     expect(tarefa["board_step_id"]).toBe(8); // reflete no turno atual
+  });
+
+  // Conv 3086 (05/10/2026): entrou com "Follow-ups: 4" herdado da Conexão e a sequência pós-preço
+  // pulou direto pro encerramento, 1h20 depois do pitch.
+  test("ao entrar na etapa, zera o contador de follow-ups da etapa anterior", async () => {
+    const tarefa: Record<string, unknown> = { id: 59, board_step_id: 10, description: DESCRICAO.replace("Follow-ups: 0", "Follow-ups: 4") };
+    await moverParaAguardandoPagamento("1", tarefa, ETAPAS, false);
+    const [, , dados] = mockAtualizarKanbanTask.mock.calls[0] as unknown as [string, number, { description: string }];
+    expect(dados.description).toContain("🔁 - Follow-ups: 0");
+  });
+
+  test("promovido a 'link enviado' DENTRO da etapa, mantém a contagem", async () => {
+    const tarefa: Record<string, unknown> = { id: 60, board_step_id: 8, description: comStatusNaDescricao(DESCRICAO.replace("Follow-ups: 0", "Follow-ups: 2"), "em negociação") };
+    await moverParaAguardandoPagamento("1", tarefa, ETAPAS, true);
+    const [, , dados] = mockAtualizarKanbanTask.mock.calls[0] as unknown as [string, number, { description: string }];
+    expect(dados.description).toContain("🔁 - Follow-ups: 2");
   });
 
   test("com link de pagamento na mesma resposta, marca 'link enviado' (roteia p/ a cadência de lembrete)", async () => {

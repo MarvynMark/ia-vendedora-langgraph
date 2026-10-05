@@ -245,6 +245,15 @@ export function comStatusNaDescricao(descricao: string, status: string): string 
   return d ? `${d}\n👤 - Descrição: ${status}` : `👤 - Descrição: ${status}`;
 }
 
+// Etapa nova = sequência de follow-up nova. O webhook do Kanban (routes/followup.ts) também zera,
+// mas aqui a descrição é regravada a partir da tarefa do início do turno e levava o contador da
+// etapa anterior junto: na conv 3086 (05/10/2026) o card entrou em Aguardando Pagamento com
+// "Follow-ups: 4", a sequência pós-preço (3 toques) foi direto pro encerramento 1h20 depois do
+// pitch e o lead respondeu "não adianta botar pressão".
+export function zerarContadorFollowups(descricao: string): string {
+  return descricao.replace(/🔁\s*-\s*Follow-ups:\s*\d+/i, "🔁 - Follow-ups: 0");
+}
+
 // Move o card para "Aguardando Pagamento" quando o preço é apresentado. Ver o comentário no
 // ponto de chamada (dentro de executarAgente) para o porquê de isto não poder ficar com o LLM.
 export async function moverParaAguardandoPagamento(
@@ -271,7 +280,9 @@ export async function moverParaAguardandoPagamento(
     // Reagendar é obrigatório ao mudar de etapa: sem isso o card entra na nova cadência com o
     // prazo antigo (quase sempre vencido) e o cron dispara o primeiro toque no ciclo seguinte —
     // foi o que pôs a abertura e o follow-up no mesmo minuto na conv 6900.
-    const descricaoNova = comStatusNaDescricao(String(tarefa["description"] ?? ""), status);
+    const descricaoComStatus = comStatusNaDescricao(String(tarefa["description"] ?? ""), status);
+    // Só zera ao ENTRAR na etapa; promover para "link enviado" dentro dela mantém a contagem.
+    const descricaoNova = jaEmPagamento ? descricaoComStatus : zerarContadorFollowups(descricaoComStatus);
     await atualizarKanbanTask(idConta, taskId as number, {
       board_step_id: stepPagamento.id,
       description: descricaoNova,
@@ -306,7 +317,7 @@ export async function desfazerPagamentoPrematuro(
   if (Number(tarefa["board_step_id"] ?? 0) !== stepPagamento.id) return;
   if (stepAntesDoTurno === stepPagamento.id) return;
   try {
-    const descricaoNova = comStatusNaDescricao(String(tarefa["description"] ?? ""), "qualificando");
+    const descricaoNova = zerarContadorFollowups(comStatusNaDescricao(String(tarefa["description"] ?? ""), "qualificando"));
     await atualizarKanbanTask(idConta, taskId as number, {
       board_step_id: stepConexao.id,
       description: descricaoNova,
