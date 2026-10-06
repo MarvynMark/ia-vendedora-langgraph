@@ -28,6 +28,24 @@ describe("extrairRespostas", () => {
     ]);
   });
 
+  test("Respondi: usa respondent.answers e ignora raw_answers", () => {
+    const r = extrairRespostas({
+      form: { form_name: "Diagnóstico Inicial – Vestigium", form_id: "Fzj4Z08x" },
+      respondent: {
+        status: "completed",
+        answers: { "Nome completo": "Ana Souza", "WhatsApp com DDD, só números": "55 62981384100" },
+        raw_answers: [
+          { question: { question_title: "Nome completo", question_id: "x7l", question_type: "name" }, answer: "ana souza" },
+        ],
+      },
+    });
+    expect(r).toEqual([
+      { pergunta: "Nome completo", resposta: "Ana Souza" },
+      { pergunta: "WhatsApp com DDD, só números", resposta: "55 62981384100" },
+    ]);
+    expect(whatsappDoAluno(r)).toBe("+5562981384100");
+  });
+
   test("lista de itens question/answer, pulando os vazios", () => {
     const r = extrairRespostas({
       answers: [

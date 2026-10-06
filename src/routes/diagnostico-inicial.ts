@@ -3,13 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
-import {
-  buscarContatoPorQuery,
-  buscarConversasDoContato,
-  criarContato,
-  criarConversa,
-  enviarMensagem,
-} from "../services/chatwoot.ts";
+import { enviarMensagem } from "../services/chatwoot.ts";
 import {
   PROMPT_ROTEIRO,
   extrairRespostas,
@@ -20,11 +14,11 @@ import {
   whatsappDoAluno,
 } from "../lib/diagnostico-inicial.ts";
 
-// Quem recebe o roteiro para gravar. Hoje é o número de teste do Gusthavo; quando aprovar,
-// troca no Coolify pelo do Walker. Sai pela "#02 Suporte" (inbox 14, WhatsApp via Baileys, então
-// texto livre, sem template).
-const DESTINO_TELEFONE = process.env["DIAGNOSTICO_DESTINO_TELEFONE"] ?? "+5562981384100";
-const DESTINO_INBOX_ID = Number(process.env["DIAGNOSTICO_INBOX_ID"] ?? "14");
+// Conversa de quem recebe o roteiro para gravar. Por ID de conversa, não por telefone: o contato
+// do Gusthavo está gravado sem o nono dígito (+556281384100), a busca pelo número com 9 não acha
+// ninguém e a criação de conversa nova é recusada (404). Hoje é a conversa 1770 (Gusthavo, #02
+// Suporte); quando aprovar, troca no Coolify pela conversa do Walker.
+const DESTINO_CONVERSA_ID = Number(process.env["DIAGNOSTICO_DESTINO_CONVERSA_ID"] ?? "1770");
 
 // Body cru dos últimos envios: o formato do webhook do Respondi não é documentado, e o buffer
 // geral de /webhook/logs só guarda um resumo e satura com o tráfego do Chatwoot.
@@ -50,17 +44,6 @@ async function gerarRoteiro(entrada: string): Promise<string> {
   return typeof resposta.content === "string" ? resposta.content : "";
 }
 
-async function conversaDoDestino(): Promise<number> {
-  const accountId = env.CHATWOOT_ACCOUNT_ID;
-  const contato =
-    (await buscarContatoPorQuery(accountId, DESTINO_TELEFONE)) ??
-    (await criarContato(accountId, { name: DESTINO_TELEFONE, phone_number: DESTINO_TELEFONE }));
-  const conversas = await buscarConversasDoContato(accountId, contato.id);
-  const existente = conversas.find(c => c.inbox_id === DESTINO_INBOX_ID);
-  if (existente) return existente.id;
-  return (await criarConversa(accountId, { inbox_id: DESTINO_INBOX_ID, contact_id: contato.id })).id;
-}
-
 async function processarDiagnostico(body: unknown) {
   const respostas = extrairRespostas(body);
   const nome = nomeDoAluno(respostas);
@@ -74,7 +57,7 @@ async function processarDiagnostico(body: unknown) {
   if (!roteiro) throw new Error("IA devolveu roteiro vazio");
 
   const mensagem = montarMensagemRoteiro({ nome, concurso, whatsapp: whatsappDoAluno(respostas), roteiro });
-  const conversationId = await conversaDoDestino();
+  const conversationId = DESTINO_CONVERSA_ID;
   await enviarMensagem(env.CHATWOOT_ACCOUNT_ID, conversationId, mensagem);
   logger.info("diagnostico", "Roteiro enviado", { nome, conversationId });
   registrarLog(body, `enviado:conversa_${conversationId}`);

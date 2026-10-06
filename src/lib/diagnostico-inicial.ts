@@ -26,11 +26,17 @@ function textoDe(valor: unknown): string | null {
 /**
  * Extrai os pares pergunta/resposta do corpo do webhook, venha no formato que vier:
  * - plano, `{ "Pergunta": "resposta" }` (como o n8n repassa o formulário de aplicação);
+ * - Respondi, em `respondent.answers` (o `raw_answers` do mesmo envio é ignorado);
  * - aninhado, com as respostas num objeto `answers`/`respostas` em qualquer nível;
  * - lista de itens `{ question|title|pergunta|label, answer|value|resposta }`.
  * Resposta em lista (múltipla escolha) vira texto separado por vírgula.
  */
 export function extrairRespostas(body: unknown): Respostas {
+  // Respondi: `respondent.answers` já vem como { título: resposta }. O mesmo envio traz
+  // `raw_answers` com IDs e tipos de pergunta, que só poluiriam a entrada da IA.
+  const respondi = (body as { respondent?: { answers?: unknown } } | null)?.respondent?.answers;
+  if (respondi && typeof respondi === "object" && !Array.isArray(respondi)) body = respondi;
+
   const saida: Respostas = [];
   const vistas = new Set<string>();
   const adicionar = (pergunta: string, resposta: string | null) => {
