@@ -99,11 +99,11 @@ export function duracaoEstimada(roteiro: string): string {
   return `${Math.floor(segundos / 60)}min${String(segundos % 60).padStart(2, "0")}s`;
 }
 
-// Trechos que só o Walker pode escrever. Enquanto estiverem entre colchetes, o roteiro sai com o
-// colchete visível, de propósito: a IA não pode inventar número de aprovados nem trajetória.
+// Trechos fixos, escritos pelo Walker (06/10/2026). A IA copia como estão: não pode inventar
+// número de aprovados nem trajetória.
 export const AUTORIDADE_WALKER =
-  "A Mentoria Vestigium é sustentada em pilares da Ciência da Aprendizagem. [TRAJETÓRIA DO WALKER E RESULTADO DOS ALUNOS]";
-export const BORDAO_WALKER = "[FRASE DE ASSINATURA DO WALKER]";
+  "A Mentoria Vestigium é sustentada em pilares da Ciência da Aprendizagem. Eu já fui aprovado em seis concursos e sei bem o caminho para a aprovação. Já aprovamos centenas de alunos para Perito Criminal e temos aprovados em todos os concursos de perito do Brasil.";
+export const BORDAO_WALKER = "Pode confiar, vamos trabalhar juntos que vai dar certo.";
 
 export const PROMPT_ROTEIRO = `Você é o assistente do Perito Walker, Perito Criminal e fundador da Mentoria Vestigium. Sua tarefa é escrever um ROTEIRO DE ÁUDIO de boas-vindas que o Walker vai gravar e enviar pelo WhatsApp para um novo aluno, com base nas respostas do formulário de diagnóstico.
 
@@ -130,13 +130,13 @@ CONCURSO: [concurso prioritário padronizado em MAIÚSCULAS, ex.: PCI-SC, PF, PO
    Ligue ao obstáculo: ansiedade/insegurança → "isso pode alimentar sua ansiedade"; esquecimento rápido → "é exatamente por isso que o conteúdo escapa"; falta de tempo → "você gasta o pouco tempo que tem no que menos retém"; procrastinação/falta de motivação/concentração → "sem ver evolução, a motivação cai"; um misto → combine os dois efeitos principais.
    Feche com a solução: "Vamos estruturar sua revisão com intervalos planejados para transformar esse conhecimento em memória de longo prazo e dar regularidade ao seu aprendizado."
 
-5. AUTORIDADE (texto fixo, copie exatamente, inclusive o que estiver entre colchetes): "${AUTORIDADE_WALKER}"
+5. AUTORIDADE (texto fixo, copie exatamente): "${AUTORIDADE_WALKER}"
 
-6. FECHAMENTO (texto fixo, copie exatamente, inclusive o que estiver entre colchetes): "${BORDAO_WALKER} Você agora faz parte da família Vestigium. Bora."
+6. FECHAMENTO (texto fixo, copie exatamente): "${BORDAO_WALKER} Você agora faz parte da família Vestigium. Bora."
 
 ## REGRAS DE ESTILO
 - Escrito para ser FALADO: frases curtas e diretas, tom de mentor próximo, firme e acolhedor. Use "você" e "pra".
-- Entre 150 e 190 palavras no roteiro, para dar cerca de 1 minuto de áudio.
+- Entre 170 e 210 palavras no roteiro, para dar cerca de 1 minuto e 15 segundos de áudio.
 - Um único parágrafo, sem tópicos, emojis, hashtags, aspas ou abreviações difíceis de ler em voz alta (escreva "Raciocínio Lógico", não "RLM").
 - Use só o primeiro nome do aluno, e apenas uma vez, na abertura.
 - NÃO mencione idade, filhos, rotina de trabalho, sono, estresse nem dados pessoais sensíveis. NÃO invente informações que o aluno não deu.
