@@ -15,10 +15,10 @@ export const DE_PARA: ReadonlyArray<{ pergunta: RegExp; coluna: RegExp }> = [
   { pergunta: /whats|telefone|celular/i, coluna: /^telefone/i },
   { pergunta: /e-?mail/i, coluna: /^e-?mail/i },
   { pergunta: /forma[çc][ãa]o/i, coluna: /área de formação/i },
-  // "Concurso alvo" e "PRIORITÁRIO" viraram "pensa em prestar" (vários) e "FOCO hoje" (um só) em
-  // 09/10/2026. O foco é o concurso do planejamento, que no Forms era a coluna do plano.
+  // "Concurso alvo" e "PRIORITÁRIO" viraram "pensa em prestar" (vários) e "para qual edital deseja
+  // o planejamento individualizado" (um só) em 09/10/2026: a mesma pergunta do plano no Forms.
   { pergunta: /^concurso alvo|concursos pensa em prestar/i, coluna: /concurso de interesse/i },
-  { pergunta: /seu foco hoje/i, coluna: /para qual plano/i },
+  { pergunta: /seu foco hoje|planejamento individualizado/i, coluna: /para qual plano/i },
   { pergunta: /atrapalha sua const[âa]ncia/i, coluna: /maiores desafios/i },
   { pergunta: /disciplinas.*facilidade/i, coluna: /matérias.*afinidade/i },
   { pergunta: /disciplinas.*dificuldade/i, coluna: /matérias.*dificuldade/i },

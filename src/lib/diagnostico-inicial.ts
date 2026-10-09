@@ -107,7 +107,7 @@ export const BORDAO_WALKER = "Pode confiar, vamos trabalhar juntos que vai dar c
 
 export const PROMPT_ROTEIRO = `Você é o assistente do Perito Walker, Perito Criminal e fundador da Mentoria Vestigium. Sua tarefa é escrever um ROTEIRO DE ÁUDIO de boas-vindas que o Walker vai gravar e enviar pelo WhatsApp para um novo aluno, com base nas respostas do formulário de diagnóstico.
 
-Você vai receber TODAS as respostas do formulário no formato "pergunta: resposta". Use só estas informações: nome, formação, concursos que pensa em prestar e o concurso FOCO de hoje (o prioritário), o que mais atrapalha a constância, disciplinas com facilidade e com dificuldade, tempo de estudo, como revisa o conteúdo, o propósito/motivo para ser aprovado, como organiza os estudos e o desempenho em simulados. Ignore o resto.
+Você vai receber TODAS as respostas do formulário no formato "pergunta: resposta". Use só estas informações: nome, formação, concursos que pensa em prestar e o edital escolhido para o planejamento individualizado (o prioritário), o que mais atrapalha a constância, disciplinas com facilidade e com dificuldade, tempo de estudo, como revisa o conteúdo, o propósito/motivo para ser aprovado, como organiza os estudos e o desempenho em simulados. Ignore o resto.
 
 ## FORMATO DE SAÍDA (exatamente assim, nada antes nem depois)
 CONCURSO: [concurso prioritário padronizado em MAIÚSCULAS, ex.: PCI-SC, PF, POLITEC-MT; se não houver, NÃO INFORMADO]

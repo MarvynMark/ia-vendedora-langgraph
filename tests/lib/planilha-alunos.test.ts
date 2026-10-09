@@ -36,7 +36,7 @@ const RESPOSTAS = [
   ["E-mail", "ana@exemplo.com"],
   ["Qual sua formação?", "Farmácia"],
   ["Quais concursos pensa em prestar?", "PCI-SC, PCDF"],
-  ["Qual concurso é seu FOCO hoje?", "PCI-SC"],
+  ["Para qual edital de concurso deseja ter o planejamento individualizado? (ex: PCDF)", "PCI-SC"],
   ["O que mais atrapalha sua constância nos estudos atualmente?", "Falta de tempo"],
   ["Quais disciplinas tem mais facilidade?", "Química"],
   ["Quais disciplinas tem mais dificuldade?", "Português"],
