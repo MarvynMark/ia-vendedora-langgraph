@@ -88,7 +88,9 @@ describe("main agent prompt", () => {
     // antigo "retomar:", que não segurava a cadência. ~200 caracteres.
     // 102k → 102,5k: conv 9909 (09/10/2026) — "qual o valor?" depois do áudio 2 segura o preço e
     // manda vídeo e entregáveis antes; o "lead quente" vale só antes do áudio 2. ~250 caracteres.
-    expect(prompt.length).toBeLessThan(102500);
+    // 102,5k → 103,5k: conv 5747 (09/10/2026) — respostas oficiais de suporte no WhatsApp, encontros
+    // ao vivo em grupo e feedback mensal por relatório; a IA improvisava. ~700 caracteres.
+    expect(prompt.length).toBeLessThan(103500);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
