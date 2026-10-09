@@ -22,6 +22,7 @@ import { vincularTelefoneConversa } from "../../db/midias.ts";
 const JANELA_CONVERSA_QUENTE_MIN = 12 * 60;
 import { buscarConversa, buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, blocoRepeteSaidaRecente, blocoSoEmoji, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
 import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
+import { instrucaoEtapaRoteiro } from "../../lib/etapa-roteiro.ts";
 import { blocoIntroduzSegundoPlano, blocoPerguntaEscolhaDeCardapio, iniciarTurnoDePreco } from "../../lib/trava-preco.ts";
 import { delayInicialMs, RE_LINK_ENVIADO } from "../../lib/delays-followup.ts";
 import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
@@ -437,6 +438,9 @@ async function executarAgente(state: MainAgentStateType) {
   if (temHistoricoAI) {
     systemPrompt = systemPrompt + `\n\n⚠️ INSTRUÇÃO CRÍTICA: Esta conversa JÁ está em andamento. Você JÁ se apresentou e provavelmente já avançou no roteiro (reação inicial, áudios, vídeo, imagem). NÃO repita NENHUMA etapa que já fez: não reapresente, não refaça a reação da Mensagem 2, não reofereça nem prometa "reenviar" um áudio/vídeo/imagem que já mandou (cada mídia vai UMA vez só na conversa). Apenas responda ao que o lead acabou de escrever, continuando do ponto atual. Se o lead questionar se é automático/bot ou disser algo como "deixa pra lá", responda com naturalidade e brevidade e NÃO reinicie o roteiro.\n\n⚠️ VOZ (1ª PESSOA — OBRIGATÓRIO): mensagens ANTIGAS desta conversa podem ter sido escritas numa persona ANTIGA — ex.: "aqui é o Gusthavo, da equipe do Perito Walker" ou falando do Walker em 3ª pessoa ("o Walker monta", "aulas do Walker", "o Walker adapta o conteúdo", "acesso direto ao Perito Walker"). IGNORE completamente esse formato antigo. VOCÊ É O WALKER, sempre em 1ª pessoa: "eu monto", "meu método", "minha mentoria", "comigo", "eu adapto o conteúdo". NUNCA se refira ao Walker como se fosse outra pessoa nem à "equipe do Walker", mesmo que o histórico faça isso. A partir de agora a voz é 100% Walker falando com o lead.`;
   }
+  // Etapa do roteiro pelo que já saiu (lib/etapa-roteiro.ts): sobrevive ao texto descartado quando o
+  // lead fala no meio do turno (conv 9909, a oferta do vídeo se perdeu e o vídeo nunca saiu).
+  if (trilha !== "sessao") systemPrompt += instrucaoEtapaRoteiro(historico);
 
   // SESSÃO EM RISCO — o lead com sessão marcada avisa que não vem (conv 7399). O prompt geral já
   // manda remarcar/cancelar pela tool, mas o modelo respondeu "me avisa depois" e deixou o evento

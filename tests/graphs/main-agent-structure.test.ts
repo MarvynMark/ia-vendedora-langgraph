@@ -86,7 +86,9 @@ describe("main agent prompt", () => {
     // já tem material, adiamento com data sem papagaio, não repetir despedida. ~1,2k caracteres.
     // 101,5k → 102k: conv 9883 (09/10/2026) — retorno combinado com data (retomarEm) no lugar do
     // antigo "retomar:", que não segurava a cadência. ~200 caracteres.
-    expect(prompt.length).toBeLessThan(102000);
+    // 102k → 102,5k: conv 9909 (09/10/2026) — "qual o valor?" depois do áudio 2 segura o preço e
+    // manda vídeo e entregáveis antes; o "lead quente" vale só antes do áudio 2. ~250 caracteres.
+    expect(prompt.length).toBeLessThan(102500);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
