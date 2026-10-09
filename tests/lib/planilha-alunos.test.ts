@@ -42,12 +42,18 @@ const RESPOSTAS = [
   ["Quais disciplinas tem mais dificuldade?", "Português"],
   ["Há quanto tempo estuda para concurso?", "1 a 2 anos"],
   ["Como você REVISA o conteúdo que já estudou?", "Releio o PDF"],
+  ["Seu planejamento é para Perito Criminal ou Médico Legista?", "Perito Criminal"],
+  ["Na última semana, em quantos dias você estudou de fato?", "3 a 4 dias"],
   ["Por qual razão, sonho, motivo de fato você quer ser aprovado ou aprovada?", "Minha família"],
+  ["O que você mais quer resolver com a mentoria?", "Ter constância e disciplina"],
   ["Já foi aprovado em algum concurso? Se sim, qual?", "Não"],
+  ["Já fez outra mentoria para concurso? Se sim, qual e o que achou?", "Não"],
   ["Como organiza seus estudos hoje?", "Sem cronograma"],
+  ["Qual é a sua situação familiar hoje?", "Solteiro(a), com filhos"],
   ["Você trabalha atualmente? Qual a sua carga horária semanal?", "Sim, 40h"],
   ["Tem filhos ou outras responsabilidades familiares que consomem sua energia mental?", "Um filho"],
   ["TEMPO DISPONÍVEL PARA ESTUDAR (SEGUNDA-FEIRA)", "2 horas"],
+  ["O que você mais espera do seu mentor?", "Me cobrar quando eu sair do ritmo"],
 ].map(([pergunta, resposta]) => ({ pergunta: pergunta!, resposta: resposta! }));
 
 const RECEBIDO = new Date("2026-10-09T17:03:27Z"); // 14:03:27 em Brasília
@@ -78,9 +84,14 @@ describe("montarLinhaPlanilha", () => {
     expect(valor(r, "Quais são as matérias que você tem mais dificuldade?")).toBe("Português");
     expect(valor(r, "Há quanto tempo você estuda para concurso público?")).toBe("1 a 2 anos");
     expect(valor(r, "Já foi aprovado em algum concurso? Se sim, qual(quais)?")).toBe("Não");
-    expect(valor(r, "Qual é o seu objetivo com a Mentoria Vestigium?")).toBe("Minha família");
     expect(valor(r, "Você trabalha ou dedica período integral aos estudos?")).toBe("Sim, 40h");
-    expect(valor(r, "É casado(a), solteiro(a)? Tem filho(s)?")).toBe("Um filho");
+    // As perguntas trazidas do Forms em 09/10/2026.
+    expect(valor(r, "O planejamento de estudos de escolha é para Perito Criminal ou Médico Legista?")).toBe("Perito Criminal");
+    expect(valor(r, "Quantos dias da semana você estuda?")).toBe("3 a 4 dias");
+    expect(valor(r, "Qual é o seu objetivo com a Mentoria Vestigium?")).toBe("Ter constância e disciplina");
+    expect(valor(r, "Já fez alguma mentoria para concurso público antes? Se sim, qual?")).toBe("Não");
+    expect(valor(r, "É casado(a), solteiro(a)? Tem filho(s)?")).toBe("Solteiro(a), com filhos");
+    expect(valor(r, "O que você espera do mentor que irá te acompanhar?")).toBe("Me cobrar quando eu sair do ritmo");
     // Sem equivalente no Respondi: fica em branco.
     expect(valor(r, "CPF:")).toBe("");
   });
@@ -92,7 +103,9 @@ describe("montarLinhaPlanilha", () => {
     expect(r.cabecalho.slice(28)).toEqual([
       "Qual concurso é seu PRIORITÁRIO atualmente?",
       "Como você REVISA o conteúdo que já estudou?",
+      "Por qual razão, sonho, motivo de fato você quer ser aprovado ou aprovada?",
       "Como organiza seus estudos hoje?",
+      "Tem filhos ou outras responsabilidades familiares que consomem sua energia mental?",
       "TEMPO DISPONÍVEL PARA ESTUDAR (SEGUNDA-FEIRA)",
       "Origem",
       COLUNA_CONCURSO_IA,

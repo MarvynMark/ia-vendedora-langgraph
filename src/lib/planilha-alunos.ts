@@ -21,9 +21,16 @@ export const DE_PARA: ReadonlyArray<{ pergunta: RegExp; coluna: RegExp }> = [
   { pergunta: /disciplinas.*dificuldade/i, coluna: /matérias.*dificuldade/i },
   { pergunta: /h[áa] quanto tempo estuda/i, coluna: /há quanto tempo você estuda/i },
   { pergunta: /j[áa] foi aprovad/i, coluna: /já foi aprovado/i },
-  { pergunta: /raz[ãa]o, sonho, motivo/i, coluna: /objetivo com a mentoria/i },
   { pergunta: /voc[êe] trabalha atualmente/i, coluna: /trabalha ou dedica/i },
-  { pergunta: /tem filhos/i, coluna: /casado\(a\), solteiro/i },
+  // Perguntas trazidas do Forms para o Respondi em 09/10/2026, para as séries continuarem
+  // comparáveis. "Razão, sonho, motivo" e "Tem filhos" deixaram de ir para as colunas 19 e 8:
+  // as perguntas novas abaixo respondem exatamente o que o Forms perguntava ali.
+  { pergunta: /perito criminal ou m[ée]dico legista/i, coluna: /perito criminal ou médico legista/i },
+  { pergunta: /situa[çc][ãa]o familiar/i, coluna: /casado\(a\), solteiro/i },
+  { pergunta: /quantos dias voc[êe] estudou/i, coluna: /quantos dias da semana/i },
+  { pergunta: /quer resolver com a mentoria/i, coluna: /objetivo com a mentoria/i },
+  { pergunta: /outra mentoria/i, coluna: /já fez alguma mentoria/i },
+  { pergunta: /espera do seu mentor/i, coluna: /espera do mentor/i },
 ];
 
 export const COLUNA_DATA = /^carimbo de data/i;
