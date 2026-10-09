@@ -155,11 +155,11 @@ async function reprocessarTelefone(telefone: string): Promise<void> {
  * a mensagem do lead vira uma órfã "invisível" — não está na fila, mas o lead ficou sem
  * resposta e o lock ficou preso. Foi o que travou a conversa 4304.
  *
- * Roda uma vez na subida do app: para cada lock preso além do TTL, se a conversa ainda é
+ * Roda na subida do app e depois a cada ciclo da varredura: para cada lock preso além do TTL, se a conversa ainda é
  * da IA (agente-on) e a ÚLTIMA mensagem é do lead (sem resposta posterior do agente),
  * reenfileira e reprocessa pelo caminho testado. Caso contrário, apenas libera o lock.
  */
-export async function recuperarConversasTravadasNoBoot(): Promise<void> {
+export async function recuperarConversasTravadasNoBoot({ silencioso = false } = {}): Promise<void> {
   let sessions: string[] = [];
   try {
     const r = await pool.query<{ session_id: string }>(
@@ -174,7 +174,7 @@ export async function recuperarConversasTravadasNoBoot(): Promise<void> {
     return;
   }
   if (sessions.length === 0) {
-    logger.info("recuperacao-boot", "nenhum lock preso além do TTL no boot");
+    if (!silencioso) logger.info("recuperacao-boot", "nenhum lock preso além do TTL no boot");
     return;
   }
   logger.warn("recuperacao-boot", `${sessions.length} lock(s) preso(s) além do TTL — avaliando:`, sessions);
@@ -217,30 +217,70 @@ async function recuperarLockPreso(sessionId: string): Promise<void> {
     return;
   }
 
-  // Última mensagem de conversa (só incoming=0 / outgoing=1). Se for do lead, ficou sem resposta.
-  const resp = (await listarMensagens(CONTA, conv.id)) as {
-    payload?: Array<{ message_type: number; content?: string; id: number }>;
-  };
-  const dialogo = (resp.payload ?? []).filter((m) => m.message_type === 0 || m.message_type === 1);
-  const ultima = dialogo[dialogo.length - 1];
-  if (!ultima || ultima.message_type !== 0 || !(ultima.content ?? "").trim()) {
-    // Última é do agente (já respondeu) ou vazia — nada pendente. Só destrava.
+  const resp = (await listarMensagens(CONTA, conv.id)) as { payload?: MensagemConversa[] };
+  const pendente = pendenciaDoLead(resp.payload ?? []);
+  if (!pendente) {
+    // Agente já respondeu, ou não há nada legível do lead — nada pendente. Só destrava.
     await liberarLock(sessionId);
     logger.info("recuperacao-boot", `${telefone}: sem mensagem pendente do lead, lock liberado`);
     return;
   }
 
   // Há mensagem do lead sem resposta → reprocessar pelo caminho testado.
-  const conteudo = (ultima.content ?? "").trim();
-  logger.warn("recuperacao-boot", `${telefone}: mensagem do lead sem resposta ("${conteudo.slice(0, 60)}") — reprocessando`);
+  logger.warn("recuperacao-boot", `${telefone}: mensagem do lead sem resposta ("${pendente.conteudo.slice(0, 60)}") — reprocessando`);
   await liberarLock(sessionId); // o grafo readquire o lock ao reprocessar
-  await enfileirarMensagem(String(ultima.id), telefone, conteudo, new Date().toISOString());
+  await enfileirarMensagem(pendente.idMensagem, telefone, pendente.conteudo, new Date().toISOString());
   await reprocessarTelefone(telefone);
+}
+
+export interface MensagemConversa {
+  id: number;
+  message_type: number;
+  content?: string | null;
+  private?: boolean;
+  attachments?: Array<{ file_type?: string }>;
+}
+
+const PREFIXO_TRANSCRICAO = "Transcrição do áudio: ";
+
+/**
+ * O que o lead mandou depois da última resposta pública do agente, ou null se não há nada pendente.
+ *
+ * Conv 9949 (09/10/2026): dois áudios às 14:58, redeploy em seguida, lead sem resposta. A versão
+ * anterior olhava só a ÚLTIMA mensagem: era a nota privada com a transcrição (message_type 1,
+ * gravada pelo próprio app), lida como "agente já respondeu"; e o áudio em si tem content null.
+ * Agora nota privada não conta como resposta, e áudio vale pela transcrição que vem logo depois.
+ */
+export function pendenciaDoLead(mensagens: MensagemConversa[]): { idMensagem: string; conteudo: string } | null {
+  let inicio = 0;
+  for (let i = mensagens.length - 1; i >= 0; i--) {
+    const m = mensagens[i]!;
+    if (m.message_type === 1 && !m.private) { inicio = i + 1; break; }
+  }
+  const partes: string[] = [];
+  let idMensagem = "";
+  for (let i = inicio; i < mensagens.length; i++) {
+    const m = mensagens[i]!;
+    if (m.message_type !== 0 || m.private) continue;
+    let texto = (m.content ?? "").trim();
+    if (!texto && m.attachments?.some((a) => a.file_type === "audio")) {
+      const nota = mensagens.slice(i + 1).find(
+        (n) => n.private && (n.content ?? "").startsWith(PREFIXO_TRANSCRICAO),
+      );
+      texto = (nota?.content ?? "").slice(PREFIXO_TRANSCRICAO.length).trim();
+    }
+    if (!texto) continue;
+    partes.push(texto);
+    idMensagem = String(m.id);
+  }
+  return partes.length ? { idMensagem, conteudo: partes.join("\n") } : null;
 }
 
 export function iniciarVarreduraFilaOrfa(intervaloMs = 3 * 60 * 1000): void {
   logger.info("varredura-fila", `varredura de fila órfã ativa (a cada ${Math.round(intervaloMs / 1000)}s, janela ${ORFA_MIN}-${ORFA_MAX}, purga >${ORFA_PURGA})`);
   setInterval(() => {
-    void varrerFilaOrfa();
+    // Lock preso também entra no ciclo, não só no boot: no boot o lock do turno morto ainda está
+    // dentro do TTL (o processo caiu segundos antes), então só vence alguns minutos depois (conv 9949).
+    void varrerFilaOrfa().then(() => recuperarConversasTravadasNoBoot({ silencioso: true }));
   }, intervaloMs);
 }
