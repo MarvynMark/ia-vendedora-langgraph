@@ -49,6 +49,47 @@ describe("criarToolAtualizarTarefa (main agent)", () => {
   });
 });
 
+// Conv 9883: "na próxima semana" — o card espera a data combinada em vez da cadência da etapa.
+describe("criarToolAtualizarTarefa — retorno combinado (retomarEm)", () => {
+  const CARD = "🟢 - Concurso: PCDF\n🔁 - Follow-ups: 2\n👤 - Descrição: em negociação";
+  const tarefa = () => ({ id: 10, description: CARD, board: { id: 2, steps: [{ id: 3, name: "Conexão" }] } });
+  const daqui = (dias: number) => new Date(Date.now() + dias * 86400000).toISOString().slice(0, 10);
+
+  test("grava a linha com a data e usa o dia combinado como prazo", async () => {
+    const tool = criarToolAtualizarTarefa({ idConta: "8", tarefa: tarefa() }, "Conexão: 3");
+    const data = daqui(5);
+    await tool.invoke({ stepId: "3", title: "Giovanna - PCDF", description: CARD, retomarEm: data, retomarContexto: "vai decidir na próxima semana" });
+    const body = JSON.parse((mockFetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    const [a, m, d] = data.split("-");
+    expect(body.description).toContain(`📅 - Retomar em: ${d}/${m}/${a}`);
+    expect(body.description).toContain("vai decidir na próxima semana");
+    expect(body.due_date.slice(11)).toBe("13:05:00.000Z");
+  });
+
+  test("data no passado volta como erro e nada é gravado", async () => {
+    const tool = criarToolAtualizarTarefa({ idConta: "8", tarefa: tarefa() }, "Conexão: 3");
+    const r = JSON.parse(await tool.invoke({ stepId: "3", title: "T", description: CARD, retomarEm: "2020-01-01" }));
+    expect(r.erro).toContain("depois de hoje");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("LLM reescreve a descrição sem a linha → a retomada do card é preservada", async () => {
+    const comRetomada = `${CARD}\n📅 - Retomar em: 12/10/2099 (seg) — semana que vem`;
+    const tool = criarToolAtualizarTarefa({ idConta: "8", tarefa: { ...tarefa(), description: comRetomada } }, "Conexão: 3");
+    await tool.invoke({ stepId: "3", title: "T", description: CARD });
+    const body = JSON.parse((mockFetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.description).toContain("Retomar em: 12/10/2099");
+  });
+
+  test("cancelarRetomada tira a linha (lead voltou antes e quer seguir agora)", async () => {
+    const comRetomada = `${CARD}\n📅 - Retomar em: 12/10/2099 (seg) — semana que vem`;
+    const tool = criarToolAtualizarTarefa({ idConta: "8", tarefa: { ...tarefa(), description: comRetomada } }, "Conexão: 3");
+    await tool.invoke({ stepId: "3", title: "T", description: comRetomada, cancelarRetomada: true });
+    const body = JSON.parse((mockFetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.description).not.toContain("Retomar em");
+  });
+});
+
 // Conv 6987: a IA moveu o card p/ Aguardando Pagamento já com "link enviado" enquanto ainda
 // perguntava "posso te mostrar os planos?". O marcador roteia a cadência para o lembrete de
 // abandono de checkout (20min), e a lead levou "travou na hora de finalizar?" sem ter visto preço.

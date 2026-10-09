@@ -26,6 +26,9 @@ export const FollowUpState = Annotation.Root({
   // --- Classificação ---
   tipoFollowup: Annotation<"followup" | "lembrete" | "boas_vindas" | "template_abertura" | "template_inicial" | "nutrir" | "ignorar">,
 
+  // --- Retorno combinado (lib/retomada.ts): a data do card chegou e a retomada tem que sair ---
+  retomadaVencida: Annotation<boolean>,
+
   // --- Resposta ---
   respostaAgente: Annotation<string>,
 });

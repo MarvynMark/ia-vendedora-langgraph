@@ -3,6 +3,7 @@ import { z } from "zod";
 import { atualizarKanbanTask } from "../services/chatwoot.ts";
 import { delayInicialMs, RE_LINK_ENVIADO } from "../lib/delays-followup.ts";
 import { proximoHorarioComercial } from "../lib/horario-comercial.ts";
+import { aplicarRetomada, datasReferenciaRetomada, removerRetomada, validarRetomarEm, type DiaSP } from "../lib/retomada.ts";
 import { logger } from "../lib/logger.ts";
 
 interface ContextoAtualizarTarefaMainAgent {
@@ -52,11 +53,25 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
         (contexto.tarefa["board"] as { steps?: Array<{ id: number; name: string }> } | undefined)
           ?.steps?.find(s => s.id === stepDestino)?.name ?? "";
       const descricaoAtual = String(contexto.tarefa["description"] ?? "");
-      const descricao = sanitizarLinkEnviado(input.description ?? "", descricaoAtual);
-      if (descricao !== (input.description ?? "")) {
+      const descricaoSanitizada = sanitizarLinkEnviado(input.description ?? "", descricaoAtual);
+      if (descricaoSanitizada !== (input.description ?? "")) {
         logger.warn("tool:atualizar-tarefa", "LLM tentou marcar 'link enviado' sem link no card — rebaixado para 'em negociação'", { taskId });
       }
-      const dueDate = proximoHorarioComercial(new Date(), delayInicialMs(nomeEtapa, descricao));
+
+      // Retorno combinado numa data (ver lib/retomada.ts): aqui é a ÚNICA exceção ao prazo pela
+      // etapa — o lead pediu um dia, o card espera até ele. Data inválida volta como erro pra IA
+      // corrigir, sem gravar nada (melhor que gravar a cadência normal achando que marcou).
+      let retomada: { dia: DiaSP; contexto?: string; momento: Date } | undefined;
+      if (input.retomarEm) {
+        const validada = validarRetomarEm(input.retomarEm);
+        if ("erro" in validada) return JSON.stringify({ erro: validada.erro });
+        retomada = { dia: validada.dia, contexto: input.retomarContexto, momento: validada.momento };
+      }
+      // Cancelar: o lead voltou antes do dia e a negociação seguiu (pediu o link, fechou).
+      const descricao = input.cancelarRetomada && !retomada
+        ? removerRetomada(descricaoSanitizada)
+        : aplicarRetomada(descricaoSanitizada, descricaoAtual, retomada);
+      const dueDate = retomada?.momento ?? proximoHorarioComercial(new Date(), delayInicialMs(nomeEtapa, descricao));
 
       try {
         const resultado = await atualizarKanbanTask(
@@ -73,6 +88,7 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
         // de `tarefa` depois que o agente responde, e sem isso enxergariam o card de antes da tool.
         contexto.tarefa["board_step_id"] = stepDestino;
         contexto.tarefa["description"] = descricao;
+        if (retomada) logger.info("tool:atualizar-tarefa", `Retomada combinada para ${retomada.momento.toISOString()}`, { taskId });
         return JSON.stringify(resultado);
       } catch (e) {
         logger.error("tool:atualizar-tarefa", "Erro:", e);
@@ -81,11 +97,14 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
     },
     {
       name: "Atualizar_tarefa",
-      description: `Atualiza a tarefa (mover etapa, título, descrição, prazo). Ação interna e silenciosa — nunca comente com o lead.\n\nIDs das etapas:\n${etapasDescricao}\nUse o ID da etapa atual se não houver mudança de etapa. Ao editar a descrição, sempre mantenha o conteúdo original.\n\nO prazo do próximo follow-up é calculado automaticamente pela etapa — você não define data.`,
+      description: `Atualiza a tarefa (mover etapa, título, descrição, prazo). Ação interna e silenciosa — nunca comente com o lead.\n\nIDs das etapas:\n${etapasDescricao}\nUse o ID da etapa atual se não houver mudança de etapa. Ao editar a descrição, sempre mantenha o conteúdo original.\n\nO prazo do próximo follow-up é calculado automaticamente pela etapa — você não define data. ÚNICA exceção: o lead combinou um retorno num dia ("semana que vem", "mês que vem", "dia 10", "segunda") → passe retomarEm; até esse dia ele não recebe follow-up nenhum.\nDatas de referência: ${datasReferenciaRetomada()}`,
       schema: z.object({
         stepId: z.string().describe("ID da etapa destino no Kanban"),
         title: z.string().describe("Título da tarefa"),
         description: z.string().describe("Descrição da tarefa"),
+        retomarEm: z.string().optional().describe("Só quando o lead combinou um retorno num dia: a data no formato AAAA-MM-DD (use as datas de referência). Sem data dita mas topou o retorno: próximo dia útil."),
+        cancelarRetomada: z.boolean().optional().describe("true só quando o card tem \"Retomar em\" e o lead voltou ANTES do dia querendo seguir agora (pediu o link, vai pagar). Sem isso o card continua esperando a data."),
+        retomarContexto: z.string().optional().describe("Junto com retomarEm: o combinado em poucas palavras (ex.: \"vai decidir na próxima semana, travou no valor do Anual\")."),
       }),
     },
   );

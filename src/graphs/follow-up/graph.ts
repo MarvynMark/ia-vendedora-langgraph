@@ -10,6 +10,7 @@ import { proximoHorarioComercial } from "../../lib/horario-comercial.ts";
 import { delayInicialMs } from "../../lib/delays-followup.ts";
 import { TOQUE_IA, TOQUE_PUXAR, escolherToque2, gerarToque1, agendarProximoToque, type EtapaToque } from "../../lib/followup-toques.ts";
 import { TOQUE_AUDIO_MUDO, TOQUE_PIX, ehToqueCuriosidade, enviarToqueCuriosidade } from "../../lib/followup-curiosidade.ts";
+import { lerRetomada, removerRetomada } from "../../lib/retomada.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
 // da janela de 24h (economiza envios pagos à Meta sem parecer spam).
@@ -130,6 +131,74 @@ export async function classificar(state: FollowUpStateType) {
 
   logger.info("follow-up", "tipoFollowup:", tipoFollowup);
   return { tipoFollowup };
+}
+
+// --- Retorno combinado numa data (lib/retomada.ts) ---
+//
+// Conv 9883: "na próxima semana" virou, no dia seguinte, o PDF de comprovante PIX. Este nó roda
+// antes de qualquer agente: com "Retomar em" no futuro o card só é reagendado pra data (nenhuma
+// mensagem); com a data vencida vai pro agente_retomada. Boas-vindas e template inicial não
+// passam por aqui — não são conversa de venda em aberto.
+const TIPOS_COM_RETOMADA = new Set(["followup", "lembrete", "nutrir", "template_abertura"]);
+
+export async function verificarRetomada(state: FollowUpStateType, agora = new Date()) {
+  if (!TIPOS_COM_RETOMADA.has(state.tipoFollowup)) return {};
+  const retomada = lerRetomada(state.description ?? "");
+  if (!retomada) return {};
+  if (retomada.momento.getTime() > agora.getTime()) {
+    await atualizarKanbanTask(state.accountId, state.taskId, { due_date: retomada.momento.toISOString() });
+    logger.info("follow-up", `Retorno combinado ainda não chegou — nada enviado, card reagendado para ${retomada.momento.toISOString()}`, { taskId: state.taskId });
+    return { tipoFollowup: "ignorar" as const };
+  }
+  return { retomadaVencida: true };
+}
+
+/**
+ * Chegou o dia combinado: manda a retomada ("como a gente tinha combinado...") e tira a linha do
+ * card. Depois dela a cadência é a curta — um toque no dia seguinte e o encerramento. Áudio mudo
+ * e comprovante PIX não entram em conversa com retorno combinado: quem disse quando decide não
+ * cai em pegadinha de curiosidade.
+ */
+async function agenteRetomada(state: FollowUpStateType) {
+  logger.info("follow-up", "executando retomada do retorno combinado...");
+  const msRestantes = await msRestantesJanela24h(state.accountId, state.conversationId);
+  const dentroJanela = msRestantes > 0;
+  const primeiroNome = primeiroNomeSaudacao(state.title);
+  const campos = await buscarCamposFormulario(state.telefone);
+  // "retomada_agendada" não é template aprovado na Meta: fora da janela vai a pergunta curta.
+  const templateFallback = "conexao_duvida";
+  const texto = dentroJanela
+    ? substituirCampos(CONTEUDO_TEMPLATES["retomada_agendada"] ?? "", { nome: state.title, concurso: campos?.concurso, dificuldade: campos?.dificuldade })
+    : substituirCampos(CONTEUDO_TEMPLATES[templateFallback] ?? "", { nome: state.title });
+
+  try {
+    if (dentroJanela) {
+      await enviarMensagem(state.accountId, state.conversationId, texto);
+      if (state.telefone) {
+        await salvarMensagem(state.telefone, { type: "ai", content: texto, tool_calls: [], additional_kwargs: {}, response_metadata: {}, invalid_tool_calls: [] });
+      }
+    } else {
+      await enviarTemplateComHistorico(state, templateFallback, texto, primeiroNome);
+    }
+  } catch (e) {
+    // A linha fica no card com a data vencida: o próximo ciclo do cron tenta de novo.
+    logger.error("follow-up", "Erro ao enviar retomada:", e);
+    return { respostaAgente: "" };
+  }
+
+  let descricao = removerRetomada(state.description ?? "");
+  let proxima: Date;
+  if (state.tipoFollowup === "followup" || state.tipoFollowup === "lembrete") {
+    // Pula pro último toque da sequência (o de antes do encerramento), no dia seguinte.
+    const ultimo = state.tipoFollowup === "lembrete" ? SEQUENCIA_LEMBRETE.length - 1 : SEQUENCIA_RECUPERACAO_CONEXAO.length - 1;
+    descricao = atualizarContadorNutrir(descricao, ultimo);
+    proxima = proximoHorarioComercial(new Date(), 24 * 60 * 60 * 1000);
+  } else {
+    proxima = proximoHorarioComercial(new Date(), delayInicialMs(state.board_step?.name ?? "", descricao));
+  }
+  await atualizarKanbanTask(state.accountId, state.taskId, { description: descricao, due_date: proxima.toISOString() });
+  logger.info("follow-up", `Retomada enviada (janela: ${dentroJanela}) — próximo toque ${proxima.toISOString()}`);
+  return { respostaAgente: "" };
 }
 
 // Sequências de quem JÁ conversou (Conexão, pós-preço e link enviado) — cadência de 30/09/2026,
@@ -771,6 +840,7 @@ async function agenteTemplateInicial(state: FollowUpStateType) {
 // --- Construção do grafo ---
 
 export function rotaClassificacao(state: FollowUpStateType): string {
+  if (state.retomadaVencida && state.tipoFollowup !== "ignorar") return "agente_retomada";
   switch (state.tipoFollowup) {
     case "template_inicial":  return "agente_template_inicial";
     case "followup":          return "agente_followup";
@@ -794,12 +864,16 @@ export async function criarGrafoFollowUp() {
     .addNode("agente_boas_vindas", agenteBoasVindas)
     .addNode("agente_template_abertura", agenteTemplateAbertura)
     .addNode("agente_nutrir", agenteNutrir)
+    .addNode("verificar_retomada", (state: FollowUpStateType) => verificarRetomada(state))
+    .addNode("agente_retomada", agenteRetomada)
     .addNode("enviar_mensagem", enviarMensagemNo)
 
     // Arestas
     .addEdge("__start__", "buscar_funil")
     .addEdge("buscar_funil", "classificar")
-    .addConditionalEdges("classificar", rotaClassificacao, {
+    .addEdge("classificar", "verificar_retomada")
+    .addConditionalEdges("verificar_retomada", rotaClassificacao, {
+      agente_retomada: "agente_retomada",
       agente_template_inicial: "agente_template_inicial",
       agente_followup: "agente_followup",
       agente_lembrete: "agente_lembrete",
@@ -814,6 +888,7 @@ export async function criarGrafoFollowUp() {
     .addEdge("agente_boas_vindas", "enviar_mensagem")
     .addEdge("agente_template_abertura", "__end__")
     .addEdge("agente_nutrir", "enviar_mensagem")
+    .addEdge("agente_retomada", "__end__")
     .addEdge("enviar_mensagem", END);
 
   return grafo.compile({ checkpointer });

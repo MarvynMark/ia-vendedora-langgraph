@@ -84,7 +84,9 @@ describe("main agent prompt", () => {
     // "travou ou foi tempo?" depois do link, escalação do que só a equipe faz. ~2k caracteres.
     // 100,5k → 101,5k: conv 9619 (04/10/2026) — pergunta do pitch só na 1ª vez, validação de quem
     // já tem material, adiamento com data sem papagaio, não repetir despedida. ~1,2k caracteres.
-    expect(prompt.length).toBeLessThan(101500);
+    // 101,5k → 102k: conv 9883 (09/10/2026) — retorno combinado com data (retomarEm) no lugar do
+    // antigo "retomar:", que não segurava a cadência. ~200 caracteres.
+    expect(prompt.length).toBeLessThan(102000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela
