@@ -35,14 +35,14 @@ const RESPOSTAS = [
   ["WhatsApp com DDD, só números", "+55 62 98138-4100"],
   ["E-mail", "ana@exemplo.com"],
   ["Qual sua formação?", "Farmácia"],
-  ["Concurso alvo", "PCI-SC"],
-  ["Qual concurso é seu PRIORITÁRIO atualmente?", "PCI-SC"],
+  ["Quais concursos pensa em prestar?", "PCI-SC, PCDF"],
+  ["Qual concurso é seu FOCO hoje?", "PCI-SC"],
   ["O que mais atrapalha sua constância nos estudos atualmente?", "Falta de tempo"],
   ["Quais disciplinas tem mais facilidade?", "Química"],
   ["Quais disciplinas tem mais dificuldade?", "Português"],
   ["Há quanto tempo estuda para concurso?", "1 a 2 anos"],
   ["Como você REVISA o conteúdo que já estudou?", "Releio o PDF"],
-  ["Seu planejamento é para Perito Criminal ou Médico Legista?", "Perito Criminal"],
+  ["Seu planejamento é para qual cargo?", "Perito Criminal"],
   ["Na última semana, em quantos dias você estudou de fato?", "3 a 4 dias"],
   ["Por qual razão, sonho, motivo de fato você quer ser aprovado ou aprovada?", "Minha família"],
   ["O que você mais quer resolver com a mentoria?", "Ter constância e disciplina"],
@@ -78,7 +78,8 @@ describe("montarLinhaPlanilha", () => {
     expect(valor(r, "Telefone para contato:")).toBe("'+55 62 98138-4100");
     expect(valor(r, "E-mail:")).toBe("ana@exemplo.com");
     expect(valor(r, "Qual é a sua área de formação?")).toBe("Farmácia");
-    expect(valor(r, "Qual é o seu concurso de interesse?")).toBe("PCI-SC");
+    expect(valor(r, "Qual é o seu concurso de interesse?")).toBe("PCI-SC, PCDF");
+    expect(valor(r, "Para qual plano você deseja ser matriculado na mentoria e ter o planejamento individualizado?")).toBe("PCI-SC");
     expect(valor(r, "Quais são os maiores desafios que você enfrenta atualmente nos seus estudos?")).toBe("Falta de tempo");
     expect(valor(r, "Quais são as matérias que você tem mais afinidade?")).toBe("Química");
     expect(valor(r, "Quais são as matérias que você tem mais dificuldade?")).toBe("Português");
@@ -101,7 +102,6 @@ describe("montarLinhaPlanilha", () => {
     expect(r.cabecalhoMudou).toBe(true);
     expect(r.cabecalho.slice(0, 28)).toEqual(CABECALHO_FORMS.slice(0, 28));
     expect(r.cabecalho.slice(28)).toEqual([
-      "Qual concurso é seu PRIORITÁRIO atualmente?",
       "Como você REVISA o conteúdo que já estudou?",
       "Por qual razão, sonho, motivo de fato você quer ser aprovado ou aprovada?",
       "Como organiza seus estudos hoje?",

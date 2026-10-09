@@ -15,7 +15,10 @@ export const DE_PARA: ReadonlyArray<{ pergunta: RegExp; coluna: RegExp }> = [
   { pergunta: /whats|telefone|celular/i, coluna: /^telefone/i },
   { pergunta: /e-?mail/i, coluna: /^e-?mail/i },
   { pergunta: /forma[çc][ãa]o/i, coluna: /área de formação/i },
-  { pergunta: /^concurso alvo/i, coluna: /concurso de interesse/i },
+  // "Concurso alvo" e "PRIORITÁRIO" viraram "pensa em prestar" (vários) e "FOCO hoje" (um só) em
+  // 09/10/2026. O foco é o concurso do planejamento, que no Forms era a coluna do plano.
+  { pergunta: /^concurso alvo|concursos pensa em prestar/i, coluna: /concurso de interesse/i },
+  { pergunta: /seu foco hoje/i, coluna: /para qual plano/i },
   { pergunta: /atrapalha sua const[âa]ncia/i, coluna: /maiores desafios/i },
   { pergunta: /disciplinas.*facilidade/i, coluna: /matérias.*afinidade/i },
   { pergunta: /disciplinas.*dificuldade/i, coluna: /matérias.*dificuldade/i },
@@ -25,7 +28,7 @@ export const DE_PARA: ReadonlyArray<{ pergunta: RegExp; coluna: RegExp }> = [
   // Perguntas trazidas do Forms para o Respondi em 09/10/2026, para as séries continuarem
   // comparáveis. "Razão, sonho, motivo" e "Tem filhos" deixaram de ir para as colunas 19 e 8:
   // as perguntas novas abaixo respondem exatamente o que o Forms perguntava ali.
-  { pergunta: /perito criminal ou m[ée]dico legista/i, coluna: /perito criminal ou médico legista/i },
+  { pergunta: /perito criminal ou m[ée]dico legista|planejamento [ée] para qual cargo/i, coluna: /perito criminal ou médico legista/i },
   { pergunta: /situa[çc][ãa]o familiar/i, coluna: /casado\(a\), solteiro/i },
   { pergunta: /quantos dias voc[êe] estudou/i, coluna: /quantos dias da semana/i },
   { pergunta: /quer resolver com a mentoria/i, coluna: /objetivo com a mentoria/i },
