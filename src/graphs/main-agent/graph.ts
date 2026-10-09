@@ -15,11 +15,13 @@ import { rotularDia, rotularHora } from "../../config/agenda.ts";
 import { env } from "../../config/env.ts";
 import { enfileirarMensagem, buscarUltimaMensagem, coletarELimparMensagens } from "../../db/fila.ts";
 import { tentarAdquirirLock, liberarLock } from "../../db/lock.ts";
-import { buscarHistorico, salvarMensagem, houveAiRecente } from "../../db/memoria.ts";
+import { buscarHistorico, salvarMensagem, houveAiRecente, falasIaDesde } from "../../db/memoria.ts";
 import { vincularTelefoneConversa } from "../../db/midias.ts";
 
 // Intro de reaplicação: a IA falou com o lead há menos que isso → conversa em andamento, sem intro.
 const JANELA_CONVERSA_QUENTE_MIN = 12 * 60;
+// Oferta mais antiga que isso é conversa que recomeçou: o gate de material volta a valer.
+const DIAS_OFERTA_RECENTE = 7;
 import { buscarConversa, buscarMensagemPorId, enviarMensagem, enviarArquivo, marcarComoLida, atualizarPresenca, pausaComDigitando, calcularDelayDigitando, limparTextosMidia, obterTextosMidia, blocoDuplicaMidia, blocoNarraEnvioMidia, blocoNarraAcaoInterna, blocoTemFraseProibida, blocoEhNomeDeTool, blocoVazaJargaoInterno, blocoRepeteSaidaRecente, blocoSoEmoji, registrarSaidasRecentes, registrarTextoMidiaNaoEnviado, atualizarKanbanTask, avisarGrupo } from "../../services/chatwoot.ts";
 import { temPrecoDePlano, temLinkDePagamento, conferirFormaDePagamento, ROTULO_PLANO } from "../../lib/planos.ts";
 import { instrucaoEtapaRoteiro } from "../../lib/etapa-roteiro.ts";
@@ -643,12 +645,26 @@ async function executarAgente(state: MainAgentStateType) {
     const veioDaPromo = promocaoAtiva() && leadVeioDaPromocao(historico.filter((m) => m.type === "ai").map((m) => m.content ?? ""));
     const ofertaJaApresentada = veioDaPromo || historico.some((m) => m.type === "ai" && ofertaNoTurno(m.content ?? ""));
     const ehMedico = ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato });
+    // Oferta ANTIGA não dispensa a descoberta de material. Conv 5747: a lead ouviu o Semestral em
+    // agosto sem nunca ter sido perguntada; voltou em outubro com "quero rever tudo, perdi as
+    // mensagens", perguntou "e quais os valores?" e levou o par com material no chute. Só uma
+    // oferta dos últimos dias (negociação em curso, o "quanto era mesmo?") pula a pergunta.
+    const ofertaRecente = async (): Promise<boolean> => {
+      if (veioDaPromo) return true;
+      if (!historico.some((m) => m.type === "ai" && ofertaNoTurno(m.content ?? ""))) return false;
+      try {
+        return (await falasIaDesde(state.telefone, DIAS_OFERTA_RECENTE)).some(ofertaNoTurno);
+      } catch (e) {
+        logger.warn("main-agent", "Não deu para ver a data da oferta anterior — tratando como recente", e);
+        return true;
+      }
+    };
     if (
       ofertaNoTurno(outputFinal) &&
-      !ofertaJaApresentada &&
       !ehMedico &&
       !descobertaMaterialFeita(historicoComTurnoAtual) &&
-      materialDeclaradoPeloLead(historicoComTurnoAtual) === null
+      materialDeclaradoPeloLead(historicoComTurnoAtual) === null &&
+      !(await ofertaRecente())
     ) {
       logger.warn("main-agent", "Oferta bloqueada: descoberta de material ainda não foi feita", {
         idConversa: state.idConversa,

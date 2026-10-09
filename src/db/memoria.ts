@@ -21,6 +21,16 @@ export async function buscarHistorico(sessionId: string, limite: number = 50): P
   return result.rows.reverse();
 }
 
+/** Falas da IA nos últimos `dias` — para saber se uma oferta é negociação em curso ou coisa antiga. */
+export async function falasIaDesde(sessionId: string, dias: number): Promise<string[]> {
+  const result = await pool.query<{ content: string }>(
+    `SELECT content FROM n8n_historico_mensagens
+     WHERE session_id = $1 AND type = 'ai' AND created_at > NOW() - ($2 || ' days')::interval`,
+    [sessionId, dias],
+  );
+  return result.rows.map((r) => r.content ?? "");
+}
+
 // Retorna true se a IA mandou alguma mensagem (type='ai') nos últimos `minutos`. Usado pra
 // evitar re-disparar a intro quando a conversa está ATIVA agora, sem bloquear leads que voltam
 // depois de muito tempo (histórico antigo não conta como "conversa em andamento").
