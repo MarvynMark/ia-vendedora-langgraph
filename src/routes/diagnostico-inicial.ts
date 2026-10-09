@@ -4,7 +4,9 @@ import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { enviarMensagem } from "../services/chatwoot.ts";
+import { anexarCadastroAluno, planilhaAlunosConfigurada } from "../services/google-sheets.ts";
 import {
+  type Respostas,
   PROMPT_ROTEIRO,
   extrairRespostas,
   montarEntradaIA,
@@ -44,8 +46,22 @@ async function gerarRoteiro(entrada: string): Promise<string> {
   return typeof resposta.content === "string" ? resposta.content : "";
 }
 
-async function processarDiagnostico(body: unknown) {
+async function processarDiagnostico(body: unknown, recebidoEm: Date) {
   const respostas = extrairRespostas(body);
+  const saidaIA: { concurso: string | null; roteiro: string | null } = { concurso: null, roteiro: null };
+  try {
+    await gerarEEnviarRoteiro(body, respostas, saidaIA);
+  } finally {
+    // Grava na planilha mesmo se o roteiro falhar: o cadastro do aluno não pode depender da IA.
+    await registrarNaPlanilha(body, respostas, saidaIA, recebidoEm);
+  }
+}
+
+async function gerarEEnviarRoteiro(
+  body: unknown,
+  respostas: Respostas,
+  saidaIA: { concurso: string | null; roteiro: string | null },
+) {
   const nome = nomeDoAluno(respostas);
   if (!nome) {
     logger.warn("diagnostico", "Payload sem nome do aluno — roteiro não gerado", { perguntas: respostas.map(r => r.pergunta) });
@@ -55,6 +71,8 @@ async function processarDiagnostico(body: unknown) {
 
   const { concurso, roteiro } = separarSaidaIA(await gerarRoteiro(montarEntradaIA(respostas)));
   if (!roteiro) throw new Error("IA devolveu roteiro vazio");
+  saidaIA.concurso = concurso;
+  saidaIA.roteiro = roteiro;
 
   const mensagem = montarMensagemRoteiro({ nome, concurso, whatsapp: whatsappDoAluno(respostas), roteiro });
   const conversationId = DESTINO_CONVERSA_ID;
@@ -63,12 +81,29 @@ async function processarDiagnostico(body: unknown) {
   registrarLog(body, `enviado:conversa_${conversationId}`);
 }
 
+async function registrarNaPlanilha(
+  body: unknown,
+  respostas: Respostas,
+  saidaIA: { concurso: string | null; roteiro: string | null },
+  recebidoEm: Date,
+) {
+  if (!planilhaAlunosConfigurada() || respostas.length === 0) return;
+  try {
+    await anexarCadastroAluno({ respostas, ...saidaIA, recebidoEm });
+    logger.info("diagnostico", "Cadastro gravado na planilha de alunos");
+    registrarLog(body, "planilha:ok");
+  } catch (e) {
+    logger.error("diagnostico", "Erro ao gravar na planilha de alunos:", e);
+    registrarLog(body, `planilha:erro:${String(e).slice(0, 300)}`);
+  }
+}
+
 export const diagnosticoRouter = new Elysia()
   .post("/webhook/diagnostico-inicial", ({ body }) => {
     registrarWebhook("/webhook/diagnostico-inicial", body, "recebido");
     registrarLog(body, "recebido");
     // Responde na hora: a IA leva alguns segundos e o Respondi pode reenviar se demorar.
-    void processarDiagnostico(body).catch(e => {
+    void processarDiagnostico(body, new Date()).catch(e => {
       logger.error("diagnostico", "Erro ao gerar/enviar roteiro:", e);
       registrarLog(body, `erro:${String(e).slice(0, 300)}`);
     });

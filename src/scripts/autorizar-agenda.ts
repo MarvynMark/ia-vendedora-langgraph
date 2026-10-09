@@ -1,4 +1,5 @@
-// Autorização única do Google Calendar (OAuth) para o funil de sessão estratégica.
+// Autorização única do Google Calendar (OAuth) para o funil de sessão estratégica, e do Google
+// Sheets para a planilha de cadastro dos alunos novos. Rodar de novo troca o refresh token.
 //
 // Por que OAuth e não Service Account: o Workspace da csiacademy.com.br aplica a política
 // `iam.managed.disableServiceAccountKeyCreation`, que proíbe criar chaves de conta de serviço.
@@ -18,7 +19,8 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { google } from "googleapis";
 
-const ESCOPOS = ["https://www.googleapis.com/auth/calendar"];
+// Planilhas: o Diagnóstico Inicial grava cada aluno novo na planilha de cadastro (services/google-sheets.ts).
+const ESCOPOS = ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/spreadsheets"];
 const PORTA = 53682; // porta alta e fixa: o cliente é "App para computador", então loopback vale
 
 const caminho = process.argv[2];

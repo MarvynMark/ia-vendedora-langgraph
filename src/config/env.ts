@@ -106,6 +106,11 @@ export const env = {
   GOOGLE_CALENDAR_ID_GUSTHAVO: process.env["GOOGLE_CALENDAR_ID_GUSTHAVO"] ?? "",
   GOOGLE_CALENDAR_ID_PEDRO: process.env["GOOGLE_CALENDAR_ID_PEDRO"] ?? "",
 
+  // Planilha "[MENTORADOS] [FORMULÁRIO] - ALUNOS": cada Diagnóstico Inicial do Respondi vira uma
+  // linha na aba que recebia o Google Forms antigo. Usa o mesmo OAuth da agenda. Vazia = desligado.
+  PLANILHA_ALUNOS_ID: process.env["PLANILHA_ALUNOS_ID"] ?? "1-VKYBb4t6W99VW_vv4eVYdogtHvj8kq8F7g4RI1LUkA",
+  PLANILHA_ALUNOS_GID: Number(process.env["PLANILHA_ALUNOS_GID"] ?? "2095691951"),
+
   // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
   // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert
   // (o revert de bf3063d mostrou que ele leva junto correções boas que vieram no mesmo commit).
