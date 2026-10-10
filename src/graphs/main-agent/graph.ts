@@ -757,7 +757,16 @@ async function executarAgente(state: MainAgentStateType) {
     // o lead acabara de ler: "Entendo, Joel..." seguido de "Entendi, Joel..." (conv 6948, 7 bolhas).
     const textoJaEnviado = mensagensAntes.join(" ").trim();
     const turnoCompleto = [textoJaEnviado, outputFinal].filter(Boolean).join(" ");
-    if (!mensagemOriginal.startsWith("[SISTEMA:") && respostaIgnoraOLead(mensagemOriginal, turnoCompleto)) {
+    // Objeção de preço respondida com pergunta é o roteiro do bloco "Tá caro" ("O que ficou mais
+    // apertado, a parcela ou o valor total?"), não eco ignorado. Na conv 9721 a trava trocou essa
+    // pergunta por um "boleto/PIX parcelado... Que tal começar por esse?" sem plano nenhum.
+    const perguntaDeObjecaoDePreco =
+      classificarObjecao(mensagemOriginal) === "preco" && turnoCompleto.includes("?");
+    if (
+      !mensagemOriginal.startsWith("[SISTEMA:") &&
+      !perguntaDeObjecaoDePreco &&
+      respostaIgnoraOLead(mensagemOriginal, turnoCompleto)
+    ) {
       logger.warn("main-agent", "Resposta ignorou a fala do lead — reescrevendo", {
         idConversa: state.idConversa,
         falaDoLead: mensagemOriginal.slice(0, 120),

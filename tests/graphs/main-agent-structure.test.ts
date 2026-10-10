@@ -90,7 +90,9 @@ describe("main agent prompt", () => {
     // manda vídeo e entregáveis antes; o "lead quente" vale só antes do áudio 2. ~250 caracteres.
     // 102,5k → 103,5k: conv 5747 (09/10/2026) — respostas oficiais de suporte no WhatsApp, encontros
     // ao vivo em grupo e feedback mensal por relatório; a IA improvisava. ~700 caracteres.
-    expect(prompt.length).toBeLessThan(103500);
+    // 103,5k → 105k: conv 9721 (06/10/2026) — ORÇAMENTO DECLARADO: "passa do meu orçamento" vira
+    // "quanto cabe por mês?" e o plano que encaixa, no lugar do boleto/PIX parcelado. ~1,3k caracteres.
+    expect(prompt.length).toBeLessThan(105000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela

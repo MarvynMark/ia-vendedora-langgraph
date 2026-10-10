@@ -65,6 +65,11 @@ const PADROES: Array<{ tipo: TipoObjecao; re: RegExp }> = [
   { tipo: "preco", re: /\btem (algo|alguma coisa|algum plano|outro plano|opcao) mais (barato|em conta|acessivel)\b/ },
   { tipo: "preco", re: /\b(o|algum) mais (barato|em conta)\b/ },
   { tipo: "preco", re: /\bnao cabe no (meu )?(bolso|orcamento)\b/ },
+  // "Preciso analisar com calma, pois ultrapassa um pouco do meu orçamento" (conv 9721) caía em
+  // adiamento pelo "preciso analisar" — mas quem trava é o valor.
+  { tipo: "preco", re: /\b(ultrapassa|passa|excede|estoura|foge)( um pouco| muito| bem)?( d?o)? (meu )?orcamento\b/ },
+  { tipo: "preco", re: /\b(acima|alem) do (meu )?orcamento\b/ },
+  { tipo: "preco", re: /\b(ver|analisar|olhar|rever|checar|conferir|organizar) (o |meu |o meu )?orcamento\b/ },
 
   // --- ADIAMENTO: o lead empurra a decisão pra frente ---
   // "ver" sozinho fica FORA: "onde vou ver o encontro ao vivo?" não é objeção, é dúvida de aluno

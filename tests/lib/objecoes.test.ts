@@ -15,6 +15,10 @@ describe("classificarObjecao — preço", () => {
     "queria o mais em conta",
     "isso ta fora do meu orçamento",
     "não cabe no meu bolso",
+    "Preciso analisar com calma, pois ultrapassa um pouco do meu orçamento",
+    "passa do meu orçamento",
+    "vou ver meu orçamento e te falo",
+    "ficou acima do orçamento",
   ];
   for (const c of CASOS) {
     test(`"${c}"`, () => expect(classificarObjecao(c)).toBe("preco"));
