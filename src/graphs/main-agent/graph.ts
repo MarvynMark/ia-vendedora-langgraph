@@ -42,6 +42,7 @@ import {
 } from "../../lib/elegibilidade.ts";
 import { classificarObjecao, montarAlertaObjecao } from "../../lib/objecoes.ts";
 import { reivindicarAlerta, liberarAlerta, chaveObjecao } from "../../db/alertas.ts";
+import { criarNotaAtendente } from "../../lib/nota-atendente.ts";
 import { montarOutputDoTurno } from "./output.ts";
 import { gerarAudioTts } from "../../services/elevenlabs.ts";
 import { formatarSsml as formatarSsmlFn, formatarTexto as formatarTextoFn, dividirMensagem, dividirEmFrases, agruparAteLimite, MAX_BOLHAS_POR_TURNO } from "../../lib/response-formatter.ts";
@@ -856,6 +857,15 @@ async function executarAgente(state: MainAgentStateType) {
             logger.warn("main-agent", "Erro ao avisar o comercial sobre a objeção:", e);
           }
         }
+        // Nota privada com o roteiro pro atendente. Em segundo plano: gerar o texto leva uma
+        // chamada ao modelo, e a resposta do lead não pode esperar por isso.
+        void criarNotaAtendente({
+          idConversa: state.idConversa,
+          telefone: state.telefone,
+          nome: state.nome,
+          descricaoCard: String(state.tarefa?.["description"] ?? ""),
+          gatilho: { tipo: "objecao", objecao: tipoObjecao, fala: mensagemOriginal, resposta: outputFinal },
+        });
       }
     } catch (e) {
       logger.warn("main-agent", "Falha no aviso de objeção (ignorada):", e);

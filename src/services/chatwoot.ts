@@ -860,8 +860,10 @@ export async function verificarLeadRespondeuUltimo(
   accountId: string | number,
   conversationId: string | number,
 ): Promise<boolean> {
-  const data = await listarMensagens(accountId, conversationId) as { payload?: Array<{ message_type: number; created_at: number }> };
-  const msgs = (data.payload ?? []).filter(m => m.message_type === 0 || m.message_type === 1);
+  const data = await listarMensagens(accountId, conversationId) as { payload?: Array<{ message_type: number; created_at: number; private?: boolean }> };
+  // Nota privada (transcrição de áudio, nota pro atendente) é outgoing mas o lead não vê: contá-la
+  // faria o lead que acabou de falar parecer respondido.
+  const msgs = (data.payload ?? []).filter(m => (m.message_type === 0 || m.message_type === 1) && !m.private);
   if (msgs.length === 0) return false;
   const ultima = msgs.sort((a, b) => b.created_at - a.created_at)[0]!;
   return ultima.message_type === 0;
@@ -903,9 +905,9 @@ export async function ultimaMensagemAgente(
 ): Promise<string> {
   try {
     const data = await listarMensagens(accountId, conversationId) as {
-      payload?: Array<{ message_type: number; content?: string | null; created_at: number }>;
+      payload?: Array<{ message_type: number; content?: string | null; created_at: number; private?: boolean }>;
     };
-    const outs = (data.payload ?? []).filter(m => m.message_type === 1 && (m.content ?? "").trim() !== "");
+    const outs = (data.payload ?? []).filter(m => m.message_type === 1 && !m.private && (m.content ?? "").trim() !== "");
     if (outs.length === 0) return "";
     return outs.sort((a, b) => b.created_at - a.created_at)[0]!.content ?? "";
   } catch (e) {

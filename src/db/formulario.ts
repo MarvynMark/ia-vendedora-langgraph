@@ -95,3 +95,72 @@ export async function buscarCamposFormulario(
     return null;
   }
 }
+
+export interface PerfilFormulario {
+  concurso: string | null;
+  formacao: string | null;
+  quandoEntrar: string | null;
+  dispostoInvestir: string | null;
+}
+
+// Perfil de vários leads numa consulta só (lista quente do relatório diário). Chave do mapa:
+// últimos 8 dígitos do telefone, o mesmo match de buscarDadosFormulario.
+export async function buscarPerfisPorTelefones(telefones: string[]): Promise<Map<string, PerfilFormulario>> {
+  const ultimos8 = [...new Set(telefones.map((t) => t.replace(/\D/g, "").slice(-8)).filter((t) => t.length === 8))];
+  const mapa = new Map<string, PerfilFormulario>();
+  if (ultimos8.length === 0) return mapa;
+  const result = await pool.query<{
+    chave: string;
+    concurso_desejado: string | null;
+    area_graduacao: string | null;
+    quando_pretende_entrar: string | null;
+    disposto_investir: string | null;
+  }>(
+    `SELECT DISTINCT ON (chave) chave, concurso_desejado, area_graduacao, quando_pretende_entrar, disposto_investir
+     FROM (SELECT RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) AS chave, * FROM leads_formulario_mentoria) f
+     WHERE chave = ANY($1)
+     ORDER BY chave, criado_em DESC`,
+    [ultimos8],
+  );
+  for (const r of result.rows) {
+    mapa.set(r.chave, {
+      concurso: r.concurso_desejado,
+      formacao: r.area_graduacao,
+      quandoEntrar: r.quando_pretende_entrar,
+      dispostoInvestir: r.disposto_investir,
+    });
+  }
+  return mapa;
+}
+
+export interface Aplicacao {
+  concurso: string | null;
+  formacao: string | null;
+  quandoEntrar: string | null;
+  dispostoInvestir: string | null;
+  criadoEm: Date;
+}
+
+/** Aplicações recebidas no intervalo [inicio, fim) — base do relatório diário do comercial. */
+export async function listarAplicacoes(inicio: Date, fim: Date): Promise<Aplicacao[]> {
+  const result = await pool.query<{
+    concurso_desejado: string | null;
+    area_graduacao: string | null;
+    quando_pretende_entrar: string | null;
+    disposto_investir: string | null;
+    criado_em: Date;
+  }>(
+    `SELECT concurso_desejado, area_graduacao, quando_pretende_entrar, disposto_investir, criado_em
+     FROM leads_formulario_mentoria
+     WHERE criado_em >= $1 AND criado_em < $2
+     ORDER BY criado_em`,
+    [inicio, fim],
+  );
+  return result.rows.map((r) => ({
+    concurso: r.concurso_desejado,
+    formacao: r.area_graduacao,
+    quandoEntrar: r.quando_pretende_entrar,
+    dispostoInvestir: r.disposto_investir,
+    criadoEm: r.criado_em,
+  }));
+}

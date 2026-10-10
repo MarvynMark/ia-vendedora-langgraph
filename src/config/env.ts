@@ -93,6 +93,12 @@ export const env = {
   TEMPLATE_DELAY_MS: Number(process.env["TEMPLATE_DELAY_MS"] ?? "300000"), // 5 minutos
   MODO_TESTE: process.env["MODO_TESTE"] === "true",
 
+  // Relatório diário do grupo do comercial (lib/relatorio-comercial.ts). Desligado por padrão:
+  // liga depois de conferir o texto com `bun run src/scripts/relatorio-comercial.ts`.
+  RELATORIO_COMERCIAL_ATIVO: process.env["RELATORIO_COMERCIAL_ATIVO"] === "true",
+  // Nota privada pro atendente na objeção e no fim do follow-up (lib/nota-atendente.ts).
+  NOTA_ATENDENTE_ATIVA: process.env["NOTA_ATENDENTE_ATIVA"] !== "false", // ligada por default
+
   // Google Calendar via OAuth (não Service Account): o Workspace da csiacademy.com.br aplica
   // `iam.managed.disableServiceAccountKeyCreation` e proíbe chaves de conta de serviço. OAuth passa
   // por essa política E, agindo como um usuário real, consegue criar sala do Meet por evento —

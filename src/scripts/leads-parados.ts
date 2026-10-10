@@ -11,81 +11,17 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { env } from "../config/env.ts";
-import { listarKanbanTasks, listarMensagens, type KanbanTaskResumo } from "../services/chatwoot.ts";
+import type { KanbanTaskResumo } from "../services/chatwoot.ts";
+import { varrerBoard, analisarConversa, STEP, type Analise } from "../lib/lista-quente.ts";
 
 const ACC = env.CHATWOOT_ACCOUNT_ID;
-const BOARD = env.KANBAN_BOARD_ID;
-const STEP_AG_PAGTO = 8;
-const STEP_CONEXAO = 10;
+const STEP_AG_PAGTO = STEP.aguardandoPagamento;
+const STEP_CONEXAO = STEP.conexao;
 const CRM = `${env.CHATWOOT_BASE_URL}/app/accounts/${ACC}/conversations`;
-
-// Mesmos padrões usados no diagnóstico de ago/26 — mantidos idênticos pra os números baterem.
-const RE_PRECO = /R\$\s?(3\.997|3\.197|1\.997|997|394|315|197)/;
-const RE_SINAL = /(link|pix|pagar|pagamento|comprovante|paguei|cart[ãa]o|boleto|parcel)/i;
-const RE_LINK_PAGTO = /peritowalker\.com\.br\/(mentoria|medicolegista)/i;
 
 const hoje = Date.now();
 const diasDe = (iso?: string | null) =>
   iso ? Math.floor((hoje - new Date(iso).getTime()) / 86_400_000) : -1;
-
-// O endpoint de tasks ignora o filtro de step e devolve o board inteiro paginado — varremos tudo
-// uma vez e filtramos em memória (mesmo padrão do relatorio-semanal.ts).
-async function varrerBoard(): Promise<KanbanTaskResumo[]> {
-  const porId = new Map<number, KanbanTaskResumo>();
-  for (let page = 1; page <= 400; page++) {
-    let tasks: KanbanTaskResumo[] = [];
-    for (let tent = 1; tent <= 3; tent++) {
-      try {
-        tasks = await listarKanbanTasks(ACC, BOARD, STEP_AG_PAGTO, page);
-        break;
-      } catch (erro) {
-        if (tent === 3) throw erro;
-      }
-    }
-    for (const t of tasks) if (!porId.has(t.id)) porId.set(t.id, t);
-    if (tasks.length === 0) break;
-  }
-  return [...porId.values()];
-}
-
-type Analise = {
-  chegouPreco: boolean;
-  sinalCompra: boolean;
-  linkEnviado: boolean;
-  ultimaEhIa: boolean;
-  ultimaEm: number;
-  ultimaLead: string;
-};
-
-// message_type: 0 = entrada (lead), 1 = saída (IA/atendente).
-// Atenção: o endpoint de mensagens é indexado pelo display_id da conversa (o mesmo número que
-// aparece em conversation_ids e na URL do CRM), NÃO pelo `id` interno que vem em conversations[].
-async function analisarConversa(displayId: number): Promise<Analise | null> {
-  try {
-    const r = await listarMensagens(ACC, displayId) as {
-      payload?: Array<{ message_type: number; created_at: number; content?: string | null }>;
-    };
-    const msgs = (r.payload ?? []).filter((m) => m.message_type === 0 || m.message_type === 1);
-    if (msgs.length === 0) return null;
-
-    const precoEm = msgs.find((m) => m.message_type === 1 && RE_PRECO.test(m.content ?? ""))?.created_at;
-    const ultima = msgs[msgs.length - 1]!;
-    const doLead = msgs.filter((m) => m.message_type === 0);
-
-    return {
-      chegouPreco: precoEm !== undefined,
-      sinalCompra: doLead.some(
-        (m) => RE_SINAL.test(m.content ?? "") && (precoEm === undefined || m.created_at >= precoEm),
-      ),
-      linkEnviado: msgs.some((m) => m.message_type === 1 && RE_LINK_PAGTO.test(m.content ?? "")),
-      ultimaEhIa: ultima.message_type === 1,
-      ultimaEm: ultima.created_at,
-      ultimaLead: (doLead[doLead.length - 1]?.content ?? "").replace(/\s+/g, " ").slice(0, 90),
-    };
-  } catch {
-    return null;
-  }
-}
 
 type Linha = {
   bloco: string;

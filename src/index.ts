@@ -25,6 +25,7 @@ import { recuperarWebhooksPerdidos } from "./lib/webhook-perdido.ts";
 import { verificarNoticias } from "./lib/monitor-noticias.ts";
 import { monitorNoticiasRouter } from "./routes/monitor-noticias.ts";
 import { verificarEditais } from "./lib/monitor-edital.ts";
+import { verificarRelatorioDiario } from "./lib/relatorio-comercial.ts";
 import { monitorEditalRouter } from "./routes/monitor-edital.ts";
 import { obterLogs, obterLogsPagamento } from "./lib/webhook-logger.ts";
 import { marcarEncerrando, aguardarDrenar, processamentosAtivos } from "./lib/processamentos-ativos.ts";
@@ -114,6 +115,16 @@ if (agendaConfigurada()) {
     }
   }, 5 * 60_000);
 }
+
+// Job: relatório diário do grupo do comercial — sai uma vez por dia a partir das 8h (trava no
+// banco). Só com RELATORIO_COMERCIAL_ATIVO=true; sem a flag é no-op.
+setInterval(async () => {
+  try {
+    await verificarRelatorioDiario();
+  } catch (e) {
+    logger.error("relatorio-comercial", "Erro no job do relatório diário:", e);
+  }
+}, 5 * 60_000);
 
 // Job: limpar dedup de mensagens processadas (a cada 24h)
 setInterval(async () => {

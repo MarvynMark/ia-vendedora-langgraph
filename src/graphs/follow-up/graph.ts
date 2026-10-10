@@ -11,6 +11,7 @@ import { delayInicialMs } from "../../lib/delays-followup.ts";
 import { TOQUE_IA, TOQUE_PUXAR, escolherToque2, gerarToque1, agendarProximoToque, type EtapaToque } from "../../lib/followup-toques.ts";
 import { TOQUE_AUDIO_MUDO, TOQUE_PIX, ehToqueCuriosidade, enviarToqueCuriosidade } from "../../lib/followup-curiosidade.ts";
 import { lerRetomada, removerRetomada } from "../../lib/retomada.ts";
+import { criarNotaAtendente, ROTULO_MOTIVO } from "../../lib/nota-atendente.ts";
 
 // Espaçamento mínimo anti-spam entre toques grátis ao "espremer" a cadência pra dentro
 // da janela de 24h (economiza envios pagos à Meta sem parecer spam).
@@ -295,9 +296,27 @@ export async function agenteFollowup(state: FollowUpStateType) {
     }
     // Lead que ouviu o preço e não respondeu a 3 mensagens: a IA para, mas ele não é lead frio —
     // é onde o "Olá, tá por aí?" do Pedro responde 30% e precede compras (análise de 21/09).
+    // Nota privada pro atendente: por que sumiu, quando entrar e o que falar. Antes do aviso ao
+    // grupo, para o aviso já dizer o motivo.
+    const motivo = await criarNotaAtendente({
+      idConversa: state.conversationId,
+      telefone: state.telefone ?? "",
+      nome: state.title,
+      descricaoCard: state.description,
+      gatilho: {
+        tipo: "sumico",
+        etapa: state.board_step?.name ?? "",
+        motivoProvavel: isPosPreco
+          ? "sumiu_pos_pitch"
+          : stepNameFollowup === "aguardando pagamento" && temLinkEnviado
+            ? "link_sem_pagamento"
+            : "sumiu_conexao",
+      },
+    });
     if (isPosPreco) {
       await avisarComercial(
         `👋 VALE UM "TÁ AÍ?" — ${state.title} (${state.telefone ?? "?"}) ouviu o preço, recebeu ${sequencia.length + 1} mensagens e não respondeu. A IA parou; o card segue em Aguardando Pagamento.\n` +
+          (motivo ? `Motivo: ${ROTULO_MOTIVO[motivo]} — o roteiro está na nota privada da conversa.\n` : "") +
           `${env.CHATWOOT_BASE_URL}/app/accounts/${state.accountId}/conversations/${state.conversationId}`,
       );
       await sinalizarFollowupsConcluidos(state, sequencia.length + 1);

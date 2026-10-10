@@ -44,3 +44,18 @@ export async function reivindicarAlertaGestor(
 export async function liberarAlertaGestor(idConversa: string): Promise<void> {
   await liberarAlerta(chaveDe(idConversa));
 }
+
+// Leitura das travas para os relatórios do comercial: as chaves `objecao:*` e `nota:*` são o único
+// registro de POR QUE cada lead travou (o motivo vai na coluna `motivo`).
+export async function listarAlertasDesde(
+  prefixo: string,
+  desde: Date,
+): Promise<Array<{ chave: string; motivo: string; criado_em: Date }>> {
+  const result = await pool.query<{ chave: string; motivo: string; criado_em: Date }>(
+    `SELECT chave, motivo, criado_em FROM alertas_gestor_enviados
+     WHERE chave LIKE $1 AND criado_em >= $2
+     ORDER BY criado_em`,
+    [`${prefixo}%`, desde],
+  );
+  return result.rows;
+}
