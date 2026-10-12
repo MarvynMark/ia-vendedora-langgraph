@@ -9,6 +9,7 @@ import { google, type sheets_v4 } from "googleapis";
 import { env } from "../config/env.ts";
 import type { Respostas } from "../lib/diagnostico-inicial.ts";
 import { montarLinhaPlanilha } from "../lib/planilha-alunos.ts";
+import { indiceDoLead, mesclarLinha } from "../lib/lead-black.ts";
 import { logger } from "../lib/logger.ts";
 
 let clienteCache: sheets_v4.Sheets | null = null;
@@ -131,6 +132,96 @@ export function anexarCadastroAluno(opts: {
         }
       }
     }
+  });
+  fila = tarefa.catch(() => {});
+  return tarefa;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Aba black-2026 da planilha "LEADS - OPERACAO PERITO": um lead por linha, chaveado pelo Lead ID.
+// O cadastro cria a linha e a pesquisa completa a mesma linha (ou cria, se chegar antes).
+// ---------------------------------------------------------------------------------------------
+
+export function planilhaBlackConfigurada(): boolean {
+  return Boolean(
+    env.PLANILHA_BLACK_ID &&
+      env.GOOGLE_OAUTH_CLIENT_ID &&
+      env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      env.GOOGLE_OAUTH_REFRESH_TOKEN,
+  );
+}
+
+/** Coluna (1-based) em letras: 1 → A, 27 → AA. */
+export function letraDaColuna(n: number): string {
+  let s = "";
+  for (let x = n; x > 0; x = Math.floor((x - 1) / 26)) s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
+  return s;
+}
+
+/**
+ * Grava `valores` (título da coluna → valor) na linha do lead e devolve a linha inteira já mesclada,
+ * por título. Usa a mesma fila da planilha de alunos: duas gravações simultâneas leriam a aba antes
+ * uma da outra e o mesmo lead ganharia duas linhas.
+ */
+export function gravarLeadBlack(leadId: string, valores: Record<string, string>): Promise<Record<string, string>> {
+  const tarefa = fila.then(async () => {
+    const api = planilhas();
+    const spreadsheetId = env.PLANILHA_BLACK_ID;
+    const sheetId = env.PLANILHA_BLACK_GID;
+
+    const { data: meta } = await api.spreadsheets.get({
+      spreadsheetId,
+      fields: "sheets(properties(sheetId,title,gridProperties.columnCount))",
+    });
+    const aba = meta.sheets?.find(s => s.properties?.sheetId === sheetId)?.properties;
+    if (!aba?.title) throw new Error(`Aba gid=${sheetId} não encontrada na planilha de leads da Black`);
+    const nome = `'${aba.title.replace(/'/g, "''")}'`;
+
+    const { data } = await api.spreadsheets.values.get({ spreadsheetId, range: nome });
+    const linhas = (data.values ?? []).map(l => l.map(v => String(v ?? "")));
+    const cabecalhoAtual = linhas[0] ?? [];
+    const indice = indiceDoLead(linhas, cabecalhoAtual, leadId);
+    const { cabecalho, cabecalhoMudou, linha } = mesclarLinha({
+      cabecalho: cabecalhoAtual,
+      linhaAtual: indice >= 0 ? linhas[indice]! : [],
+      valores,
+    });
+
+    const colunasGrade = aba.gridProperties?.columnCount ?? 0;
+    if (cabecalho.length > colunasGrade) {
+      await api.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: [{ appendDimension: { sheetId, dimension: "COLUMNS", length: cabecalho.length - colunasGrade } }] },
+      });
+    }
+    if (cabecalhoMudou) {
+      await api.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${nome}!A1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [cabecalho] },
+      });
+    }
+
+    if (indice >= 0) {
+      const n = indice + 1;
+      await api.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${nome}!A${n}:${letraDaColuna(cabecalho.length)}${n}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [linha] },
+      });
+    } else {
+      await api.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${nome}!A1`,
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: [linha] },
+      });
+    }
+
+    return Object.fromEntries(cabecalho.map((c, i) => [c.trim(), linha[i] ?? ""]));
   });
   fila = tarefa.catch(() => {});
   return tarefa;

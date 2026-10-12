@@ -12,6 +12,7 @@ import { pagamentoRouter } from "./routes/pagamento.ts";
 import { pagamentoTmbRouter } from "./routes/pagamento-tmb.ts";
 import { aplicacaoRouter } from "./routes/aplicacao-mentoria.ts";
 import { diagnosticoRouter } from "./routes/diagnostico-inicial.ts";
+import { leadBlackRouter } from "./routes/lead-black.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
 import { registrarMensagemRouter } from "./routes/registrar-mensagem.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
@@ -40,6 +41,7 @@ const app = new Elysia()
   .use(pagamentoTmbRouter)
   .use(aplicacaoRouter)
   .use(diagnosticoRouter)
+  .use(leadBlackRouter)
   .use(dashboardRouter)
   .use(registrarMensagemRouter)
   .use(monitorNoticiasRouter)

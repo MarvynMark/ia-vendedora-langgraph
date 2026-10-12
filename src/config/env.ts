@@ -117,6 +117,12 @@ export const env = {
   PLANILHA_ALUNOS_ID: process.env["PLANILHA_ALUNOS_ID"] ?? "1-VKYBb4t6W99VW_vv4eVYdogtHvj8kq8F7g4RI1LUkA",
   PLANILHA_ALUNOS_GID: Number(process.env["PLANILHA_ALUNOS_GID"] ?? "2095691951"),
 
+  // Planilha "LEADS - OPERACAO PERITO", aba black-2026: cadastro e mini pesquisa da LP
+  // lp.mentoriavestigium.com.br/lista-vip (Black Antecipada, 03/11/2026). Mesmo OAuth da agenda,
+  // e contato@csiacademy.com.br precisa ser Editor da planilha. ID vazio = desligado.
+  PLANILHA_BLACK_ID: process.env["PLANILHA_BLACK_ID"] ?? "1WhM9OjlHtj_WcRgM9ybUkh20lB43TeXPjGKWzZeMMg4",
+  PLANILHA_BLACK_GID: Number(process.env["PLANILHA_BLACK_GID"] ?? "784338254"),
+
   // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
   // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert
   // (o revert de bf3063d mostrou que ele leva junto correções boas que vieram no mesmo commit).

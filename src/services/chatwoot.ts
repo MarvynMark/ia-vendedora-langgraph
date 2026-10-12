@@ -1165,3 +1165,27 @@ export async function removerEtiquetas(
   const restantes = (conversa.labels ?? []).filter(l => !labelsARemover.includes(l));
   return definirEtiquetas(accountId, conversationId, restantes);
 }
+
+// Etiquetas do CONTATO (as de cima, adicionarEtiquetas/removerEtiquetas, são da conversa).
+// O POST de labels substitui a lista inteira, por isso lê as atuais e envia a união.
+export async function adicionarEtiquetasContato(
+  accountId: string | number,
+  contactId: string | number,
+  labels: string[],
+) {
+  const url = `${urlConta(accountId)}/contacts/${contactId}/labels`;
+  const atual = await fetchComTimeout(url, { method: "GET", headers: headers() });
+  if (!atual.ok) {
+    const text = await atual.text();
+    throw new Error(`[chatwoot] listar etiquetas do contato falhou (${atual.status}): ${text}`);
+  }
+  const { payload } = await atual.json() as { payload?: string[] };
+  const merged = [...new Set([...(payload ?? []), ...labels])];
+
+  const res = await fetchComTimeout(url, { method: "POST", headers: headers(), body: JSON.stringify({ labels: merged }) });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`[chatwoot] adicionarEtiquetasContato falhou (${res.status}): ${text}`);
+  }
+  return res.json();
+}
