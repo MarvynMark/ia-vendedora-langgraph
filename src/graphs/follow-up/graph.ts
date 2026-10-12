@@ -505,6 +505,13 @@ export function linkPrimeirosPassos(description: string): string {
     : LINK_PRIMEIROS_PASSOS_PERITO;
 }
 
+// Fallback fora da janela de 24h: um template por trilha, com o link fixo e {{1}} = primeiro nome.
+// 11/10/2026 (conv 8563): a aluna comprou dias depois da última mensagem dela, a boas-vindas saiu
+// como texto livre, a Meta recusou ("janela de 24 horas encerrada") e ela ficou sem o onboarding.
+export function templateBoasVindas(link: string): string {
+  return link === LINK_PRIMEIROS_PASSOS_MEDICO ? "boas_vindas_medico" : "boas_vindas_perito";
+}
+
 async function agenteBoasVindas(state: FollowUpStateType) {
   logger.info("follow-up", "enviando boas-vindas...");
 
@@ -515,9 +522,16 @@ async function agenteBoasVindas(state: FollowUpStateType) {
 
   const msg = `🚀 ${primeiroNome}, parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 ${link}\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.`;
 
+  const dentroJanela = (await msRestantesJanela24h(state.accountId, state.conversationId)) > 0;
+
   try {
-    await enviarMensagem(state.accountId, state.conversationId, msg);
-    logger.info("follow-up", "boas-vindas enviada", { link });
+    if (dentroJanela) {
+      await enviarMensagem(state.accountId, state.conversationId, msg);
+    } else {
+      // O texto do template é idêntico ao msg (só o nome entra como {{1}}).
+      await enviarTemplateComHistorico(state, templateBoasVindas(link), msg, primeiroNome);
+    }
+    logger.info("follow-up", "boas-vindas enviada", { link, janela: dentroJanela });
   } catch (e) {
     logger.error("follow-up", "Erro ao enviar boas-vindas:", e);
   }

@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { linkPrimeirosPassos } from "../../src/graphs/follow-up/graph.ts";
+import { linkPrimeirosPassos, templateBoasVindas } from "../../src/graphs/follow-up/graph.ts";
+import { CONTEUDO_TEMPLATES, TEMPLATE_META } from "../../src/lib/templates.ts";
 
 const MEDICO = "https://lp.mentoriavestigium.com.br/primeiros-passos-medico";
 const PERITO = "https://lp.mentoriavestigium.com.br/primeiros-passos-perito";
@@ -28,5 +29,19 @@ describe("linkPrimeirosPassos", () => {
     // O lead pode ter escrito "sou médico" numa anotação do card; só o plano decide.
     const description = "Lead comentou que é médico do trabalho\n💳 - Plano: Mentoria Vestigium - Perito Criminal - Anual";
     expect(linkPrimeirosPassos(description)).toBe(PERITO);
+  });
+});
+
+describe("templateBoasVindas", () => {
+  test("cada trilha usa o template com o próprio link", () => {
+    expect(templateBoasVindas(MEDICO)).toBe("boas_vindas_medico");
+    expect(templateBoasVindas(PERITO)).toBe("boas_vindas_perito");
+  });
+
+  test("texto registrado no CRM aponta pro mesmo link do template", () => {
+    expect(CONTEUDO_TEMPLATES.boas_vindas_medico).toContain(MEDICO);
+    expect(CONTEUDO_TEMPLATES.boas_vindas_perito).toContain(PERITO);
+    expect(TEMPLATE_META.boas_vindas_medico?.bodyVars).toBe(1);
+    expect(TEMPLATE_META.boas_vindas_perito?.bodyVars).toBe(1);
   });
 });

@@ -147,6 +147,12 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   sessao_link_1h:
     "Opa! Nossa conversa é daqui a pouco, às {{1}}. É por aqui: {{2}} — te espero!",
 
+  // --- Boas-vindas pós-compra (fallback fora da janela) — {{1}} = primeiro nome, 1:1 com a Meta ---
+  boas_vindas_perito:
+    "🚀 [Nome], parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 https://lp.mentoriavestigium.com.br/primeiros-passos-perito\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.",
+  boas_vindas_medico:
+    "🚀 [Nome], parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 https://lp.mentoriavestigium.com.br/primeiros-passos-medico\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.",
+
   // --- Promoção do Dia do Cliente (18/09/2026, um dia só) — sem variável, texto 1:1 com a Meta ---
   dia_cliente_quente_v2:
     "Oi, tudo bem? Aqui é o Walker. Eu tava revendo umas conversas aqui e parei na sua. A gente chegou a falar de valor e não fechou, e eu fiquei com isso na cabeça, porque o seu caso era de quem tinha tudo pra dar certo. Hoje eu consegui fazer a condição única do dia do cliente, nunca feita antes na mentoria: mais de R$ 1.000 a menos, e eu queria que você soubesse antes de acabar, porque é só hoje mesmo. Me responde eu quero que eu te mostro.",
@@ -210,4 +216,8 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
 
   dia_cliente_quente_v2: { language: "pt_BR", bodyVars: 0 },
   dia_cliente_abertura_v2: { language: "pt_BR", bodyVars: 0 },
+
+  // Boas-vindas pós-compra — {{1}} = primeiro nome.
+  boas_vindas_perito: { language: "pt_BR", bodyVars: 1 },
+  boas_vindas_medico: { language: "pt_BR", bodyVars: 1 },
 };
