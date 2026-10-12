@@ -8,6 +8,7 @@ import {
   ETIQUETA_BLACK,
   ORIGEM_BLACK,
   atributosDaPesquisa,
+  chaveColuna,
   eventoBlackSchema,
   telefoneE164,
   valoresDaPesquisa,
@@ -96,7 +97,8 @@ async function processarPesquisa(p: PesquisaBlack) {
   let telefone = "";
   try {
     const linha = await gravarLeadBlack(p.lead_id, valoresDaPesquisa(p));
-    telefone = linha[COLUNAS.whatsapp] ?? "";
+    const digitos = (linha[chaveColuna(COLUNAS.whatsapp)] ?? "").replace(/\D/g, "");
+    telefone = digitos ? telefoneE164(digitos) : "";
     registrarLog("pesquisa", p.lead_id, "planilha:ok");
   } catch (e) {
     logger.error("lead-black", "Erro ao gravar pesquisa na planilha:", e);

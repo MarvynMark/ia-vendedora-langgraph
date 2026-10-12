@@ -3,6 +3,7 @@ import {
   COLUNAS,
   ORIGEM_BLACK,
   atributosDaPesquisa,
+  chaveColuna,
   eventoBlackSchema,
   indiceDoLead,
   mesclarLinha,
@@ -74,7 +75,7 @@ describe("mesclarLinha", () => {
     expect(r.cabecalho.slice(0, 5)).toEqual([COLUNAS.data, COLUNAS.leadId, COLUNAS.nome, COLUNAS.whatsapp, COLUNAS.email]);
     const v = (t: string) => r.linha[r.cabecalho.indexOf(t)];
     expect(v(COLUNAS.data)).toBe("20/10/2026 11:03:00");
-    expect(v(COLUNAS.whatsapp)).toBe("'+5511988887777"); // apóstrofo: não vira fórmula nem número
+    expect(v(COLUNAS.whatsapp)).toBe("5511988887777"); // só dígitos, como nas abas de disparo
     expect(v(COLUNAS.origem)).toBe(ORIGEM_BLACK);
   });
 
@@ -94,6 +95,21 @@ describe("mesclarLinha", () => {
     expect(r.cabecalho.slice(0, 4)).toEqual(cabecalho);
     expect(r.linha[0]).toBe("Ana Souza");
     expect(r.linha[2]).toBe("");
+  });
+});
+
+describe("mesclarLinha com o cabeçalho que a equipe criou (nome | email | whatsapp)", () => {
+  test("preenche A–C em vez de duplicar Nome, E-mail e WhatsApp", () => {
+    const cadastro = eventoBlackSchema.parse(CADASTRO) as CadastroBlack;
+    const r = mesclarLinha({
+      cabecalho: ["nome", "email", "whatsapp"],
+      linhaAtual: [],
+      valores: valoresDoCadastro(cadastro, new Date("2026-10-20T14:03:00.000Z")),
+    });
+    expect(r.cabecalho.slice(0, 3)).toEqual(["nome", "email", "whatsapp"]);
+    expect(r.linha.slice(0, 3)).toEqual(["Ana Souza", "ana@exemplo.com", "5511988887777"]);
+    expect(r.cabecalho.filter(c => chaveColuna(c) === "nome")).toHaveLength(1);
+    expect(r.cabecalho).toContain(COLUNAS.leadId);
   });
 });
 

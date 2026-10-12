@@ -67,6 +67,20 @@ export const COLUNAS = {
   origem: "Origem",
 } as const;
 
+/**
+ * Chave para comparar títulos de coluna: sem caixa, acento nem pontuação. Assim o "nome | email |
+ * whatsapp" que a equipe já tinha criado na aba casa com "Nome", "E-mail" e "WhatsApp".
+ */
+export function chaveColuna(titulo: string): string {
+  return titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** "55" + DDD + número, só dígitos: o formato das outras abas usadas para disparo. */
+export function telefoneDigitos(whatsapp: string): string {
+  const d = whatsapp.replace(/\D/g, "");
+  return d.startsWith("55") ? d : `55${d}`;
+}
+
 /** "55" + DDD + número → "+55...", o formato que o Chatwoot guarda. */
 export function telefoneE164(whatsapp: string): string {
   const d = whatsapp.replace(/\D/g, "");
@@ -79,7 +93,7 @@ export function valoresDoCadastro(c: CadastroBlack, recebidoEm: Date): Record<st
     [COLUNAS.data]: carimboBrasilia(recebidoEm),
     [COLUNAS.leadId]: c.lead_id,
     [COLUNAS.nome]: c.nome,
-    [COLUNAS.whatsapp]: telefoneE164(c.whatsapp),
+    [COLUNAS.whatsapp]: telefoneDigitos(c.whatsapp),
     [COLUNAS.email]: c.email,
     [COLUNAS.utmSource]: c.utm_source,
     [COLUNAS.utmMedium]: c.utm_medium,
@@ -143,17 +157,27 @@ export function mesclarLinha(opts: {
   if (!cabecalho.length) cabecalho.push(...ordem);
   const titulos = Object.keys(opts.valores).sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
   for (const t of titulos) {
-    if (!cabecalho.some(c => c.trim() === t)) cabecalho.push(t);
+    if (!cabecalho.some(c => chaveColuna(c) === chaveColuna(t))) cabecalho.push(t);
   }
 
-  const linha = cabecalho.map((c, i) => opts.valores[c.trim()] ?? opts.linhaAtual[i] ?? "");
+  // Valor por chave normalizada; cada chave vai para a PRIMEIRA coluna que casa com ela.
+  const porChave = new Map(Object.entries(opts.valores).map(([t, v]) => [chaveColuna(t), v]));
+  const usadas = new Set<string>();
+  const linha = cabecalho.map((c, i) => {
+    const k = chaveColuna(c);
+    if (porChave.has(k) && !usadas.has(k)) {
+      usadas.add(k);
+      return porChave.get(k)!;
+    }
+    return opts.linhaAtual[i] ?? "";
+  });
   const cabecalhoMudou = cabecalho.length > tamanhoOriginal;
   return { cabecalho: cabecalhoMudou ? cabecalho : opts.cabecalho, cabecalhoMudou, linha };
 }
 
 /** Índice (0-based, contando o cabeçalho como 0) da linha do lead, ou -1. */
 export function indiceDoLead(linhas: string[][], cabecalho: string[], leadId: string): number {
-  const col = cabecalho.findIndex(c => c.trim() === COLUNAS.leadId);
+  const col = cabecalho.findIndex(c => chaveColuna(c) === chaveColuna(COLUNAS.leadId));
   if (col < 0) return -1;
   for (let i = 1; i < linhas.length; i++) {
     if ((linhas[i]?.[col] ?? "").trim() === leadId) return i;

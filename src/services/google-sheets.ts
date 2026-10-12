@@ -9,7 +9,7 @@ import { google, type sheets_v4 } from "googleapis";
 import { env } from "../config/env.ts";
 import type { Respostas } from "../lib/diagnostico-inicial.ts";
 import { montarLinhaPlanilha } from "../lib/planilha-alunos.ts";
-import { indiceDoLead, mesclarLinha } from "../lib/lead-black.ts";
+import { chaveColuna, indiceDoLead, mesclarLinha } from "../lib/lead-black.ts";
 import { logger } from "../lib/logger.ts";
 
 let clienteCache: sheets_v4.Sheets | null = null;
@@ -160,7 +160,7 @@ export function letraDaColuna(n: number): string {
 
 /**
  * Grava `valores` (título da coluna → valor) na linha do lead e devolve a linha inteira já mesclada,
- * por título. Usa a mesma fila da planilha de alunos: duas gravações simultâneas leriam a aba antes
+ * por chaveColuna() do título (a primeira coluna de cada chave). Usa a mesma fila da planilha de alunos: duas gravações simultâneas leriam a aba antes
  * uma da outra e o mesmo lead ganharia duas linhas.
  */
 export function gravarLeadBlack(leadId: string, valores: Record<string, string>): Promise<Record<string, string>> {
@@ -221,7 +221,9 @@ export function gravarLeadBlack(leadId: string, valores: Record<string, string>)
       });
     }
 
-    return Object.fromEntries(cabecalho.map((c, i) => [c.trim(), linha[i] ?? ""]));
+    const porChave: Record<string, string> = {};
+    cabecalho.forEach((c, i) => { const k = chaveColuna(c); if (!(k in porChave)) porChave[k] = linha[i] ?? ""; });
+    return porChave;
   });
   fila = tarefa.catch(() => {});
   return tarefa;
