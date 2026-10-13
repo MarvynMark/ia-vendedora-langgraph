@@ -70,7 +70,7 @@ export function montarDevolutiva(
   const justificativas = perfil.criterios
     .map((c) => `${c.sigla}: ${avaliacao.criterios[c.sigla]?.justificativa?.trim() ?? "—"}`)
     .join("\n\n");
-  const erros = errosValidos(avaliacao, perfil);
+  const erros = errosValidos(avaliacao, meta.linhasEstimadas ? Number.MAX_SAFE_INTEGER : perfil.linhasMax);
   const listaErros = erros.length
     ? erros.map((e, i) => `${i + 1}. Linha ${e.linha}: "${e.trecho.trim()}" → "${e.correcao.trim()}" (${e.tipo.trim()})\n   ${e.explicacao.trim()}`).join("\n")
     : "Nenhum erro efetivo encontrado.";
@@ -78,6 +78,9 @@ export function montarDevolutiva(
     `TL = ${tl}${meta.linhasEstimadas ? ` (estimado: texto digitado, ~${perfil.caracteresPorLinha} caracteres por linha manuscrita)` : ""}`,
     calculo.linhasDescartadas
       ? `⚠️ ${calculo.linhasDescartadas} linha(s) depois da ${perfil.linhasMax}ª foram desconsideradas, como no edital.`
+      : "",
+    calculo.excedenteEstimado
+      ? `⚠️ Seu texto equivale a cerca de ${perfil.linhasMax + calculo.excedenteEstimado} linhas manuscritas. Na prova, o que passar da ${perfil.linhasMax}ª linha é desconsiderado: treine para caber no limite.`
       : "",
   ].filter(Boolean).join("\n");
 

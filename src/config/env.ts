@@ -135,6 +135,10 @@ export const env = {
     : "teste",
   CORRETOR_INBOX_ID: Number(process.env["CORRETOR_INBOX_ID"] ?? "13"), // #01 Suporte
   CORRETOR_LIMITE_DIARIO: Number(process.env["CORRETOR_LIMITE_DIARIO"] ?? "5"),
+  // Modelo PRÓPRIO do corretor, separado do OPENAI_MODEL da vendedora (gpt-4o em produção):
+  // no primeiro teste real (conv 10066, 13/10/2026) o gpt-4o deu uma correção rasa e apontou
+  // erro de vírgula inexistente; o gpt-5.2 foi o validado com o perfil PCDF.
+  CORRETOR_MODELO: process.env["CORRETOR_MODELO"] ?? "gpt-5.2",
 
   // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
   // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert

@@ -28,7 +28,9 @@ export interface Sessao {
 }
 
 // Sem resposta do aluno por esse tempo, o modo correção fecha e a conversa volta para a equipe.
-export const EXPIRACAO_MIN = 30;
+// 30 min era pouco: o aluno recebe o enunciado e vai ESCREVER a resposta à mão (conv 10066: a
+// resposta chegou 1h20 depois e foi ignorada em silêncio).
+export const EXPIRACAO_MIN = 4 * 60;
 // "corrigindo" travado por mais que isso é um processo que morreu no meio (deploy): libera.
 const EXPIRACAO_CORRIGINDO_MIN = 10;
 

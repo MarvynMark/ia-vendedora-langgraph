@@ -163,6 +163,20 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
     expect(c.linhasDescartadas).toBe(3);
   });
 
+  test("texto digitado (linhas estimadas) não é cortado: TL limitado a 15 e aviso do excedente", () => {
+    const a = avaliacao({ errosPortugues: [
+      { linha: 18, trecho: "x", correcao: "y", tipo: "grafia", explicacao: "" },
+    ] });
+    const c = calcularNota(perfilPcdf, a, linhas(21), true);
+    expect(c.tl).toBe(15);
+    expect(c.linhasDescartadas).toBe(0);
+    expect(c.excedenteEstimado).toBe(6);
+    expect(c.ne).toBe(1); // erro da linha 18 conta: o texto inteiro foi avaliado
+    const [, m2] = montarDevolutiva(perfilPcdf, a, c, { linhasEstimadas: true, codigoQuestao: null });
+    expect(m2).toContain("equivale a cerca de 21 linhas manuscritas");
+    expect(m2).not.toContain("foram desconsideradas");
+  });
+
   test("menos de 10 linhas zera a questão", () => {
     const c = calcularNota(perfilPcdf, avaliacao(), linhas(9));
     expect(c.zero).toBe("menos_linhas");

@@ -15,7 +15,7 @@ O sistema já cortou o que passou da 15ª linha: o que veio depois dela foi desc
 - liste cada erro de língua portuguesa uma única vez, com o número da linha em que ele aparece;
 - marque fuga ao tema e identificação indevida só quando elas realmente ocorrerem.
 
-Quando a resposta foi DIGITADA (e não manuscrita), as linhas foram estimadas pelo sistema a partir do tamanho do texto. Nesse caso, não conte translineação como erro.
+Quando a resposta foi DIGITADA (e não manuscrita), as linhas foram estimadas pelo sistema a partir do tamanho do texto. Nesse caso, não conte translineação como erro e não desconte nota pela extensão (a estimativa é aproximada; o sistema avisa o aluno se o texto parecer longo demais).
 
 # REGRA SOBRE O EDITAL
 

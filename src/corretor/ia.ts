@@ -72,7 +72,7 @@ async function chamarJson<T>(
       method: "POST",
       headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: env.OPENAI_MODEL,
+        model: env.CORRETOR_MODELO,
         messages: [
           { role: "system", content: sistema },
           { role: "user", content: conteudo },
@@ -195,13 +195,13 @@ export interface EntradaAvaliacao {
 
 export async function avaliarResposta(e: EntradaAvaliacao): Promise<AvaliacaoIA> {
   const modelo = new ChatOpenAI({
-    modelName: env.OPENAI_MODEL,
+    modelName: env.CORRETOR_MODELO,
     openAIApiKey: env.OPENAI_API_KEY,
     timeout: 240_000,
   }).withStructuredOutput(schemaAvaliacao(e.perfil), { name: "correcao_discursiva" });
 
   const origem = e.digitada
-    ? `Resposta DIGITADA pelo aluno no WhatsApp${e.linhasEstimadas ? " — linhas estimadas pelo sistema (não conte translineação)" : " — linhas quebradas pelo próprio aluno"}.`
+    ? `Resposta DIGITADA pelo aluno no WhatsApp${e.linhasEstimadas ? " — linhas estimadas pelo sistema a partir do tamanho do texto: avalie o texto INTEIRO (nada foi descartado), não conte translineação e NÃO tire pontos pela extensão: a estimativa é aproximada e o sistema já avisa o aluno sobre o tamanho" : " — linhas quebradas pelo próprio aluno"}.`
     : "Resposta MANUSCRITA, transcrita da foto/PDF e conferida pelo aluno.";
   const entrada = [
     `COMANDO DA QUESTÃO:\n${e.enunciado}`,

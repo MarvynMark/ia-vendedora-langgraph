@@ -108,8 +108,13 @@ export function linhasDeTextoDigitado(texto: string, perfil: PerfilConcurso): { 
   return { linhas, estimadas: true };
 }
 
-/** Linhas que entram na correção (até o máximo do edital) e quantas foram desconsideradas. */
-export function linhasConsideradas(linhas: string[], perfil: PerfilConcurso): { consideradas: string[]; descartadas: number } {
+/**
+ * Linhas que entram na correção (até o máximo do edital) e quantas foram desconsideradas.
+ * Linhas ESTIMADAS (texto digitado) não são cortadas: a estimativa de largura é grosseira e
+ * cortar por ela jogava fora conteúdo que, na folha, talvez coubesse. O aluno só é avisado.
+ */
+export function linhasConsideradas(linhas: string[], perfil: PerfilConcurso, estimadas = false): { consideradas: string[]; descartadas: number } {
+  if (estimadas) return { consideradas: linhas, descartadas: 0 };
   const consideradas = linhas.slice(0, perfil.linhasMax);
   return { consideradas, descartadas: Math.max(0, linhas.length - perfil.linhasMax) };
 }
@@ -131,6 +136,7 @@ export interface CalculoNota {
   nq: number;             // nota final da questão
   zero: MotivoZero | null;
   linhasDescartadas: number;
+  excedenteEstimado: number;  // texto digitado: quantas linhas estimadas passaram do máximo (sem cortar)
 }
 
 /**
@@ -138,9 +144,11 @@ export interface CalculoNota {
  * critério, TL das linhas efetivamente escritas até o limite, NE só de erros dentro dele, fórmula
  * e hipóteses de zero do edital.
  */
-export function calcularNota(perfil: PerfilConcurso, avaliacao: AvaliacaoIA, linhas: string[]): CalculoNota {
-  const { consideradas, descartadas } = linhasConsideradas(linhas, perfil);
-  const tl = consideradas.filter((l) => l.trim()).length;
+export function calcularNota(perfil: PerfilConcurso, avaliacao: AvaliacaoIA, linhas: string[], estimadas = false): CalculoNota {
+  const { consideradas, descartadas } = linhasConsideradas(linhas, perfil, estimadas);
+  const escritas = consideradas.filter((l) => l.trim()).length;
+  const tl = Math.min(escritas, perfil.linhasMax);
+  const excedenteEstimado = estimadas ? Math.max(0, escritas - perfil.linhasMax) : 0;
 
   const criterios = perfil.criterios.map((c) => {
     const bruta = Number(avaliacao.criterios[c.sigla]?.nota ?? 0);
@@ -148,7 +156,7 @@ export function calcularNota(perfil: PerfilConcurso, avaliacao: AvaliacaoIA, lin
     return { sigla: c.sigla, nome: c.nome, nota, maximo: c.maximo };
   });
   const dq = arredondar(criterios.reduce((s, c) => s + c.nota, 0));
-  const ne = errosValidos(avaliacao, perfil).length;
+  const ne = errosValidos(avaliacao, estimadas ? consideradas.length : perfil.linhasMax).length;
 
   let zero: MotivoZero | null = null;
   if (tl === 0) zero = "sem_texto";
@@ -158,12 +166,12 @@ export function calcularNota(perfil: PerfilConcurso, avaliacao: AvaliacaoIA, lin
 
   const nqCalculada = tl > 0 ? arredondar(perfil.formula({ dq, ne, tl })) : 0;
   const nq = zero ? 0 : Math.max(0, nqCalculada);
-  return { criterios, dq, ne, tl, nqCalculada, nq, zero, linhasDescartadas: descartadas };
+  return { criterios, dq, ne, tl, nqCalculada, nq, zero, linhasDescartadas: descartadas, excedenteEstimado };
 }
 
-/** Erros que contam no NE: com linha dentro do limite do edital. */
-export function errosValidos(avaliacao: AvaliacaoIA, perfil: PerfilConcurso): AvaliacaoIA["errosPortugues"] {
-  return avaliacao.errosPortugues.filter((e) => Number.isInteger(e.linha) && e.linha >= 1 && e.linha <= perfil.linhasMax);
+/** Erros que contam no NE: com linha dentro das linhas consideradas. */
+export function errosValidos(avaliacao: AvaliacaoIA, ultimaLinha: number): AvaliacaoIA["errosPortugues"] {
+  return avaliacao.errosPortugues.filter((e) => Number.isInteger(e.linha) && e.linha >= 1 && e.linha <= ultimaLinha);
 }
 
 /** 17.789 → "17,79". */
@@ -175,7 +183,7 @@ export function formatarNumero(n: number): string {
  * Quebra um texto longo em mensagens de WhatsApp (o limite do WhatsApp é 4096 caracteres).
  * Corta entre parágrafos; só parte um parágrafo se ele sozinho passar do limite.
  */
-export function dividirMensagem(texto: string, max = 3900): string[] {
+export function dividirMensagem(texto: string, max = 4000): string[] {
   const partes: string[] = [];
   let atual = "";
   for (const paragrafo of texto.split("\n\n")) {

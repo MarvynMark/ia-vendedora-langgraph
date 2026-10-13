@@ -93,8 +93,12 @@ export async function tratarMensagemCorretor(payload: ChatwootWebhookPayload): P
   }
 
   if (!sessao) {
-    if (comando && (texto.startsWith("/") || comando.tipo === "corrigir")) {
-      await ctx.enviar("Seu modo correção não está aberto (ele fecha depois de 30 minutos parado). Para corrigir uma resposta, digite */corrigir*.");
+    // PRONTO e CORRIGIR soltos também, mas só em conversa que já usou o corretor: o aluno que
+    // voltou depois de a sessão fechar ficava sem resposta (conv 10066), e num "pronto" dito à
+    // equipe o corretor não deve se meter.
+    const jaUsou = payload.conversation.labels.includes(ETIQUETA_CORRETOR);
+    if (comando && (texto.startsWith("/") || jaUsou)) {
+      await ctx.enviar("Seu modo correção não está aberto (ele fecha depois de 4 horas parado). Para corrigir uma resposta, digite */corrigir* e siga os passos de novo.");
       return "corretor:sem_sessao";
     }
     return null;
@@ -333,7 +337,7 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
   const perfil = buscarPerfil(sessao.concurso)!;
 
   await ctx.enviar("Corrigindo… ⏳ Leva cerca de 1 a 2 minutos.");
-  const { consideradas, descartadas } = linhasConsideradas(sessao.transcricao, perfil);
+  const { consideradas, descartadas } = linhasConsideradas(sessao.transcricao, perfil, sessao.linhasEstimadas);
   const avaliacao = await avaliarResposta({
     perfil,
     area: sessao.area,
@@ -344,7 +348,7 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
     linhasEstimadas: sessao.linhasEstimadas,
     telefone: ctx.telefone,
   });
-  const calculo = calcularNota(perfil, avaliacao, sessao.transcricao);
+  const calculo = calcularNota(perfil, avaliacao, sessao.transcricao, sessao.linhasEstimadas);
 
   for (const msg of montarDevolutiva(perfil, avaliacao, calculo, { linhasEstimadas: sessao.linhasEstimadas, codigoQuestao: sessao.codigoQuestao })) {
     await enviarMensagem(ctx.conta, ctx.conversaId, msg);
