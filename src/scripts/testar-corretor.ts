@@ -6,12 +6,18 @@
 //   bun run src/scripts/testar-corretor.ts --enunciado "Explique..." --resposta prova.pdf
 //
 // Opções: --concurso (padrão pcdf), --area (código, ex.: 103), --questao (código do banco) ou
-// --enunciado (texto), --resposta (um .txt, ou fotos/PDF manuscritos, em ordem), --vezes N (consistência).
+// --enunciado (texto), --resposta (um .txt, ou fotos/PDF manuscritos, em ordem),
+// --vezes N (consistência: N correções com o mesmo espelho), --estimada N (simula a autoavaliação),
+// --reescrita arquivo.txt (simula o desafio de reescrita depois da correção).
 import { readFileSync } from "node:fs";
 import { buscarPerfil } from "../corretor/perfis/index.ts";
-import { avaliarResposta, bytesParaConteudo, montarEspelhoPorMaioria, tipoPorExtensao, transcreverResposta } from "../corretor/ia.ts";
-import { buscarQuestao, calcularNota, linhasConsideradas, linhasDeTextoDigitado, numerarLinhas } from "../corretor/regras.ts";
-import { montarDevolutiva } from "../corretor/devolutiva.ts";
+import { avaliarResposta } from "../corretor/avaliacao.ts";
+import { montarEspelhoPorMaioria } from "../corretor/espelho.ts";
+import { transcreverResposta } from "../corretor/leitura.ts";
+import { bytesParaConteudo, tipoPorExtensao } from "../corretor/openai.ts";
+import { avaliarReescrita } from "../corretor/reescrita.ts";
+import { buscarQuestao, linhasConsideradas, linhasDeTextoDigitado, numerarLinhas } from "../corretor/regras.ts";
+import { mensagemDetalhes, mensagemErros, mensagemModelo, mensagemPrincipal, mensagemReescrita } from "../corretor/devolutiva.ts";
 
 function argumentos(): Record<string, string[]> {
   const r: Record<string, string[]> = {};
@@ -47,25 +53,48 @@ if (arquivos.length === 1 && arquivos[0]!.endsWith(".txt")) {
 }
 
 const { consideradas, descartadas } = linhasConsideradas(linhas, perfil, estimadas);
-// --vezes N: corrige N vezes com o MESMO espelho, para medir a consistência da nota.
 const vezes = Number(args["vezes"]?.[0] ?? "1");
 const exigidos = await montarEspelhoPorMaioria(perfil, enunciado);
 console.log(`\n===== ESPELHO EXIGIDO (montado só pelo enunciado) =====\n${exigidos.map((x, i) => `${i + 1}. ${x.elemento}\n   critério: ${x.atendidoSe}`).join("\n")}`);
 console.log(`\n===== ENUNCIADO =====\n${enunciado}\n\n===== RESPOSTA (${linhas.length} linhas${estimadas ? ", estimadas" : ""}) =====\n${numerarLinhas(linhas)}`);
 
-const inicio = Date.now();
-const rodadas = await Promise.all(Array.from({ length: vezes }, () => avaliarResposta({
+const entrada = {
   perfil, area, enunciado, exigidos, linhas: consideradas, linhasDescartadas: descartadas,
-  digitada, linhasEstimadas: estimadas, telefone: "teste-local",
-})));
-for (const [n, avaliacao] of rodadas.entries()) {
-  const calculo = calcularNota(perfil, avaliacao, linhas, estimadas);
-  const msgs = montarDevolutiva(perfil, avaliacao, calculo, { linhasEstimadas: estimadas, codigoQuestao: codigo });
+  digitada, linhasEstimadas: estimadas, historico: "", telefone: "teste-local",
+};
+const inicio = Date.now();
+const rodadas = await Promise.all(Array.from({ length: vezes }, () => avaliarResposta(entrada, linhas)));
+const estimada = args["estimada"]?.[0] ? Number(args["estimada"][0]) : null;
+const meta = { linhasEstimadas: estimadas, codigoQuestao: codigo, autoavaliacao: estimada, anteriores: [] };
+
+for (const [n, { avaliacao, calculo }] of rodadas.entries()) {
   if (vezes > 1) {
     console.log(`\n##### RODADA ${n + 1}: NQ ${calculo.nq} | ${calculo.criterios.map((c) => `${c.sigla} ${c.nota} (${c.faixa?.codigo ?? "?"}${c.faixaAjustada ? "*" : ""})`).join(" · ")} | NE ${calculo.ne}`);
-    console.log(avaliacao.espelho.map((e) => `   ${e.origem === "EXIGIDO" ? "E" : "+"} ${e.status.padEnd(12)} ${e.elemento.slice(0, 90)}`).join("\n"));
+    console.log(`   ponto de virada: ${avaliacao.pontoDeVirada.problema}`);
+    continue;
   }
-  if (vezes === 1 || args["completo"]) for (const [i, msg] of msgs.entries()) console.log(`\n===== MENSAGEM ${i + 1} (${msg.length} caracteres) =====\n${msg}`);
+  const visoes: Array<[string, string[]]> = [
+    ["MENSAGEM PRINCIPAL", mensagemPrincipal(perfil, avaliacao, calculo, meta)],
+    ["DETALHES", mensagemDetalhes(perfil, avaliacao, calculo, meta)],
+    ["ERROS", mensagemErros(perfil, avaliacao, meta)],
+    ["MODELO", mensagemModelo(perfil, avaliacao)],
+  ];
+  for (const [nome, msgs] of visoes) {
+    for (const [i, m] of msgs.entries()) console.log(`\n===== ${nome}${msgs.length > 1 ? ` (${i + 1}/${msgs.length})` : ""} — ${m.length} caracteres =====\n${m}`);
+  }
+
+  const arquivoReescrita = args["reescrita"]?.[0];
+  if (arquivoReescrita) {
+    const retorno = await avaliarReescrita({
+      enunciado,
+      pontoDeVirada: `${avaliacao.pontoDeVirada.problema} ${avaliacao.pontoDeVirada.comoFazer}`,
+      desafio: avaliacao.desafio.instrucao,
+      criterioSucesso: avaliacao.desafio.criterioSucesso,
+      trechoOriginal: avaliacao.antesDepois.antes,
+      tentativa: readFileSync(arquivoReescrita, "utf-8"),
+    });
+    console.log(`\n===== RETORNO DA REESCRITA =====\n${mensagemReescrita(retorno)}`);
+  }
 }
 console.log(`\n(${vezes} correção(ões) em ${((Date.now() - inicio) / 1000).toFixed(1)}s)`);
 process.exit(0);

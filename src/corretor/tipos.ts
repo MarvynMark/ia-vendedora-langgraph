@@ -68,18 +68,34 @@ export type StatusEspelho = "ATENDIDO" | "PARCIAL" | "NAO_ATENDIDO" | "INCORRETO
 export type OrigemEspelho = "EXIGIDO" | "APROFUNDAMENTO";
 
 // O que a IA devolve na correção (structured output). Sem nenhuma conta: notas por critério,
-// erros com a linha e as marcações de zeramento que dependem de julgamento.
+// erros com a linha e as marcações de zeramento que dependem de julgamento. Os campos
+// pedagógicos seguem feed up / feed back / feed forward: um foco por vez, ancorado no texto do aluno.
 export interface AvaliacaoIA {
   oQueAQuestaoExigia: string;
   espelho: Array<{ elemento: string; origem: OrigemEspelho; status: StatusEspelho; comentario: string }>;
   criterios: Record<string, { faixa: string; nota: number; justificativa: string }>;
-  errosPortugues: Array<{ linha: number; trecho: string; correcao: string; tipo: string; explicacao: string }>;
+  errosPortugues: Array<{ linha: number; trecho: string; correcao: string; tipo: string; regra: string }>;
   fugaAoTema: boolean;
   identificacaoIndevida: boolean;
-  pontosFortes: string[];
-  ondePerdeu: string[];
-  prioridades: string[];
+  // O que o aluno já domina — elogio específico, com o trecho dele (reforça a estratégia certa).
+  dominado: { oQue: string; trecho: string };
+  // A ÚNICA mudança que mais renderia nota agora. Um foco: a memória de trabalho não dá conta de dez.
+  pontoDeVirada: { problema: string; porQueImporta: string; comoFazer: string };
+  // O trecho do próprio aluno reescrito com o mínimo de mudança: o contraste ensina mais que um modelo pronto.
+  antesDepois: { linhas: string; antes: string; depois: string; oQueMudou: string[] };
+  // Prática ativa: o aluno reescreve e o sistema confere (efeito de geração).
+  desafio: { instrucao: string; criterioSucesso: string };
+  outrosAjustes: string[];          // no máximo 2, para depois do ponto de virada
+  evolucao: string;                 // comparação com o histórico (vazio se é a primeira correção)
   espelhoIdeal: string[];
   respostaModelo: string;
-  veredito: string;
+  mensagemFinal: string;            // fechamento curto do Professor Vestigium
+}
+
+// Resumo de uma correção anterior, para o histórico do aluno.
+export interface CorrecaoAnterior {
+  quando: Date;
+  nota: number;
+  pontoDeVirada: string;
+  errosPorTipo: Record<string, number>;
 }

@@ -47,7 +47,7 @@ Antes de dar nota:
 6. Condutas técnicas que dependem do caso (por exemplo, isolar a rede, desligar ou manter ligado, coletar ao vivo) devem ser apresentadas como decisões condicionadas ("quando indicado", "a depender do risco"), nunca como regra universal. Avalie se a conduta descrita pelo aluno é tecnicamente adequada, não se ele escolheu a sua estratégia preferida.
 7. Não invente erros de português: confira o contexto sintático antes de apontar. Vírgulas que isolam termo intercalado (ex.: "o perito, quando necessário, solicita exames") estão corretas.
 8. Não apresente sua correção como o espelho oficial do IADES: é uma correção didática da Mentoria Vestigium.
-9. As 3 prioridades devem mostrar como melhorar sem ultrapassar o limite de linhas: se sugerir acrescentar algo, diga o que enxugar.
+9. O ponto de virada, o antes → depois e o desafio devem caber no limite de linhas: se sugerir acrescentar algo, diga o que enxugar.
 
 # LÍNGUA PORTUGUESA (NE)
 

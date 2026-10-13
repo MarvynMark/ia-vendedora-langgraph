@@ -3,9 +3,11 @@
 // As tabelas são criadas na primeira chamada, como em db/midias.ts: não depende de rodar /setup.
 import { pool } from "../db/pool.ts";
 import { env } from "../config/env.ts";
-import type { Anexo } from "./ia.ts";
+import type { Anexo } from "./openai.ts";
 
-export type Etapa = "concurso" | "area" | "enunciado" | "resposta" | "confirmar" | "corrigindo";
+// pos_correcao: devolutiva entregue; o aluno pode pedir DETALHES/ERROS/MODELO ou fazer o desafio.
+// reescrita: o aluno está mandando a reescrita do desafio.
+export type Etapa = "concurso" | "area" | "enunciado" | "resposta" | "confirmar" | "corrigindo" | "pos_correcao" | "reescrita";
 
 export interface Parte {
   texto?: string;
@@ -24,6 +26,8 @@ export interface Sessao {
   transcricao: string[] | null;
   digitada: boolean;
   linhasEstimadas: boolean;
+  correcaoId: number | null;        // última correção entregue (para DETALHES/ERROS/MODELO/REESCREVER)
+  autoavaliacao: number | null;     // nota que o aluno estimou enquanto a correção rodava
   atualizadoEm: Date;
 }
 
@@ -72,6 +76,18 @@ function garantirTabelas() {
       criado_em      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_corretor_correcoes_tel ON corretor_correcoes(telefone, criado_em DESC);
+    ALTER TABLE corretor_sessoes ADD COLUMN IF NOT EXISTS correcao_id INTEGER;
+    ALTER TABLE corretor_sessoes ADD COLUMN IF NOT EXISTS autoavaliacao NUMERIC(5,2);
+    ALTER TABLE corretor_correcoes ADD COLUMN IF NOT EXISTS calculo JSONB;
+    ALTER TABLE corretor_correcoes ADD COLUMN IF NOT EXISTS autoavaliacao NUMERIC(5,2);
+    CREATE TABLE IF NOT EXISTS corretor_reescritas (
+      id           SERIAL PRIMARY KEY,
+      correcao_id  INTEGER NOT NULL,
+      texto        TEXT NOT NULL,
+      atingiu      BOOLEAN NOT NULL,
+      retorno      JSONB NOT NULL,
+      criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
     CREATE TABLE IF NOT EXISTS corretor_espelhos (
       chave      TEXT PRIMARY KEY,
       concurso   TEXT NOT NULL,
@@ -101,6 +117,8 @@ function deLinha(r: Linha): Sessao {
     transcricao: (r["transcricao"] as string[] | null) ?? null,
     digitada: Boolean(r["digitada"]),
     linhasEstimadas: Boolean(r["linhas_estimadas"]),
+    correcaoId: r["correcao_id"] == null ? null : Number(r["correcao_id"]),
+    autoavaliacao: r["autoavaliacao"] == null ? null : Number(r["autoavaliacao"]),
     atualizadoEm: new Date(r["atualizado_em"] as string),
   };
 }
@@ -129,7 +147,8 @@ export async function iniciarSessao(s: Pick<Sessao, "conversaId" | "telefone" | 
      ON CONFLICT (conversa_id) DO UPDATE SET
        telefone = EXCLUDED.telefone, etapa = EXCLUDED.etapa, concurso = EXCLUDED.concurso,
        area = EXCLUDED.area, codigo_questao = EXCLUDED.codigo_questao, enunciado = EXCLUDED.enunciado,
-       partes = '[]', transcricao = NULL, digitada = FALSE, linhas_estimadas = FALSE, atualizado_em = NOW()`,
+       partes = '[]', transcricao = NULL, digitada = FALSE, linhas_estimadas = FALSE,
+       correcao_id = NULL, autoavaliacao = NULL, atualizado_em = NOW()`,
     [s.conversaId, s.telefone, s.etapa, s.concurso, s.area, s.codigoQuestao, s.enunciado],
   );
 }
@@ -143,9 +162,11 @@ const COLUNAS: Record<string, string> = {
   transcricao: "transcricao",
   digitada: "digitada",
   linhasEstimadas: "linhas_estimadas",
+  correcaoId: "correcao_id",
+  autoavaliacao: "autoavaliacao",
 };
 
-type Campos = Partial<Pick<Sessao, "etapa" | "concurso" | "area" | "codigoQuestao" | "enunciado" | "transcricao" | "digitada" | "linhasEstimadas">>;
+type Campos = Partial<Pick<Sessao, "etapa" | "concurso" | "area" | "codigoQuestao" | "enunciado" | "transcricao" | "digitada" | "linhasEstimadas" | "correcaoId" | "autoavaliacao">>;
 
 /**
  * Atualiza a sessão. Com `deEtapa`, só atualiza se ela ainda estiver nessa etapa (claim atômico:
@@ -220,14 +241,72 @@ export async function registrarCorrecao(c: {
   enunciado: string;
   transcricao: string[];
   avaliacao: unknown;
+  calculo: unknown;
   nota: number;
-}): Promise<void> {
+  autoavaliacao: number | null;
+}): Promise<number> {
+  await garantirTabelas();
+  const r = await pool.query(
+    `INSERT INTO corretor_correcoes (telefone, conversa_id, concurso, area, codigo_questao, enunciado, transcricao, avaliacao, calculo, nota, autoavaliacao)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+    [c.telefone, c.conversaId, c.concurso, c.area, c.codigoQuestao, c.enunciado,
+      JSON.stringify(c.transcricao), JSON.stringify(c.avaliacao), JSON.stringify(c.calculo), c.nota, c.autoavaliacao],
+  );
+  return Number((r.rows[0] as Linha)["id"]);
+}
+
+export interface CorrecaoSalva {
+  id: number;
+  concurso: string;
+  area: string | null;
+  codigoQuestao: string | null;
+  enunciado: string;
+  transcricao: string[];
+  avaliacao: unknown;
+  calculo: unknown;
+  nota: number;
+  autoavaliacao: number | null;
+  criadoEm: Date;
+}
+
+function correcaoDeLinha(r: Linha): CorrecaoSalva {
+  return {
+    id: Number(r["id"]),
+    concurso: String(r["concurso"]),
+    area: (r["area"] as string | null) ?? null,
+    codigoQuestao: (r["codigo_questao"] as string | null) ?? null,
+    enunciado: String(r["enunciado"]),
+    transcricao: (r["transcricao"] as string[]) ?? [],
+    avaliacao: r["avaliacao"],
+    calculo: r["calculo"],
+    nota: Number(r["nota"]),
+    autoavaliacao: r["autoavaliacao"] == null ? null : Number(r["autoavaliacao"]),
+    criadoEm: new Date(r["criado_em"] as string),
+  };
+}
+
+export async function buscarCorrecao(id: number): Promise<CorrecaoSalva | null> {
+  await garantirTabelas();
+  const r = await pool.query(`SELECT * FROM corretor_correcoes WHERE id = $1`, [id]);
+  const linha = r.rows[0] as Linha | undefined;
+  return linha ? correcaoDeLinha(linha) : null;
+}
+
+/** Últimas correções do aluno naquele concurso, da mais recente para a mais antiga. */
+export async function ultimasCorrecoes(telefone: string, concurso: string, limite = 5): Promise<CorrecaoSalva[]> {
+  await garantirTabelas();
+  const r = await pool.query(
+    `SELECT * FROM corretor_correcoes WHERE telefone = $1 AND concurso = $2 ORDER BY criado_em DESC LIMIT $3`,
+    [telefone, concurso, limite],
+  );
+  return (r.rows as Linha[]).map(correcaoDeLinha);
+}
+
+export async function registrarReescrita(correcaoId: number, texto: string, atingiu: boolean, retorno: unknown): Promise<void> {
   await garantirTabelas();
   await pool.query(
-    `INSERT INTO corretor_correcoes (telefone, conversa_id, concurso, area, codigo_questao, enunciado, transcricao, avaliacao, nota)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [c.telefone, c.conversaId, c.concurso, c.area, c.codigoQuestao, c.enunciado,
-      JSON.stringify(c.transcricao), JSON.stringify(c.avaliacao), c.nota],
+    `INSERT INTO corretor_reescritas (correcao_id, texto, atingiu, retorno) VALUES ($1, $2, $3, $4)`,
+    [correcaoId, texto, atingiu, JSON.stringify(retorno)],
   );
 }
 

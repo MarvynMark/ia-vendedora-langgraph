@@ -12,7 +12,10 @@ import {
 } from "../../src/corretor/regras.ts";
 import { perfilPcdf } from "../../src/corretor/perfis/pcdf/perfil.ts";
 import { PERFIS } from "../../src/corretor/perfis/index.ts";
-import { montarDevolutiva } from "../../src/corretor/devolutiva.ts";
+import { comentarioAutoavaliacao, mensagemDetalhes, mensagemErros, mensagemModelo, mensagemPrincipal } from "../../src/corretor/devolutiva.ts";
+import { errosRecorrentes, historicoParaIA, linhaEvolucao } from "../../src/corretor/historico.ts";
+import { interpretarNotaEstimada } from "../../src/corretor/regras.ts";
+import type { CorrecaoSalva } from "../../src/corretor/sessao.ts";
 import type { AvaliacaoIA } from "../../src/corretor/tipos.ts";
 
 function avaliacao(parcial: Partial<AvaliacaoIA> = {}): AvaliacaoIA {
@@ -30,18 +33,21 @@ function avaliacao(parcial: Partial<AvaliacaoIA> = {}): AvaliacaoIA {
       EC: { faixa: "C", nota: 6.5, justificativa: "d" },
     },
     errosPortugues: [
-      { linha: 2, trecho: "pericia", correcao: "perícia", tipo: "acentuação", explicacao: "proparoxítona" },
-      { linha: 5, trecho: "a nível", correcao: "em nível", tipo: "propriedade vocabular", explicacao: "x" },
-      { linha: 9, trecho: "haviam", correcao: "havia", tipo: "concordância", explicacao: "impessoal" },
+      { linha: 2, trecho: "pericia", correcao: "perícia", tipo: "acentuação", regra: "Toda proparoxítona é acentuada." },
+      { linha: 5, trecho: "a nível", correcao: "em nível", tipo: "propriedade vocabular", regra: "Em nível de." },
+      { linha: 9, trecho: "haviam", correcao: "havia", tipo: "concordância", regra: "Haver no sentido de existir é impessoal." },
     ],
     fugaAoTema: false,
     identificacaoIndevida: false,
-    pontosFortes: ["p1", "p2", "p3"],
-    ondePerdeu: ["o1"],
-    prioridades: ["a", "b", "c", "d"],
+    dominado: { oQue: "Definiu com precisão o conceito central.", trecho: "o concurso de pessoas ocorre" },
+    pontoDeVirada: { problema: "Faltou o liame subjetivo (linhas 04-05).", porQueImporta: "É requisito imprescindível no padrão oficial.", comoFazer: "Liste os quatro requisitos na mesma frase." },
+    antesDepois: { linhas: "04 a 05", antes: "São requisitos: pluralidade", depois: "São requisitos: pluralidade e liame subjetivo", oQueMudou: ["acrescentei o liame → completa os requisitos"] },
+    desafio: { instrucao: "Reescreva as linhas 04 a 05 com os quatro requisitos.", criterioSucesso: "Os quatro requisitos aparecem." },
+    outrosAjustes: ["ajuste 1", "ajuste 2"],
+    evolucao: "",
     espelhoIdeal: ["e1"],
     respostaModelo: "modelo",
-    veredito: "bom caminho",
+    mensagemFinal: "Bom caminho.",
     ...parcial,
   };
 }
@@ -60,6 +66,22 @@ describe("interpretarComando", () => {
     expect(interpretarComando("CORRIGIR")).toEqual({ tipo: "corrigir" });
     expect(interpretarComando("pode corrigir minha redação?")).toBeNull();
     expect(interpretarComando("corrigir redação")).toBeNull();
+  });
+
+  test("comandos depois da correção", () => {
+    expect(interpretarComando("DETALHES")).toEqual({ tipo: "detalhes" });
+    expect(interpretarComando("erros")).toEqual({ tipo: "erros" });
+    expect(interpretarComando("Modelo")).toEqual({ tipo: "modelo" });
+    expect(interpretarComando("reescrever")).toEqual({ tipo: "reescrever" });
+    expect(interpretarComando("quais foram meus erros?")).toBeNull();
+  });
+
+  test("nota estimada pelo aluno", () => {
+    expect(interpretarNotaEstimada("18", 25)).toBe(18);
+    expect(interpretarNotaEstimada("acho que uns 17,5", 25)).toBe(17.5);
+    expect(interpretarNotaEstimada("30", 25)).toBeNull();
+    expect(interpretarNotaEstimada("entre 15 e 18", 25)).toBeNull();
+    expect(interpretarNotaEstimada("ok", 25)).toBeNull();
   });
 
   test("pronto e cancelar", () => {
@@ -229,8 +251,8 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
 
   test("texto depois da 15ª linha é desconsiderado: TL = 15 e erro da linha 16 não conta", () => {
     const a = avaliacao({ errosPortugues: [
-      { linha: 3, trecho: "x", correcao: "y", tipo: "grafia", explicacao: "" },
-      { linha: 16, trecho: "x", correcao: "y", tipo: "grafia", explicacao: "" },
+      { linha: 3, trecho: "x", correcao: "y", tipo: "grafia", regra: "" },
+      { linha: 16, trecho: "x", correcao: "y", tipo: "grafia", regra: "" },
     ] });
     const c = calcularNota(perfilPcdf, a, linhas(18));
     expect(c.tl).toBe(15);
@@ -240,14 +262,14 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
 
   test("texto digitado (linhas estimadas) não é cortado: TL limitado a 15 e aviso do excedente", () => {
     const a = avaliacao({ errosPortugues: [
-      { linha: 18, trecho: "x", correcao: "y", tipo: "grafia", explicacao: "" },
+      { linha: 18, trecho: "x", correcao: "y", tipo: "grafia", regra: "" },
     ] });
     const c = calcularNota(perfilPcdf, a, linhas(21), true);
     expect(c.tl).toBe(15);
     expect(c.linhasDescartadas).toBe(0);
     expect(c.excedenteEstimado).toBe(6);
     expect(c.ne).toBe(1); // erro da linha 18 conta: o texto inteiro foi avaliado
-    const [, m2] = montarDevolutiva(perfilPcdf, a, c, { linhasEstimadas: true, codigoQuestao: null });
+    const [m2] = mensagemDetalhes(perfilPcdf, a, c, { linhasEstimadas: true });
     expect(m2).toContain("ficaria com cerca de 21 linhas na folha");
     expect(m2).toContain("estimativa, não contagem");
     expect(m2).not.toContain("foram desconsideradas");
@@ -267,7 +289,7 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
   });
 
   test("resultado negativo vira zero", () => {
-    const erros = Array.from({ length: 30 }, (_, i) => ({ linha: (i % 10) + 1, trecho: "x", correcao: "y", tipo: "grafia", explicacao: "" }));
+    const erros = Array.from({ length: 30 }, (_, i) => ({ linha: (i % 10) + 1, trecho: "x", correcao: "y", tipo: "grafia", regra: "" }));
     const c = calcularNota(perfilPcdf, avaliacao({
       criterios: { TX: { faixa: "E", nota: 0.5, justificativa: "" }, AR: { faixa: "E", nota: 0, justificativa: "" }, CA: { faixa: "E", nota: 0, justificativa: "" }, EC: { faixa: "E", nota: 0, justificativa: "" } },
       espelho: [
@@ -282,31 +304,102 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
   });
 });
 
-describe("devolutiva", () => {
-  test("três blocos, cada um dentro do limite do WhatsApp, com a conta da nota", () => {
+function correcaoAnterior(nota: number, tipos: string[], dias: number): CorrecaoSalva {
+  return {
+    id: dias, concurso: "pcdf", area: null, codigoQuestao: null, enunciado: "e", transcricao: [], calculo: null,
+    nota, autoavaliacao: null, criadoEm: new Date(Date.UTC(2026, 9, 13 - dias, 15)),
+    avaliacao: { pontoDeVirada: { problema: `foco ${dias}` }, errosPortugues: tipos.map((tipo) => ({ tipo })) },
+  };
+}
+
+describe("devolutiva (divulgação progressiva)", () => {
+  const meta = { linhasEstimadas: false, codigoQuestao: "G01", autoavaliacao: null, anteriores: [] as CorrecaoSalva[] };
+
+  test("mensagem principal: nota + UM foco + antes → depois + desafio + menu, numa mensagem só", () => {
     const a = avaliacao();
-    const msgs = montarDevolutiva(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { linhasEstimadas: false, codigoQuestao: "G01" });
-    expect(msgs).toHaveLength(3);
-    expect(msgs.every((m) => m.length <= 4000)).toBe(true);
-    expect(msgs[0]).toContain("*NOTA ESTIMADA: 17,79 / 25,00*");
-    expect(msgs[0]).toContain("não é nota oficial");
-    expect(msgs[0]).toContain("EC — Elaboração Crítica: 6,50 / 10,00 (faixa C)");
-    expect(msgs[0]).toContain("NQ = DQ − (NE / TL) = 18,00 − (3 / 14) = 17,79");
-    expect(msgs[0]).not.toContain("p3"); // até 2 pontos fortes
-    expect(msgs[1]).toContain("NE = 3");
-    expect(msgs[1]).toContain("✅ ATENDIDO");
-    // aprofundamento ausente vira sugestão, não "NÃO ATENDIDO"
-    expect(msgs[1]).toContain("Bloqueador de escrita — 💡 poderia agregar");
-    expect(msgs[1]).not.toContain("❌");
-    expect(msgs[2]).toContain("Não é nota oficial da banca");
+    const msgs = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), meta);
+    expect(msgs).toHaveLength(1);
+    const m = msgs[0]!;
+    expect(m).toContain("*Nota estimada: 17,79 / 25,00*");
+    expect(m).toContain("não é nota oficial");
+    expect(m).toContain("EC 6,50 (C)");
+    expect(m).toContain("🎯 *Seu ponto de virada*");
+    expect(m).toContain("✍️ *Antes → depois* (linhas 04 a 05)");
+    expect(m).toContain("🏋️ *Seu desafio");
+    expect(m).toContain("*REESCREVER*");
+    expect(m).toContain("*DETALHES*");
+    // o detalhe técnico NÃO entra na mensagem principal
+    expect(m).not.toContain("Memória de cálculo");
+    expect(m).not.toContain("Resposta-modelo");
+    expect(m).not.toContain("ajuste 1");
   });
 
-  test("questão zerada explica o motivo", () => {
+  test("DETALHES: espelho, faixas, cálculo; aprofundamento ausente é sugestão, não falha", () => {
     const a = avaliacao();
-    const [m1] = montarDevolutiva(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(8)), { linhasEstimadas: true, codigoQuestao: null });
-    expect(m1).toContain("*NOTA ESTIMADA: 0,00 / 25,00*");
-    expect(m1).toContain("8 linha(s), abaixo do mínimo de 10");
-    expect(m1).toContain("TL = 8 (estimativa: texto digitado)");
+    const m = mensagemDetalhes(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), meta).join("\n");
+    expect(m).toContain("NQ = DQ − (NE / TL) = 18,00 − (3 / 14) = 17,79");
+    expect(m).toContain("✅ ATENDIDO");
+    expect(m).toContain("Bloqueador de escrita — 💡 poderia agregar");
+    expect(m).not.toContain("❌");
+    expect(m).toContain("ajuste 1");
+  });
+
+  test("ERROS: agrupados por tipo, com a regra", () => {
+    const m = mensagemErros(perfilPcdf, avaliacao(), meta).join("\n");
+    expect(m).toContain("*Acentuação (1)*");
+    expect(m).toContain("📌 Toda proparoxítona é acentuada.");
+    expect(mensagemErros(perfilPcdf, avaliacao({ errosPortugues: [] }), meta)[0]).toContain("Nenhum erro efetivo");
+  });
+
+  test("MODELO: referência de nível, com o aviso de não oficial", () => {
+    const m = mensagemModelo(perfilPcdf, avaliacao()).join("\n");
+    expect(m).toContain("Resposta-modelo");
+    expect(m).toContain("Não é nota oficial da banca");
+  });
+
+  test("questão zerada explica o motivo na mensagem principal", () => {
+    const a = avaliacao();
+    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(8)), meta);
+    expect(m).toContain("*Nota estimada: 0,00 / 25,00*");
+    expect(m).toContain("8 linha(s), abaixo do mínimo de 10");
+  });
+
+  test("autoavaliação: calibrada, acima e abaixo", () => {
+    expect(comentarioAutoavaliacao(17, 16.5)).toContain("Boa calibragem");
+    expect(comentarioAutoavaliacao(22, 16)).toContain("item do comando");
+    expect(comentarioAutoavaliacao(12, 18)).toContain("melhor do que você acha");
+    const a = avaliacao();
+    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { ...meta, autoavaliacao: 22 });
+    expect(m).toContain("Você estimou 22,00; a correção deu 17,79.");
+  });
+});
+
+describe("histórico do aluno", () => {
+  const anteriores = [correcaoAnterior(18.4, ["acentuação"], 1), correcaoAnterior(16.1, ["acentuação", "regência"], 3)];
+
+  test("evolução em ordem cronológica, com a atual em destaque", () => {
+    expect(linhaEvolucao(anteriores, 21.35)).toBe("16,10 → 18,40 → *21,35*");
+    expect(linhaEvolucao([], 20)).toBeNull();
+  });
+
+  test("erro que aparece em 3 correções seguidas vira padrão recorrente", () => {
+    expect(errosRecorrentes(anteriores, [{ tipo: "Acentuação" }, { tipo: "grafia" }])).toEqual([{ tipo: "acentuação", vezes: 3, de: 3 }]);
+    expect(errosRecorrentes(anteriores.slice(0, 1), [{ tipo: "acentuação" }])).toEqual([]); // pouco histórico
+  });
+
+  test("histórico para a IA traz nota, foco anterior e erros por tipo", () => {
+    const h = historicoParaIA(anteriores);
+    expect(h).toContain("nota 18,40");
+    expect(h).toContain("foco 1");
+    expect(h).toContain("acentuação 1, regência 1");
+    expect(historicoParaIA([])).toBe("");
+  });
+
+  test("mensagem principal mostra a evolução quando há histórico", () => {
+    const a = avaliacao({ evolucao: "Agora você listou os requisitos." });
+    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { linhasEstimadas: false, codigoQuestao: null, autoavaliacao: null, anteriores });
+    expect(m).toContain("📈 *Sua evolução:* 16,10 → 18,40 → *17,79*");
+    expect(m).toContain("Agora você listou os requisitos.");
   });
 });
 

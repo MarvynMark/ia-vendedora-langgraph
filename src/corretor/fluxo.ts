@@ -3,7 +3,9 @@
 //   /corrigir [concurso] [G05]
 //     → concurso (se houver mais de um)  → área (só na 1ª vez; fica salva)
 //     → enunciado (texto, foto ou código do banco)  → resposta (fotos/PDF/texto, várias mensagens)
-//     → PRONTO → transcrição numerada → aluno confere (pode pedir ajuste) → CORRIGIR → devolutiva
+//     → PRONTO → transcrição numerada → aluno confere (pode pedir ajuste) → CORRIGIR
+//     → (enquanto corrige: "que nota você acha que tirou?") → devolutiva com UM foco + desafio
+//     → DETALHES / ERROS / MODELO sob demanda · REESCREVER → o aluno reescreve e recebe retorno
 //
 // Fora do modo correção, as mensagens do Suporte 1 seguem para a equipe como sempre: o fluxo só
 // age com sessão aberta ou com um comando que começa com "/". As etapas lentas (ler foto, corrigir)
@@ -13,18 +15,24 @@ import { logger } from "../lib/logger.ts";
 import { rastrear } from "../lib/processamentos-ativos.ts";
 import { adicionarEtiquetas, enviarMensagem } from "../services/chatwoot.ts";
 import type { ChatwootWebhookPayload } from "../types/chatwoot.ts";
-import { montarDevolutiva } from "./devolutiva.ts";
+import { avaliarResposta } from "./avaliacao.ts";
+import { mensagemDetalhes, mensagemErros, mensagemModelo, mensagemPrincipal, mensagemReescrita } from "./devolutiva.ts";
 import { obterEspelhoExigido } from "./espelho.ts";
-import { type Anexo, ErroAnexo, ajustarTranscricao, avaliarResposta, transcreverEnunciado, transcreverResposta } from "./ia.ts";
+import { historicoParaIA } from "./historico.ts";
+import { ajustarTranscricao, transcreverEnunciado, transcreverResposta } from "./leitura.ts";
+import { type Anexo, ErroAnexo } from "./openai.ts";
+import { avaliarReescrita } from "./reescrita.ts";
 import { PERFIS, buscarPerfil } from "./perfis/index.ts";
 import {
+  type CalculoNota,
   buscarQuestao,
-  calcularNota,
+  formatarNumero,
   codigoQuestaoNoTexto,
   dividirMensagem,
   interpretarArea,
   interpretarComando,
   interpretarConcurso,
+  interpretarNotaEstimada,
   linhasConsideradas,
   linhasDeTextoDigitado,
   numerarLinhas,
@@ -35,14 +43,17 @@ import {
   apagarSessao,
   areaDoAluno,
   atualizarSessao,
+  buscarCorrecao,
   buscarSessao,
   correcoesHoje,
   iniciarSessao,
   registrarCorrecao,
+  registrarReescrita,
   salvarAreaDoAluno,
+  ultimasCorrecoes,
   type Sessao,
 } from "./sessao.ts";
-import type { PerfilConcurso } from "./tipos.ts";
+import type { AvaliacaoIA, PerfilConcurso } from "./tipos.ts";
 
 export const ETIQUETA_TESTE = "teste-corretor";
 export const ETIQUETA_CORRETOR = "corretor-redacao";
@@ -117,9 +128,9 @@ export async function tratarMensagemCorretor(payload: ChatwootWebhookPayload): P
     case "enunciado": return etapaEnunciado(ctx, sessao, texto, anexos);
     case "resposta": return etapaResposta(ctx, sessao, texto, anexos, comando);
     case "confirmar": return etapaConfirmar(ctx, sessao, texto, anexos, comando);
-    case "corrigindo":
-      await ctx.enviar("Sua correção está saindo ⏳ Leva cerca de 1 a 2 minutos.");
-      return "corretor:aguarde";
+    case "corrigindo": return etapaCorrigindo(ctx, sessao, texto);
+    case "pos_correcao": return etapaPosCorrecao(ctx, sessao, comando);
+    case "reescrita": return etapaReescrita(ctx, sessao, texto, anexos, comando);
   }
 }
 
@@ -337,10 +348,16 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
   if (!sessao?.transcricao || !sessao.enunciado) return;
   const perfil = buscarPerfil(sessao.concurso)!;
 
-  await ctx.enviar("Corrigindo… ⏳ Leva cerca de 1 a 2 minutos.");
+  // Pergunta de metacognição enquanto a IA trabalha: o tempo de espera vira prática de julgar a
+  // própria resposta, que é o que o aluno vai precisar fazer sozinho na prova.
+  await ctx.enviar(`Corrigindo… ⏳ Leva cerca de 1 minuto.
+
+Enquanto isso, um exercício rápido: *de 0 a ${formatarNumero(perfil.notaMaximaQuestao)}, que nota você acha que tirou?* (opcional — responda só com o número)`);
+
+  const anteriores = await ultimasCorrecoes(ctx.telefone, perfil.codigo).catch(() => []);
   const { consideradas, descartadas } = linhasConsideradas(sessao.transcricao, perfil, sessao.linhasEstimadas);
   const exigidos = await obterEspelhoExigido(perfil, sessao.enunciado);
-  const avaliacao = await avaliarResposta({
+  const { avaliacao, calculo } = await avaliarResposta({
     perfil,
     area: sessao.area,
     enunciado: sessao.enunciado,
@@ -349,14 +366,13 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
     linhasDescartadas: descartadas,
     digitada: sessao.digitada,
     linhasEstimadas: sessao.linhasEstimadas,
+    historico: historicoParaIA(anteriores),
     telefone: ctx.telefone,
-  });
-  const calculo = calcularNota(perfil, avaliacao, sessao.transcricao, sessao.linhasEstimadas);
+  }, sessao.transcricao);
 
-  for (const msg of montarDevolutiva(perfil, avaliacao, calculo, { linhasEstimadas: sessao.linhasEstimadas, codigoQuestao: sessao.codigoQuestao })) {
-    await enviarMensagem(ctx.conta, ctx.conversaId, msg);
-  }
-  await registrarCorrecao({
+  // Relê a sessão: a nota estimada pode ter chegado durante a correção.
+  const autoavaliacao = (await buscarSessao(ctx.conversaId))?.autoavaliacao ?? null;
+  const correcaoId = await registrarCorrecao({
     telefone: ctx.telefone,
     conversaId: ctx.conversaId,
     concurso: perfil.codigo,
@@ -365,11 +381,119 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
     enunciado: sessao.enunciado,
     transcricao: sessao.transcricao,
     avaliacao,
+    calculo,
     nota: calculo.nq,
+    autoavaliacao,
   });
-  await apagarSessao(ctx.conversaId);
-  await ctx.enviar("Quer corrigir outra resposta? É só digitar */corrigir*.");
-  logger.info("corretor", "Correção entregue", { conversa: ctx.conversaId, concurso: perfil.codigo, nota: calculo.nq });
+  await atualizarSessao(ctx.conversaId, { etapa: "pos_correcao", correcaoId });
+
+  const meta = { linhasEstimadas: sessao.linhasEstimadas, codigoQuestao: sessao.codigoQuestao, autoavaliacao, anteriores };
+  for (const msg of mensagemPrincipal(perfil, avaliacao, calculo, meta)) await enviarMensagem(ctx.conta, ctx.conversaId, msg);
+  logger.info("corretor", "Correção entregue", { conversa: ctx.conversaId, concurso: perfil.codigo, nota: calculo.nq, correcaoId });
+}
+
+// ── Depois da correção ──────────────────────────────────────────────────────────────────────────
+
+async function etapaCorrigindo(ctx: Contexto, sessao: Sessao, texto: string): Promise<string> {
+  const perfil = buscarPerfil(sessao.concurso)!;
+  const estimada = sessao.autoavaliacao == null ? interpretarNotaEstimada(texto, perfil.notaMaximaQuestao) : null;
+  if (estimada != null) {
+    await atualizarSessao(ctx.conversaId, { autoavaliacao: estimada });
+    await ctx.enviar("Anotado ✍️ Já já te mostro como ficou.");
+    return "corretor:autoavaliacao";
+  }
+  await ctx.enviar("Sua correção está saindo ⏳ Leva cerca de 1 minuto.");
+  return "corretor:aguarde";
+}
+
+interface CorrecaoCarregada {
+  perfil: PerfilConcurso;
+  avaliacao: AvaliacaoIA;
+  calculo: CalculoNota;
+  linhasEstimadas: boolean;
+  enunciado: string;
+  transcricao: string[];
+  id: number;
+  telefone: string;
+}
+
+async function carregarCorrecao(sessao: Sessao): Promise<CorrecaoCarregada | null> {
+  if (!sessao.correcaoId) return null;
+  const c = await buscarCorrecao(sessao.correcaoId);
+  const perfil = buscarPerfil(c?.concurso);
+  if (!c || !perfil || !c.calculo) return null;
+  return {
+    perfil,
+    avaliacao: c.avaliacao as AvaliacaoIA,
+    calculo: c.calculo as CalculoNota,
+    linhasEstimadas: sessao.linhasEstimadas,
+    enunciado: c.enunciado,
+    transcricao: c.transcricao,
+    id: c.id,
+    telefone: sessao.telefone,
+  };
+}
+
+/**
+ * Devolutiva entregue: o detalhe vem sob demanda e o desafio fica à espera. Qualquer outra
+ * mensagem segue para a equipe (null) — o aluno pode estar falando com o suporte.
+ */
+async function etapaPosCorrecao(ctx: Contexto, sessao: Sessao, comando: Comando | null): Promise<string | null> {
+  if (!comando || !["detalhes", "erros", "modelo", "reescrever"].includes(comando.tipo)) return null;
+  const c = await carregarCorrecao(sessao);
+  if (!c) {
+    await ctx.enviar("Não encontrei a sua última correção. Digite */corrigir* para corrigir uma nova resposta.");
+    return "corretor:sem_correcao";
+  }
+  switch (comando.tipo) {
+    case "detalhes":
+      for (const m of mensagemDetalhes(c.perfil, c.avaliacao, c.calculo, c)) await ctx.enviar(m);
+      return "corretor:detalhes";
+    case "erros": {
+      const anteriores = (await ultimasCorrecoes(c.telefone, c.perfil.codigo, 6).catch(() => [])).filter((x) => x.id !== c.id);
+      for (const m of mensagemErros(c.perfil, c.avaliacao, { linhasEstimadas: c.linhasEstimadas, anteriores })) await ctx.enviar(m);
+      return "corretor:erros";
+    }
+    case "modelo":
+      for (const m of mensagemModelo(c.perfil, c.avaliacao)) await ctx.enviar(m);
+      return "corretor:modelo";
+    default:
+      await atualizarSessao(ctx.conversaId, { etapa: "reescrita" });
+      await ctx.enviar(`🏋️ *Desafio*
+${c.avaliacao.desafio?.instrucao ?? "Reescreva o trecho do seu ponto de virada."}
+
+Mande sua versão agora (texto ou foto). Para desistir, digite */cancelar*.`);
+      return "corretor:reescrever";
+  }
+}
+
+async function etapaReescrita(ctx: Contexto, sessao: Sessao, texto: string, anexos: Anexo[], comando: Comando | null): Promise<string> {
+  // Pedir DETALHES/ERROS/MODELO no meio do desafio continua funcionando.
+  if (comando && comando.tipo !== "reescrever") {
+    await atualizarSessao(ctx.conversaId, { etapa: "pos_correcao" });
+    return (await etapaPosCorrecao(ctx, { ...sessao, etapa: "pos_correcao" }, comando)) ?? "corretor:reescrita_ignorada";
+  }
+  if (!anexos.length && texto.length < 15) {
+    await ctx.enviar("Mande a sua versão do trecho (texto ou foto).");
+    return "corretor:reescrita_curta";
+  }
+  emBackground(ctx, "conferir reescrita", async () => {
+    const c = await carregarCorrecao(sessao);
+    if (!c) return;
+    const tentativa = anexos.length ? (await transcreverResposta(anexos)).linhas.join(" ") : texto;
+    const retorno = await avaliarReescrita({
+      enunciado: c.enunciado,
+      pontoDeVirada: `${c.avaliacao.pontoDeVirada.problema} ${c.avaliacao.pontoDeVirada.comoFazer}`,
+      desafio: c.avaliacao.desafio.instrucao,
+      criterioSucesso: c.avaliacao.desafio.criterioSucesso,
+      trechoOriginal: c.avaliacao.antesDepois.antes,
+      tentativa,
+    });
+    await registrarReescrita(c.id, tentativa, retorno.atingiu, retorno).catch((e) => logger.warn("corretor", "Falha ao registrar reescrita", e));
+    await atualizarSessao(ctx.conversaId, { etapa: "pos_correcao" });
+    await ctx.enviar(mensagemReescrita(retorno));
+  });
+  return "corretor:reescrita";
 }
 
 /**

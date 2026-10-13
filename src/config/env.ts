@@ -139,6 +139,9 @@ export const env = {
   // no primeiro teste real (conv 10066, 13/10/2026) o gpt-4o deu uma correção rasa e apontou
   // erro de vírgula inexistente; o gpt-5.2 foi o validado com o perfil PCDF.
   CORRETOR_MODELO: process.env["CORRETOR_MODELO"] ?? "gpt-5.2",
+  // Avaliações por correção (entrega a de nota mediana). 1 = mais barato; 3 = nota mais estável
+  // (um item de fronteira mudava ~3 pontos entre rodadas da mesma resposta), ~3x o custo.
+  CORRETOR_VOTOS: Number(process.env["CORRETOR_VOTOS"] ?? "1"),
 
   // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
   // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert
