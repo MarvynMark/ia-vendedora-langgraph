@@ -14,7 +14,7 @@ import { perfilPcdf } from "../../src/corretor/perfis/pcdf/perfil.ts";
 import { PERFIS } from "../../src/corretor/perfis/index.ts";
 import { comentarioAutoavaliacao, mensagemDetalhes, mensagemErros, mensagemModelo, mensagemPrincipal } from "../../src/corretor/devolutiva.ts";
 import { errosRecorrentes, historicoParaIA, linhaEvolucao } from "../../src/corretor/historico.ts";
-import { interpretarNotaEstimada } from "../../src/corretor/regras.ts";
+import { contarPalavras, interpretarNotaEstimada, palavrasMinimas } from "../../src/corretor/regras.ts";
 import type { CorrecaoSalva } from "../../src/corretor/sessao.ts";
 import type { AvaliacaoIA } from "../../src/corretor/tipos.ts";
 
@@ -355,6 +355,22 @@ describe("devolutiva (divulgação progressiva)", () => {
     const m = mensagemModelo(perfilPcdf, avaliacao()).join("\n");
     expect(m).toContain("Resposta-modelo");
     expect(m).toContain("Não é nota oficial da banca");
+  });
+
+  test("fuga ao tema: versão curta, sem elogio, sem antes → depois e sem desafio", () => {
+    const a = avaliacao({ fugaAoTema: true });
+    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(12)), meta);
+    expect(m).toContain("não trata do que o comando pede");
+    expect(m).toContain("fuga ao tema zera a questão");
+    expect(m).not.toContain("O que você já domina");
+    expect(m).not.toContain("Antes → depois");
+    expect(m).not.toContain("REESCREVER");
+  });
+
+  test("triagem: menos de 40 palavras não vai para a IA", () => {
+    expect(palavrasMinimas(perfilPcdf)).toBe(40);
+    expect(contarPalavras("asdf teste")).toBe(2);
+    expect(contarPalavras("O concurso de pessoas, segundo o CP, exige liame.")).toBe(9);
   });
 
   test("questão zerada explica o motivo na mensagem principal", () => {

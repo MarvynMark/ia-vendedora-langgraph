@@ -129,6 +129,19 @@ export function linhasDeTextoDigitado(texto: string, perfil: PerfilConcurso): { 
   return { linhas, estimadas: true };
 }
 
+export function contarPalavras(texto: string): number {
+  return (texto.match(/[A-Za-zÀ-ÿ0-9]+/g) ?? []).length;
+}
+
+/**
+ * Mínimo de palavras para valer a correção: ~4 palavras por linha do mínimo do edital (10 linhas
+ * → 40). Abaixo disso não é uma resposta — "asdf" ia para a IA, gastava a correção do dia e
+ * voltava com a resposta-modelo inteira no "antes → depois".
+ */
+export function palavrasMinimas(perfil: PerfilConcurso): number {
+  return perfil.linhasMin * 4;
+}
+
 /**
  * Linhas que entram na correção (até o máximo do edital) e quantas foram desconsideradas.
  * Linhas ESTIMADAS (texto digitado) não são cortadas: a estimativa de largura é grosseira e

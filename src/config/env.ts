@@ -127,12 +127,13 @@ export const env = {
   //   "off"   → desligado: o Suporte 1 segue só com a equipe.
   //   "teste" → só conversas com a etiqueta "teste-corretor" (para validar antes de abrir).
   //   "on"    → qualquer número que mandar /corrigir no Suporte 1.
-  // Default "teste" DE PROPÓSITO: o deploy não abre o corretor para todo mundo antes da validação.
+  // Default "on" desde 13/10/2026 (liberado pelo Walker para todos); "teste" ou "off" no Coolify
+  // fecham de novo sem deploy de código.
   CORRETOR_MODO: (["off", "teste", "on"] as const).includes(
     process.env["CORRETOR_MODO"] as "off" | "teste" | "on",
   )
     ? (process.env["CORRETOR_MODO"] as "off" | "teste" | "on")
-    : "teste",
+    : "on",
   CORRETOR_INBOX_ID: Number(process.env["CORRETOR_INBOX_ID"] ?? "13"), // #01 Suporte
   CORRETOR_LIMITE_DIARIO: Number(process.env["CORRETOR_LIMITE_DIARIO"] ?? "5"),
   // Modelo PRÓPRIO do corretor, separado do OPENAI_MODEL da vendedora (gpt-4o em produção):

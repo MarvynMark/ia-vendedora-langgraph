@@ -34,8 +34,10 @@ import {
   interpretarConcurso,
   interpretarNotaEstimada,
   linhasConsideradas,
+  contarPalavras,
   linhasDeTextoDigitado,
   numerarLinhas,
+  palavrasMinimas,
   type Comando,
 } from "./regras.ts";
 import {
@@ -333,14 +335,28 @@ async function fecharResposta(ctx: Contexto): Promise<void> {
       await ctx.enviar(`Não consegui ler texto nesse arquivo${aviso ? ` (${aviso})` : ""}. Mande uma foto mais nítida, um PDF ou o texto digitado, e depois *PRONTO*.`);
       return;
     }
+    if (await respostaCurtaDemais(ctx, perfil, linhas.join(" "))) return;
     await atualizarSessao(ctx.conversaId, { etapa: "confirmar", transcricao: linhas, digitada: false, linhasEstimadas: false });
     await ctx.enviar(mensagemTranscricao(linhas, aviso));
     return;
   }
 
+  if (await respostaCurtaDemais(ctx, perfil, textos.join(" "))) return;
   const { linhas, estimadas } = linhasDeTextoDigitado(textos.join("\n"), perfil);
   await atualizarSessao(ctx.conversaId, { transcricao: linhas, digitada: true, linhasEstimadas: estimadas });
   await executarCorrecao(ctx);
+}
+
+/**
+ * Triagem antes da IA: texto curto demais não é corrigido nem conta no limite do dia. A sessão
+ * volta para "resposta" com as partes já recebidas — o aluno pode completar e mandar PRONTO.
+ */
+async function respostaCurtaDemais(ctx: Contexto, perfil: PerfilConcurso, texto: string): Promise<boolean> {
+  const palavras = contarPalavras(texto);
+  if (palavras >= palavrasMinimas(perfil)) return false;
+  await atualizarSessao(ctx.conversaId, { etapa: "resposta" });
+  await ctx.enviar(`Recebi só ${palavras} palavra(s) — isso ainda não dá para corrigir. Uma resposta de ${perfil.linhasMin} a ${perfil.linhasMax} linhas tem por volta de ${perfil.linhasMin * 11} a ${perfil.linhasMax * 11} palavras.\n\nMande a sua resposta completa (texto, foto ou PDF) e digite *PRONTO*. Esta tentativa não contou no seu limite do dia.`);
+  return true;
 }
 
 async function executarCorrecao(ctx: Contexto): Promise<void> {

@@ -56,8 +56,24 @@ export function comentarioAutoavaliacao(estimada: number, nota: number): string 
   return `🧭 ${base} Você se avaliou abaixo: sua resposta está melhor do que você acha.`;
 }
 
+/**
+ * Fuga ao tema ou texto que não é resposta: elogiar e mostrar "antes → depois" não faz sentido (a
+ * IA chegou a elogiar uma receita de bolo e entregou a resposta inteira pronta). Fica a nota, o
+ * que o comando pedia e um roteiro — o aluno escreve a resposta dele e manda de novo.
+ */
+function mensagemForaDoTema(perfil: PerfilConcurso, a: AvaliacaoIA, c: CalculoNota, meta: MetaDevolutiva): string[] {
+  return dividirMensagem([
+    `📝 *Correção — ${perfil.nome}*${meta.codigoQuestao ? ` · questão ${meta.codigoQuestao}` : ""}`,
+    `*Nota estimada: ${formatarNumero(c.nq)} / ${formatarNumero(perfil.notaMaximaQuestao)}*\n⚠️ Esta resposta não trata do que o comando pede. Pelo edital, ${motivoZero(c.zero ?? "fuga_tema", perfil, c.tl)} zera a questão.`,
+    `🔎 *O que a questão pede*\n${a.oQueAQuestaoExigia.trim()}`,
+    `🧭 *Como montar a sua resposta*\n${a.pontoDeVirada.comoFazer.trim()}`,
+    "Escreva a sua resposta com essas partes e mande de novo: digite */corrigir*.",
+  ].join("\n\n"));
+}
+
 /** Mensagem principal: nota + UM foco + prática. */
 export function mensagemPrincipal(perfil: PerfilConcurso, a: AvaliacaoIA, c: CalculoNota, meta: MetaDevolutiva): string[] {
+  if (c.zero === "fuga_tema" || c.zero === "sem_texto") return mensagemForaDoTema(perfil, a, c, meta);
   const notas = c.criterios.map((x) => `${x.sigla} ${formatarNumero(x.nota)}${x.faixa ? ` (${x.faixa.codigo})` : ""}`).join(" · ");
   const evolucao = linhaEvolucao(meta.anteriores, c.nq);
   const blocos = [
