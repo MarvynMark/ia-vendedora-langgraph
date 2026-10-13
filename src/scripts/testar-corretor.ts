@@ -6,10 +6,10 @@
 //   bun run src/scripts/testar-corretor.ts --enunciado "Explique..." --resposta prova.pdf
 //
 // Opções: --concurso (padrão pcdf), --area (código, ex.: 103), --questao (código do banco) ou
-// --enunciado (texto), --resposta (um .txt, ou fotos/PDF manuscritos, em ordem).
+// --enunciado (texto), --resposta (um .txt, ou fotos/PDF manuscritos, em ordem), --vezes N (consistência).
 import { readFileSync } from "node:fs";
 import { buscarPerfil } from "../corretor/perfis/index.ts";
-import { avaliarResposta, bytesParaConteudo, tipoPorExtensao, transcreverResposta } from "../corretor/ia.ts";
+import { avaliarResposta, bytesParaConteudo, montarEspelhoPorMaioria, tipoPorExtensao, transcreverResposta } from "../corretor/ia.ts";
 import { buscarQuestao, calcularNota, linhasConsideradas, linhasDeTextoDigitado, numerarLinhas } from "../corretor/regras.ts";
 import { montarDevolutiva } from "../corretor/devolutiva.ts";
 
@@ -46,16 +46,26 @@ if (arquivos.length === 1 && arquivos[0]!.endsWith(".txt")) {
   console.log(`\n===== TRANSCRIÇÃO =====\n${numerarLinhas(linhas)}${t.aviso ? `\n⚠️ ${t.aviso}` : ""}`);
 }
 
-const { consideradas, descartadas } = linhasConsideradas(linhas, perfil);
-const inicio = Date.now();
-const avaliacao = await avaliarResposta({
-  perfil, area, enunciado, linhas: consideradas, linhasDescartadas: descartadas,
-  digitada, linhasEstimadas: estimadas, telefone: "teste-local",
-});
-const calculo = calcularNota(perfil, avaliacao, linhas);
+const { consideradas, descartadas } = linhasConsideradas(linhas, perfil, estimadas);
+// --vezes N: corrige N vezes com o MESMO espelho, para medir a consistência da nota.
+const vezes = Number(args["vezes"]?.[0] ?? "1");
+const exigidos = await montarEspelhoPorMaioria(perfil, enunciado);
+console.log(`\n===== ESPELHO EXIGIDO (montado só pelo enunciado) =====\n${exigidos.map((x, i) => `${i + 1}. ${x.elemento}\n   critério: ${x.atendidoSe}`).join("\n")}`);
 console.log(`\n===== ENUNCIADO =====\n${enunciado}\n\n===== RESPOSTA (${linhas.length} linhas${estimadas ? ", estimadas" : ""}) =====\n${numerarLinhas(linhas)}`);
-for (const [i, msg] of montarDevolutiva(perfil, avaliacao, calculo, { linhasEstimadas: estimadas, codigoQuestao: codigo }).entries()) {
-  console.log(`\n===== MENSAGEM ${i + 1} (${msg.length} caracteres) =====\n${msg}`);
+
+const inicio = Date.now();
+const rodadas = await Promise.all(Array.from({ length: vezes }, () => avaliarResposta({
+  perfil, area, enunciado, exigidos, linhas: consideradas, linhasDescartadas: descartadas,
+  digitada, linhasEstimadas: estimadas, telefone: "teste-local",
+})));
+for (const [n, avaliacao] of rodadas.entries()) {
+  const calculo = calcularNota(perfil, avaliacao, linhas, estimadas);
+  const msgs = montarDevolutiva(perfil, avaliacao, calculo, { linhasEstimadas: estimadas, codigoQuestao: codigo });
+  if (vezes > 1) {
+    console.log(`\n##### RODADA ${n + 1}: NQ ${calculo.nq} | ${calculo.criterios.map((c) => `${c.sigla} ${c.nota} (${c.faixa?.codigo ?? "?"}${c.faixaAjustada ? "*" : ""})`).join(" · ")} | NE ${calculo.ne}`);
+    console.log(avaliacao.espelho.map((e) => `   ${e.origem === "EXIGIDO" ? "E" : "+"} ${e.status.padEnd(12)} ${e.elemento.slice(0, 90)}`).join("\n"));
+  }
+  if (vezes === 1 || args["completo"]) for (const [i, msg] of msgs.entries()) console.log(`\n===== MENSAGEM ${i + 1} (${msg.length} caracteres) =====\n${msg}`);
 }
-console.log(`\n(correção em ${((Date.now() - inicio) / 1000).toFixed(1)}s)`);
+console.log(`\n(${vezes} correção(ões) em ${((Date.now() - inicio) / 1000).toFixed(1)}s)`);
 process.exit(0);

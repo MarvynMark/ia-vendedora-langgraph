@@ -148,21 +148,92 @@ Se a mensagem dele não for um pedido de ajuste da transcrição, devolva as lin
   return { linhas: r.linhas.map((l) => l.replace(/^\d{1,2}\.\s/, "").trim()).filter(Boolean), entendeu: r.entendeu };
 }
 
+const PROMPT_ESPELHO = `Você monta o espelho técnico de uma questão discursiva de concurso a partir SOMENTE do enunciado, antes de ler qualquer resposta.
+
+Liste os elementos EXIGIDOS: o que o comando pede expressamente.
+- Granularidade (siga à risca, para que a mesma questão gere sempre o mesmo espelho):
+  • um elemento por AÇÃO pedida sobre cada OBJETO: "diferencie X e Y, apresentando exemplos" → "diferença entre X e Y" + "exemplos de X e de Y"; "a finalidade de H e sua importância para I" → "finalidade de H" + "importância de H para I"; "procedimentos de preservação e aquisição" → "procedimentos de preservação" + "procedimentos de aquisição";
+  • qualidades do MESMO objeto ficam juntas: "importância de C para a validade e a confiabilidade" → um elemento só.
+- Cada elemento diz o que precisa aparecer na resposta, de forma concreta e verificável, no MESMO nível de especificidade do comando. Se o comando diz "procedimentos adequados de preservação", o elemento é "procedimentos de preservação" — técnicas específicas (isolar a rede, bloqueador de escrita, bolsa de Faraday…) entram apenas como EXEMPLOS aceitos no "atendidoSe", nunca como elementos próprios.
+- Exceção: quando o comando NOMEIA um conjunto fechado e conhecido (os requisitos de X, as etapas de Y, as fases de Z), crie UM elemento para CADA componente que a doutrina ou a técnica consolidada considera indispensável, nomeando-o (ex.: "descreva as etapas da PCR" → desnaturação; anelamento dos iniciadores; extensão). É assim que a banca corrige: veja o exemplo de padrão oficial abaixo.
+- NÃO inclua condutas, técnicas ou conhecimentos que o comando não pede, por mais relevantes que sejam: eles são aprofundamento, não exigência.
+- Se o enunciado narra um caso, NÃO crie um elemento só de "aplicar ao caso": a aplicação ao caso é avaliada na elaboração crítica. Só crie elemento sobre o caso se o comando pedir algo expressamente sobre ele (ex.: "no caso descrito, indique…").
+- NÃO inclua requisitos de forma (gênero textual, número de linhas, extensão, letra): o sistema confere isso separadamente.
+- Em "comando", copie o trecho do enunciado que exige o elemento.
+- Em "atendidoSe", escreva o critério mínimo e objetivo para o elemento contar como ATENDIDO, no nível de exigência da banca (o que basta, não o ideal). Ex.: "ATENDIDO se citar ao menos uma medida concreta de preservação (ex.: documentar o estado, isolar quando indicado, coletar voláteis); PARCIAL se só disser que é preciso preservar, sem medida concreta". Esse critério fixa a fronteira entre ATENDIDO e PARCIAL para todas as correções desta questão. Quando houver várias condutas tecnicamente adequadas, o critério aceita QUALQUER uma delas (lista aberta de exemplos), não uma conduta preferida.`;
+
+
+/** Itens EXIGIDOS do espelho, montados só a partir do enunciado (sem ver a resposta). */
+const SCHEMA_ITENS_ESPELHO = {
+  type: "object",
+  properties: {
+    itens: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { elemento: { type: "string" }, comando: { type: "string" }, atendidoSe: { type: "string" } },
+        required: ["elemento", "comando", "atendidoSe"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["itens"],
+  additionalProperties: false,
+};
+
+export interface ItemEspelho {
+  elemento: string;
+  comando: string;
+  atendidoSe: string;
+}
+
+export async function montarEspelhoExigido(perfil: PerfilConcurso, enunciado: string): Promise<ItemEspelho[]> {
+  const r = await chamarJson<{ itens: ItemEspelho[] }>(
+    `${PROMPT_ESPELHO}\n\nConcurso: ${perfil.nome} (${perfil.banca}).\n\nEXEMPLO DE PADRÃO OFICIAL DA BANCA (granularidade de referência; não é a questão a corrigir):\n${perfil.exemploEspelhoOficial}`,
+    [{ type: "text", text: `ENUNCIADO:\n${enunciado}` }],
+    "espelho_exigido",
+    SCHEMA_ITENS_ESPELHO,
+  );
+  return r.itens.filter((i) => i.elemento.trim());
+}
+
+/**
+ * Espelho da questão por maioria: monta 3 em paralelo e fica com o de estrutura (nº de itens) mais
+ * frequente. A montagem única variava (o mesmo enunciado saía com 6 ou 7 itens), e o espelho
+ * escolhido fica salvo como a régua da questão — só acontece uma vez por enunciado.
+ */
+export async function montarEspelhoPorMaioria(perfil: PerfilConcurso, enunciado: string): Promise<ItemEspelho[]> {
+  const tentativas = (await Promise.allSettled([1, 2, 3].map(() => montarEspelhoExigido(perfil, enunciado))))
+    .flatMap((t) => (t.status === "fulfilled" && t.value.length ? [t.value] : []));
+  if (!tentativas.length) throw new Error("[corretor] Nenhuma montagem de espelho deu certo");
+  const contagem = new Map<number, number>();
+  for (const t of tentativas) contagem.set(t.length, (contagem.get(t.length) ?? 0) + 1);
+  const maisFrequente = [...contagem.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+  return tentativas.find((t) => t.length === maisFrequente)!;
+}
+
 function schemaAvaliacao(perfil: PerfilConcurso) {
   const criterios = Object.fromEntries(perfil.criterios.map((c) => [
     c.sigla,
     z.object({
-      nota: z.number().describe(`Nota de ${c.nome}, de 0 a ${c.maximo}, com até duas casas decimais.`),
-      justificativa: z.string().describe("Por que essa nota, citando o que o aluno escreveu ou deixou de escrever."),
+      faixa: z.enum(c.faixas.map((f) => f.codigo) as [string, ...string[]])
+        .describe(`Faixa da rubrica de ${c.nome} cujo descritor corresponde à resposta.`),
+      nota: z.number().describe(`Nota de ${c.nome} DENTRO da faixa escolhida, com até duas casas decimais.`),
+      justificativa: z.string().describe("Qual descritor da faixa se aplica e o trecho do aluno que comprova. Se não for a faixa máxima, o item EXIGIDO que impediu."),
     }),
   ]));
   return z.object({
     oQueAQuestaoExigia: z.string().describe("O comando explicado: verbos, subitens e recortes."),
-    espelho: z.array(z.object({
-      elemento: z.string().describe("Elemento técnico concreto e verificável esperado na resposta."),
+    espelhoExigido: z.array(z.object({
+      item: z.number().int().describe("Número do item no ESPELHO EXIGIDO recebido."),
       status: z.enum(["ATENDIDO", "PARCIAL", "NAO_ATENDIDO", "INCORRETO"]),
-      comentario: z.string().describe("O que o aluno escreveu sobre esse elemento (curto)."),
-    })),
+      comentario: z.string().describe("O que o aluno efetivamente escreveu sobre esse item (curto, citando o texto)."),
+    })).describe("Uma classificação para CADA item do espelho exigido, na mesma ordem."),
+    aprofundamentos: z.array(z.object({
+      elemento: z.string().describe("Conhecimento complementar, não pedido pelo comando."),
+      status: z.enum(["ATENDIDO", "PARCIAL", "NAO_ATENDIDO", "INCORRETO"]),
+      comentario: z.string(),
+    })).describe("No máximo 3. Valorizam a resposta; a ausência não desconta. INCORRETO se o aluno afirmou algo errado."),
     criterios: z.object(criterios),
     errosPortugues: z.array(z.object({
       linha: z.number().int().describe("Número da linha da transcrição onde está o erro."),
@@ -186,6 +257,7 @@ export interface EntradaAvaliacao {
   perfil: PerfilConcurso;
   area: string | null;
   enunciado: string;
+  exigidos: ItemEspelho[];
   linhas: string[];            // já cortadas no máximo do edital
   linhasDescartadas: number;
   digitada: boolean;
@@ -201,11 +273,12 @@ export async function avaliarResposta(e: EntradaAvaliacao): Promise<AvaliacaoIA>
   }).withStructuredOutput(schemaAvaliacao(e.perfil), { name: "correcao_discursiva" });
 
   const origem = e.digitada
-    ? `Resposta DIGITADA pelo aluno no WhatsApp${e.linhasEstimadas ? " — linhas estimadas pelo sistema a partir do tamanho do texto: avalie o texto INTEIRO (nada foi descartado), não conte translineação e NÃO tire pontos pela extensão: a estimativa é aproximada e o sistema já avisa o aluno sobre o tamanho" : " — linhas quebradas pelo próprio aluno"}.`
+    ? `Resposta DIGITADA pelo aluno no WhatsApp${e.linhasEstimadas ? " — as linhas abaixo são uma ESTIMATIVA do sistema, não a folha do aluno: avalie o texto INTEIRO, não conte translineação e NÃO comente nem desconte nada pela quantidade de linhas (o sistema trata disso)" : " — linhas quebradas pelo próprio aluno"}.`
     : "Resposta MANUSCRITA, transcrita da foto/PDF e conferida pelo aluno.";
   const entrada = [
     `COMANDO DA QUESTÃO:\n${e.enunciado}`,
     origem,
+    `ESPELHO EXIGIDO (fixo, montado a partir do enunciado — classifique cada item pelo critério dele; não acrescente nem remova itens exigidos):\n${e.exigidos.map((x, i) => `${i + 1}. ${x.elemento} [comando: "${x.comando}"]${x.atendidoSe ? `\n   Critério: ${x.atendidoSe}` : ""}`).join("\n")}`,
     `RESPOSTA DO ALUNO (${e.linhas.length} linha(s) consideradas${e.linhasDescartadas ? `; ${e.linhasDescartadas} linha(s) após a ${e.perfil.linhasMax}ª foram desconsideradas e não aparecem aqui` : ""}):\n${numerarLinhas(e.linhas)}`,
   ].join("\n\n");
 
@@ -222,7 +295,20 @@ export async function avaliarResposta(e: EntradaAvaliacao): Promise<AvaliacaoIA>
       ],
       handler ? { callbacks: [handler] } : undefined,
     );
-    return r as AvaliacaoIA;
+    type Bruta = Omit<AvaliacaoIA, "espelho"> & {
+      espelhoExigido: Array<{ item: number; status: AvaliacaoIA["espelho"][number]["status"]; comentario: string }>;
+      aprofundamentos: Array<{ elemento: string; status: AvaliacaoIA["espelho"][number]["status"]; comentario: string }>;
+    };
+    const { espelhoExigido, aprofundamentos, ...resto } = r as unknown as Bruta;
+    // Item exigido que a IA não classificou não pode sumir do espelho (nem da contagem da faixa).
+    const espelho: AvaliacaoIA["espelho"] = e.exigidos.map((x, i) => {
+      const c = espelhoExigido.find((y) => y.item === i + 1);
+      return c
+        ? { elemento: x.elemento, origem: "EXIGIDO" as const, status: c.status, comentario: c.comentario }
+        : { elemento: x.elemento, origem: "EXIGIDO" as const, status: "NAO_ATENDIDO" as const, comentario: "(não classificado pela correção)" };
+    });
+    for (const a of aprofundamentos.slice(0, 3)) espelho.push({ ...a, origem: "APROFUNDAMENTO" });
+    return { ...resto, espelho };
   } finally {
     await finalizarLangfuseHandler(handler);
   }

@@ -1,6 +1,6 @@
 // Regras PURAS do corretor (sem banco, sem rede): leitura dos comandos do aluno, linhas e nota.
 // Ficam aqui para serem testadas sem mock — a conta da nota não pode depender da IA.
-import type { AvaliacaoIA, MotivoZero, PerfilConcurso, QuestaoBanco } from "./tipos.ts";
+import type { AvaliacaoIA, ContagemEspelho, Criterio, Faixa, MotivoZero, PerfilConcurso, QuestaoBanco } from "./tipos.ts";
 
 export function normalizar(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
@@ -127,8 +127,58 @@ function arredondar(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/** Rubrica em texto para o prompt — gerada dos MESMOS números que o código usa para conferir. */
+export function textoRubrica(criterios: Criterio[]): string {
+  const blocos = criterios.map((c) => [
+    `${c.sigla} — ${c.nome} (0 a ${formatarNumero(c.maximo)}): ${c.avalia}`,
+    ...c.faixas.map((f) => `  Faixa ${f.codigo} (${formatarNumero(f.min)} a ${formatarNumero(f.max)}): ${f.descritor}`),
+    ...(c.faixaPeloEspelho ? ["  (o sistema confere esta faixa pela contagem dos itens EXIGIDOS do espelho: classifique o espelho com rigor)"] : []),
+  ].join("\n"));
+  return `# RUBRICA DE NOTAS (didática Vestigium — obrigatória)
+
+Para cada critério: escolha a FAIXA cujo descritor corresponde ao que o aluno escreveu, dê a nota DENTRO dessa faixa e, na justificativa, diga qual descritor se aplica e cite o trecho do aluno que comprova. Escolha a faixa a partir do espelho já classificado; nunca escolha a nota primeiro e ajuste a justificativa depois.
+Os descritores falam de itens EXIGIDOS pelo comando. Aprofundamento ausente nunca rebaixa de faixa: ele só decide a nota dentro da faixa A.
+
+${blocos.join("\n\n")}`;
+}
+
+/** Faixa da rubrica pelo código ("A"), ou null se a IA devolveu algo fora da lista. */
+export function buscarFaixa(criterio: Criterio, codigo: string | undefined): Faixa | null {
+  return criterio.faixas.find((f) => f.codigo === (codigo ?? "").trim().toUpperCase()) ?? null;
+}
+
+export function contarEspelho(espelho: AvaliacaoIA["espelho"]): ContagemEspelho {
+  const exigidos = espelho.filter((e) => e.origem !== "APROFUNDAMENTO");
+  return {
+    exigidos: exigidos.length,
+    atendidos: exigidos.filter((e) => e.status === "ATENDIDO").length,
+    parciais: exigidos.filter((e) => e.status === "PARCIAL").length,
+    naoAtendidos: exigidos.filter((e) => e.status === "NAO_ATENDIDO").length,
+    incorretos: espelho.filter((e) => e.status === "INCORRETO").length,
+  };
+}
+
+/**
+ * Faixa final do critério: a da IA, a não ser que o espelho a dite (`exata`) ou a limite (`teto`).
+ * Letra mais adiante na lista = faixa pior.
+ */
+export function faixaFinal(criterio: Criterio, daIA: Faixa | null, contagem: ContagemEspelho): { faixa: Faixa | null; ajustada: boolean } {
+  const regra = criterio.faixaPeloEspelho?.(contagem);
+  if (!regra) return { faixa: daIA, ajustada: false };
+  if (regra.exata) {
+    const f = buscarFaixa(criterio, regra.exata);
+    return { faixa: f, ajustada: f?.codigo !== daIA?.codigo };
+  }
+  const pos = (f: Faixa | null) => (f ? criterio.faixas.indexOf(f) : -1);
+  const teto = buscarFaixa(criterio, regra.teto);
+  const piso = buscarFaixa(criterio, regra.piso);
+  if (teto && (!daIA || pos(daIA) < pos(teto))) return { faixa: teto, ajustada: true };
+  if (piso && (!daIA || pos(daIA) > pos(piso))) return { faixa: piso, ajustada: true };
+  return { faixa: daIA, ajustada: false };
+}
+
 export interface CalculoNota {
-  criterios: Array<{ sigla: string; nome: string; nota: number; maximo: number }>;
+  criterios: Array<{ sigla: string; nome: string; nota: number; maximo: number; faixa: Faixa | null; faixaAjustada: boolean }>;
   dq: number;
   ne: number;
   tl: number;
@@ -137,6 +187,7 @@ export interface CalculoNota {
   zero: MotivoZero | null;
   linhasDescartadas: number;
   excedenteEstimado: number;  // texto digitado: quantas linhas estimadas passaram do máximo (sem cortar)
+  curtoEstimado: boolean;     // texto digitado: a estimativa ficou abaixo do mínimo (aviso, não zero)
 }
 
 /**
@@ -150,23 +201,33 @@ export function calcularNota(perfil: PerfilConcurso, avaliacao: AvaliacaoIA, lin
   const tl = Math.min(escritas, perfil.linhasMax);
   const excedenteEstimado = estimadas ? Math.max(0, escritas - perfil.linhasMax) : 0;
 
+  // A nota fica DENTRO da faixa que a IA escolheu: é isso que torna a nota verificável pelo
+  // descritor. Faixa inválida: só prende entre 0 e o máximo do critério.
+  const contagem = contarEspelho(avaliacao.espelho);
   const criterios = perfil.criterios.map((c) => {
-    const bruta = Number(avaliacao.criterios[c.sigla]?.nota ?? 0);
-    const nota = arredondar(Math.min(c.maximo, Math.max(0, Number.isFinite(bruta) ? bruta : 0)));
-    return { sigla: c.sigla, nome: c.nome, nota, maximo: c.maximo };
+    const avaliado = avaliacao.criterios[c.sigla];
+    const bruta = Number(avaliado?.nota ?? 0);
+    const { faixa, ajustada } = faixaFinal(c, buscarFaixa(c, avaliado?.faixa), contagem);
+    const min = faixa?.min ?? 0;
+    const max = faixa?.max ?? c.maximo;
+    const nota = arredondar(Math.min(max, Math.max(min, Number.isFinite(bruta) ? bruta : 0)));
+    return { sigla: c.sigla, nome: c.nome, nota, maximo: c.maximo, faixa, faixaAjustada: ajustada };
   });
   const dq = arredondar(criterios.reduce((s, c) => s + c.nota, 0));
   const ne = errosValidos(avaliacao, estimadas ? consideradas.length : perfil.linhasMax).length;
 
+  // Regra única de linhas: penalidade de linha (zero por menos de 10) só com linha CONTADA. Linha
+  // estimada de texto digitado é incerta: vira aviso, nunca nota.
   let zero: MotivoZero | null = null;
+  const curtoEstimado = estimadas && tl > 0 && tl < perfil.linhasMin;
   if (tl === 0) zero = "sem_texto";
-  else if (tl < perfil.linhasMin) zero = "menos_linhas";
+  else if (tl < perfil.linhasMin && !estimadas) zero = "menos_linhas";
   else if (avaliacao.fugaAoTema) zero = "fuga_tema";
   else if (avaliacao.identificacaoIndevida) zero = "identificacao";
 
   const nqCalculada = tl > 0 ? arredondar(perfil.formula({ dq, ne, tl })) : 0;
   const nq = zero ? 0 : Math.max(0, nqCalculada);
-  return { criterios, dq, ne, tl, nqCalculada, nq, zero, linhasDescartadas: descartadas, excedenteEstimado };
+  return { criterios, dq, ne, tl, nqCalculada, nq, zero, linhasDescartadas: descartadas, excedenteEstimado, curtoEstimado };
 }
 
 /** Erros que contam no NE: com linha dentro das linhas consideradas. */

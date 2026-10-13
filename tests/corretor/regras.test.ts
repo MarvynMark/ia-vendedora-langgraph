@@ -18,12 +18,16 @@ import type { AvaliacaoIA } from "../../src/corretor/tipos.ts";
 function avaliacao(parcial: Partial<AvaliacaoIA> = {}): AvaliacaoIA {
   return {
     oQueAQuestaoExigia: "Explicar X e diferenciar Y.",
-    espelho: [{ elemento: "Conceito de X", status: "ATENDIDO", comentario: "ok" }],
+    espelho: [
+      { elemento: "Conceito de X", origem: "EXIGIDO", status: "ATENDIDO", comentario: "ok" },
+      { elemento: "Exemplos de X", origem: "EXIGIDO", status: "PARCIAL", comentario: "só um exemplo" },
+      { elemento: "Bloqueador de escrita", origem: "APROFUNDAMENTO", status: "NAO_ATENDIDO", comentario: "" },
+    ],
     criterios: {
-      TX: { nota: 4, justificativa: "a" },
-      AR: { nota: 3.5, justificativa: "b" },
-      CA: { nota: 4, justificativa: "c" },
-      EC: { nota: 6.5, justificativa: "d" },
+      TX: { faixa: "B", nota: 4, justificativa: "a" },
+      AR: { faixa: "B", nota: 3.5, justificativa: "b" },
+      CA: { faixa: "B", nota: 4, justificativa: "c" },
+      EC: { faixa: "C", nota: 6.5, justificativa: "d" },
     },
     errosPortugues: [
       { linha: 2, trecho: "pericia", correcao: "perícia", tipo: "acentuação", explicacao: "proparoxítona" },
@@ -115,6 +119,9 @@ describe("perfil PCDF", () => {
     expect(p).toContain("Teste da benevolência");
     expect(p).toContain("ÁREA DE CONHECIMENTOS GERAIS");
     expect(p).not.toContain("Formato obrigatório de saída");
+    expect(p).toContain("Questão 1 (101)");          // sem área: só a questão comum do padrão oficial
+    expect(p).not.toContain("Questão 2 (101)");
+    expect(perfilPcdf.promptSistema("103")).toContain("Three Way Handshake"); // padrão da área do aluno
   });
 });
 
@@ -143,13 +150,81 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
     expect(c.zero).toBeNull();
   });
 
-  test("nota da IA acima do máximo do critério é presa no máximo", () => {
+  test("nota fica dentro da faixa escolhida pela IA (rubrica verificável)", () => {
     const c = calcularNota(perfilPcdf, avaliacao({ criterios: {
-      TX: { nota: 7, justificativa: "" }, AR: { nota: -1, justificativa: "" },
-      CA: { nota: 5, justificativa: "" }, EC: { nota: 12, justificativa: "" },
+      TX: { faixa: "A", nota: 7, justificativa: "" },     // acima do teto da faixa A → 5
+      AR: { faixa: "B", nota: 4.8, justificativa: "" },   // nota de faixa A com faixa B → 4
+      CA: { faixa: "C", nota: 1, justificativa: "" },     // abaixo do piso da faixa C → 2,5
+      EC: { faixa: "Z", nota: 12, justificativa: "" },    // faixa inválida → só o máximo do critério
     } }), linhas(15));
-    expect(c.criterios.map((x) => x.nota)).toEqual([5, 0, 5, 10]);
-    expect(c.dq).toBe(20);
+    expect(c.criterios.map((x) => x.nota)).toEqual([5, 4, 2.5, 10]);
+    expect(c.criterios.map((x) => x.faixa?.codigo ?? null)).toEqual(["A", "B", "C", null]);
+    expect(c.dq).toBe(21.5);
+  });
+
+  test("AR sai da contagem do espelho: aprofundamento ausente não rebaixa (caso do teste de 13/10)", () => {
+    const tudoAtendido = avaliacao({
+      espelho: [
+        { elemento: "voláteis x não voláteis", origem: "EXIGIDO", status: "ATENDIDO", comentario: "" },
+        { elemento: "hash", origem: "EXIGIDO", status: "ATENDIDO", comentario: "" },
+        { elemento: "bloqueador de escrita", origem: "APROFUNDAMENTO", status: "NAO_ATENDIDO", comentario: "" },
+      ],
+      criterios: { ...avaliacao().criterios, AR: { faixa: "B", nota: 4, justificativa: "faltou write-blocker" } },
+    });
+    const ar = calcularNota(perfilPcdf, tudoAtendido, linhas(14)).criterios[1]!;
+    expect(ar.faixa?.codigo).toBe("A");
+    expect(ar.faixaAjustada).toBe(true);
+    expect(ar.nota).toBe(4.5);
+  });
+
+  test("item exigido ausente: AR cai para C e EC fica no máximo em C", () => {
+    const umAusente = avaliacao({
+      espelho: [
+        { elemento: "a", origem: "EXIGIDO", status: "ATENDIDO", comentario: "" },
+        { elemento: "b", origem: "EXIGIDO", status: "NAO_ATENDIDO", comentario: "" },
+      ],
+      criterios: { ...avaliacao().criterios, AR: { faixa: "A", nota: 5, justificativa: "" }, EC: { faixa: "A", nota: 9.5, justificativa: "" } },
+    });
+    const c = calcularNota(perfilPcdf, umAusente, linhas(14));
+    expect(c.criterios[1]!.faixa?.codigo).toBe("C");
+    expect(c.criterios[3]!.faixa?.codigo).toBe("C");
+    expect(c.criterios[3]!.nota).toBe(6.5);
+  });
+
+  test("TX: sem item ausente, no mínimo faixa B; com item ausente, no máximo C", () => {
+    const semAusente = avaliacao({ criterios: { ...avaliacao().criterios, TX: { faixa: "C", nota: 3, justificativa: "" } } });
+    expect(calcularNota(perfilPcdf, semAusente, linhas(14)).criterios[0]!.faixa?.codigo).toBe("B");
+    const comAusente = avaliacao({
+      espelho: [{ elemento: "a", origem: "EXIGIDO", status: "NAO_ATENDIDO", comentario: "" }],
+      criterios: { ...avaliacao().criterios, TX: { faixa: "A", nota: 5, justificativa: "" } },
+    });
+    expect(calcularNota(perfilPcdf, comAusente, linhas(14)).criterios[0]!.faixa?.codigo).toBe("C");
+  });
+
+  test("informação incorreta: AR no máximo C, com a gravidade julgada pela IA", () => {
+    const comErro = avaliacao({
+      espelho: [{ elemento: "a", origem: "EXIGIDO", status: "INCORRETO", comentario: "" }],
+      criterios: { ...avaliacao().criterios, AR: { faixa: "D", nota: 1.5, justificativa: "" } },
+    });
+    expect(calcularNota(perfilPcdf, comErro, linhas(14)).criterios[1]!.faixa?.codigo).toBe("D");
+    const leve = avaliacao({
+      espelho: [{ elemento: "a", origem: "EXIGIDO", status: "INCORRETO", comentario: "" }],
+      criterios: { ...avaliacao().criterios, AR: { faixa: "A", nota: 5, justificativa: "" } },
+    });
+    expect(calcularNota(perfilPcdf, leve, linhas(14)).criterios[1]!.faixa?.codigo).toBe("C");
+  });
+
+  test("rubrica do prompt sai dos mesmos números que o código confere", () => {
+    const p = perfilPcdf.promptSistema(null);
+    expect(p).toContain("Faixa A (9,00 a 10,00)");
+    expect(p).toContain("Aprofundamento ausente nunca rebaixa de faixa");
+  });
+
+  test("texto digitado curto (estimado) não zera: só avisa", () => {
+    const c = calcularNota(perfilPcdf, avaliacao(), linhas(7), true);
+    expect(c.zero).toBeNull();
+    expect(c.curtoEstimado).toBe(true);
+    expect(c.nq).toBeGreaterThan(0);
   });
 
   test("texto depois da 15ª linha é desconsiderado: TL = 15 e erro da linha 16 não conta", () => {
@@ -173,7 +248,8 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
     expect(c.excedenteEstimado).toBe(6);
     expect(c.ne).toBe(1); // erro da linha 18 conta: o texto inteiro foi avaliado
     const [, m2] = montarDevolutiva(perfilPcdf, a, c, { linhasEstimadas: true, codigoQuestao: null });
-    expect(m2).toContain("equivale a cerca de 21 linhas manuscritas");
+    expect(m2).toContain("ficaria com cerca de 21 linhas na folha");
+    expect(m2).toContain("estimativa, não contagem");
     expect(m2).not.toContain("foram desconsideradas");
   });
 
@@ -193,7 +269,11 @@ describe("calcularNota (Edital PCDF 2016, item 13)", () => {
   test("resultado negativo vira zero", () => {
     const erros = Array.from({ length: 30 }, (_, i) => ({ linha: (i % 10) + 1, trecho: "x", correcao: "y", tipo: "grafia", explicacao: "" }));
     const c = calcularNota(perfilPcdf, avaliacao({
-      criterios: { TX: { nota: 0.5, justificativa: "" }, AR: { nota: 0, justificativa: "" }, CA: { nota: 0, justificativa: "" }, EC: { nota: 0, justificativa: "" } },
+      criterios: { TX: { faixa: "E", nota: 0.5, justificativa: "" }, AR: { faixa: "E", nota: 0, justificativa: "" }, CA: { faixa: "E", nota: 0, justificativa: "" }, EC: { faixa: "E", nota: 0, justificativa: "" } },
+      espelho: [
+        { elemento: "a", origem: "EXIGIDO", status: "NAO_ATENDIDO", comentario: "" },
+        { elemento: "b", origem: "EXIGIDO", status: "NAO_ATENDIDO", comentario: "" },
+      ],
       errosPortugues: erros,
     }), linhas(10));
     expect(c.nqCalculada).toBeLessThan(0);
@@ -208,20 +288,25 @@ describe("devolutiva", () => {
     const msgs = montarDevolutiva(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { linhasEstimadas: false, codigoQuestao: "G01" });
     expect(msgs).toHaveLength(3);
     expect(msgs.every((m) => m.length <= 4000)).toBe(true);
-    expect(msgs[0]).toContain("*NOTA: 17,79 / 25,00*");
+    expect(msgs[0]).toContain("*NOTA ESTIMADA: 17,79 / 25,00*");
+    expect(msgs[0]).toContain("não é nota oficial");
+    expect(msgs[0]).toContain("EC — Elaboração Crítica: 6,50 / 10,00 (faixa C)");
     expect(msgs[0]).toContain("NQ = DQ − (NE / TL) = 18,00 − (3 / 14) = 17,79");
     expect(msgs[0]).not.toContain("p3"); // até 2 pontos fortes
     expect(msgs[1]).toContain("NE = 3");
     expect(msgs[1]).toContain("✅ ATENDIDO");
-    expect(msgs[2]).toContain("referência de treino");
+    // aprofundamento ausente vira sugestão, não "NÃO ATENDIDO"
+    expect(msgs[1]).toContain("Bloqueador de escrita — 💡 poderia agregar");
+    expect(msgs[1]).not.toContain("❌");
+    expect(msgs[2]).toContain("Não é nota oficial da banca");
   });
 
   test("questão zerada explica o motivo", () => {
     const a = avaliacao();
     const [m1] = montarDevolutiva(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(8)), { linhasEstimadas: true, codigoQuestao: null });
-    expect(m1).toContain("*NOTA: 0,00 / 25,00*");
+    expect(m1).toContain("*NOTA ESTIMADA: 0,00 / 25,00*");
     expect(m1).toContain("8 linha(s), abaixo do mínimo de 10");
-    expect(m1).toContain("TL = 8 (estimado)");
+    expect(m1).toContain("TL = 8 (estimativa: texto digitado)");
   });
 });
 

@@ -72,6 +72,13 @@ function garantirTabelas() {
       criado_em      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_corretor_correcoes_tel ON corretor_correcoes(telefone, criado_em DESC);
+    CREATE TABLE IF NOT EXISTS corretor_espelhos (
+      chave      TEXT PRIMARY KEY,
+      concurso   TEXT NOT NULL,
+      enunciado  TEXT NOT NULL,
+      itens      JSONB NOT NULL,
+      criado_em  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `).catch((e) => {
     tabelasProntas = null;
     throw e;
@@ -221,5 +228,21 @@ export async function registrarCorrecao(c: {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [c.telefone, c.conversaId, c.concurso, c.area, c.codigoQuestao, c.enunciado,
       JSON.stringify(c.transcricao), JSON.stringify(c.avaliacao), c.nota],
+  );
+}
+
+/** Espelho exigido já montado para este enunciado (mesma questão → mesmo espelho → nota estável). */
+export async function buscarEspelhoSalvo(chave: string): Promise<Array<{ elemento: string; comando: string; atendidoSe?: string }> | null> {
+  await garantirTabelas();
+  const r = await pool.query(`SELECT itens FROM corretor_espelhos WHERE chave = $1`, [chave]);
+  return ((r.rows[0] as Linha | undefined)?.["itens"] as Array<{ elemento: string; comando: string; atendidoSe?: string }> | undefined) ?? null;
+}
+
+export async function salvarEspelho(chave: string, concurso: string, enunciado: string, itens: unknown): Promise<void> {
+  await garantirTabelas();
+  await pool.query(
+    `INSERT INTO corretor_espelhos (chave, concurso, enunciado, itens) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (chave) DO UPDATE SET itens = EXCLUDED.itens, criado_em = NOW()`,
+    [chave, concurso, enunciado, JSON.stringify(itens)],
   );
 }

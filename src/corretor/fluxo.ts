@@ -14,6 +14,7 @@ import { rastrear } from "../lib/processamentos-ativos.ts";
 import { adicionarEtiquetas, enviarMensagem } from "../services/chatwoot.ts";
 import type { ChatwootWebhookPayload } from "../types/chatwoot.ts";
 import { montarDevolutiva } from "./devolutiva.ts";
+import { obterEspelhoExigido } from "./espelho.ts";
 import { type Anexo, ErroAnexo, ajustarTranscricao, avaliarResposta, transcreverEnunciado, transcreverResposta } from "./ia.ts";
 import { PERFIS, buscarPerfil } from "./perfis/index.ts";
 import {
@@ -338,10 +339,12 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
 
   await ctx.enviar("Corrigindo… ⏳ Leva cerca de 1 a 2 minutos.");
   const { consideradas, descartadas } = linhasConsideradas(sessao.transcricao, perfil, sessao.linhasEstimadas);
+  const exigidos = await obterEspelhoExigido(perfil, sessao.enunciado);
   const avaliacao = await avaliarResposta({
     perfil,
     area: sessao.area,
     enunciado: sessao.enunciado,
+    exigidos,
     linhas: consideradas,
     linhasDescartadas: descartadas,
     digitada: sessao.digitada,
