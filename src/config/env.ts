@@ -123,6 +123,19 @@ export const env = {
   PLANILHA_BLACK_ID: process.env["PLANILHA_BLACK_ID"] ?? "1WhM9OjlHtj_WcRgM9ybUkh20lB43TeXPjGKWzZeMMg4",
   PLANILHA_BLACK_GID: Number(process.env["PLANILHA_BLACK_GID"] ?? "784338254"),
 
+  // Corretor de discursivas no WhatsApp do Suporte 1 (src/corretor/). O aluno digita /corrigir.
+  //   "off"   → desligado: o Suporte 1 segue só com a equipe.
+  //   "teste" → só conversas com a etiqueta "teste-corretor" (para validar antes de abrir).
+  //   "on"    → qualquer número que mandar /corrigir no Suporte 1.
+  // Default "teste" DE PROPÓSITO: o deploy não abre o corretor para todo mundo antes da validação.
+  CORRETOR_MODO: (["off", "teste", "on"] as const).includes(
+    process.env["CORRETOR_MODO"] as "off" | "teste" | "on",
+  )
+    ? (process.env["CORRETOR_MODO"] as "off" | "teste" | "on")
+    : "teste",
+  CORRETOR_INBOX_ID: Number(process.env["CORRETOR_INBOX_ID"] ?? "13"), // #01 Suporte
+  CORRETOR_LIMITE_DIARIO: Number(process.env["CORRETOR_LIMITE_DIARIO"] ?? "5"),
+
   // Funil de sessão estratégica: a IA deixa de fechar por texto e passa a agendar call.
   // Reverter é trocar esta variável para "off" no Coolify e redeployar — NUNCA um git revert
   // (o revert de bf3063d mostrou que ele leva junto correções boas que vieram no mesmo commit).

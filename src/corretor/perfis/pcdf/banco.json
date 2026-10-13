@@ -1,0 +1,554 @@
+[
+  {
+    "codigo": "G01",
+    "area": null,
+    "tema": "Direito Penal",
+    "enunciado": "Explique os requisitos do concurso de pessoas no Direito Penal brasileiro e diferencie, de forma objetiva, coautoria e participação, indicando a regra geral acerca da comunicabilidade das circunstâncias e condições de caráter pessoal."
+  },
+  {
+    "codigo": "G02",
+    "area": null,
+    "tema": "Processo Penal",
+    "enunciado": "Discorra sobre a finalidade e as características do inquérito policial, indicando seu valor probatório e a relação entre a investigação preliminar e a formação da opinio delicti."
+  },
+  {
+    "codigo": "G03",
+    "area": null,
+    "tema": "Processo Penal / Perícia",
+    "enunciado": "Explique a importância do exame de corpo de delito nas infrações que deixam vestígios e analise a função da prova pericial na reconstrução técnico-científica do fato investigado."
+  },
+  {
+    "codigo": "G04",
+    "area": null,
+    "tema": "Direito Administrativo",
+    "enunciado": "Diferencie anulação e revogação do ato administrativo, indicando fundamento, efeitos e limites de cada forma de desfazimento."
+  },
+  {
+    "codigo": "G05",
+    "area": null,
+    "tema": "Direito Constitucional",
+    "enunciado": "Analise a segurança pública como dever do Estado e responsabilidade de todos, destacando a posição constitucional da Polícia Civil e sua função na apuração de infrações penais."
+  },
+  {
+    "codigo": "G06",
+    "area": null,
+    "tema": "Legislação Especial",
+    "enunciado": "Explique a finalidade do Estatuto do Desarmamento e diferencie, em linhas gerais, posse irregular e porte ilegal de arma de fogo, observando a legislação vigente."
+  },
+  {
+    "codigo": "G07",
+    "area": null,
+    "tema": "Legislação Especial",
+    "enunciado": "Discorra sobre a tutela penal dos crimes ambientais e explique por que a responsabilização ambiental pode envolver diferentes esferas de responsabilidade."
+  },
+  {
+    "codigo": "G08",
+    "area": null,
+    "tema": "Aspectos do DF",
+    "enunciado": "Explique o conceito e a finalidade da Região Integrada de Desenvolvimento do Distrito Federal e Entorno (RIDE) e analise a importância da integração regional para políticas públicas."
+  },
+  {
+    "codigo": "G09",
+    "area": null,
+    "tema": "Georreferenciamento",
+    "enunciado": "Conceitue georreferenciamento e explique duas aplicações relevantes dessa ferramenta em atividades de investigação, perícia ou planejamento territorial."
+  },
+  {
+    "codigo": "G10",
+    "area": null,
+    "tema": "Estatística",
+    "enunciado": "Diferencie população e amostra e explique a utilidade das medidas de posição e de dispersão na interpretação de um conjunto de dados."
+  },
+  {
+    "codigo": "G11",
+    "area": null,
+    "tema": "Raciocínio lógico",
+    "enunciado": "Explique a diferença entre implicação e equivalência lógica e indique por que a análise de proposições pode ser útil na avaliação estruturada de hipóteses."
+  },
+  {
+    "codigo": "G12",
+    "area": null,
+    "tema": "Direito Penal",
+    "enunciado": "Diferencie crime consumado e crime tentado e explique os elementos necessários para o reconhecimento da tentativa e seus efeitos na aplicação da pena."
+  },
+  {
+    "codigo": "G13",
+    "area": null,
+    "tema": "Direito Penal",
+    "enunciado": "Explique os elementos da culpabilidade e indique situações gerais em que a culpabilidade pode ser afastada, observando o direito vigente."
+  },
+  {
+    "codigo": "G14",
+    "area": null,
+    "tema": "Processo Penal",
+    "enunciado": "Diferencie prisão em flagrante, prisão preventiva e prisão temporária quanto à natureza, finalidade e pressupostos gerais."
+  },
+  {
+    "codigo": "G15",
+    "area": null,
+    "tema": "Direito Administrativo",
+    "enunciado": "Explique os elementos da responsabilidade civil do Estado e diferencie, de forma sintética, responsabilidade estatal e eventual direito de regresso contra o agente."
+  },
+  {
+    "codigo": "G16",
+    "area": null,
+    "tema": "Língua Portuguesa",
+    "enunciado": "Explique como coerência e coesão atuam conjuntamente na construção de um texto técnico e indique dois problemas de escrita que podem comprometer a precisão de uma resposta discursiva."
+  },
+  {
+    "codigo": "G17",
+    "area": null,
+    "tema": "Lei Orgânica do DF",
+    "enunciado": "Analise, em perspectiva geral, a organização político-administrativa do Distrito Federal e a relação entre autonomia distrital e competências constitucionalmente atribuídas."
+  },
+  {
+    "codigo": "G18",
+    "area": null,
+    "tema": "Atualidades/DF",
+    "enunciado": "Analise dois desafios contemporâneos de integração entre o Distrito Federal e seu entorno que possam repercutir sobre segurança pública, mobilidade ou ocupação territorial."
+  },
+  {
+    "codigo": "G19",
+    "area": null,
+    "tema": "Processo Penal / Prova",
+    "enunciado": "Diferencie prova, indício e elemento informativo da investigação, explicando a importância dessa distinção para a persecução penal."
+  },
+  {
+    "codigo": "G20",
+    "area": null,
+    "tema": "Direito Constitucional",
+    "enunciado": "Explique a relação entre direitos e garantias fundamentais e a atividade investigativa estatal, indicando por que a busca da verdade não autoriza atuação fora dos limites constitucionais."
+  },
+  {
+    "codigo": "E01",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Explique o princípio da PCR e descreva as etapas essenciais da técnica, relacionando sua utilidade à análise de material genético em contexto pericial."
+  },
+  {
+    "codigo": "E02",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Diferencie mutação, recombinação e reparo do DNA e explique como esses fenômenos se relacionam à variabilidade genética."
+  },
+  {
+    "codigo": "E03",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Explique o equilíbrio de Hardy-Weinberg, seus pressupostos e sua utilidade na genética de populações."
+  },
+  {
+    "codigo": "E04",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Discorra sobre regiões repetitivas e polimorfismos do genoma humano e explique sua relevância para identificação genética."
+  },
+  {
+    "codigo": "E05",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Explique a contribuição da entomologia forense para a investigação pericial e indique fatores ambientais capazes de interferir na interpretação dos vestígios entomológicos."
+  },
+  {
+    "codigo": "E06",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Conceitue bioindicadores e explique como podem ser empregados na avaliação de poluição e dano ambiental."
+  },
+  {
+    "codigo": "E07",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Analise a importância da cadeia de procedimentos de coleta, preservação e preparo de material biológico para a confiabilidade do exame laboratorial."
+  },
+  {
+    "codigo": "E08",
+    "area": "101",
+    "tema": null,
+    "enunciado": "Explique os principais riscos de biossegurança associados ao processamento de amostras biológicas e indique medidas gerais de prevenção."
+  },
+  {
+    "codigo": "E01",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Explique o objetivo da contabilidade e a relação entre patrimônio, fatos contábeis e demonstrações contábeis."
+  },
+  {
+    "codigo": "E02",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Diferencie ativo, passivo e patrimônio líquido e explique como alterações nesses grupos podem repercutir na análise patrimonial."
+  },
+  {
+    "codigo": "E03",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Explique a finalidade do balanço patrimonial e da demonstração do resultado e indique como essas peças se complementam na análise econômico-financeira."
+  },
+  {
+    "codigo": "E04",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Discorra sobre depreciação, amortização e exaustão, diferenciando seus objetos e efeitos contábeis."
+  },
+  {
+    "codigo": "E05",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Explique o conceito de fluxo de caixa e analise sua utilidade na identificação de incompatibilidades entre movimentação financeira e capacidade econômica declarada."
+  },
+  {
+    "codigo": "E06",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Conceitue auditoria e perícia contábil e diferencie seus objetivos e produtos técnicos."
+  },
+  {
+    "codigo": "E07",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Explique a importância dos documentos e registros contábeis para rastreamento de operações e reconstrução de fatos econômicos."
+  },
+  {
+    "codigo": "E08",
+    "area": "102",
+    "tema": null,
+    "enunciado": "Analise como indicadores de liquidez e endividamento podem auxiliar a avaliação da situação econômico-financeira de uma entidade."
+  },
+  {
+    "codigo": "E01",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Explique o funcionamento de uma assinatura digital, relacionando função hash, criptografia assimétrica, chave privada, integridade, autenticidade e não repúdio."
+  },
+  {
+    "codigo": "E02",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Descreva o TCP three-way handshake e explique a finalidade de cada etapa no estabelecimento de uma conexão."
+  },
+  {
+    "codigo": "E03",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Diferencie IPv4 e IPv6 quanto ao endereçamento e indique razões técnicas que motivaram a adoção do IPv6."
+  },
+  {
+    "codigo": "E04",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Explique a função de firewall e IDS e diferencie prevenção, detecção e monitoramento de eventos de segurança em redes."
+  },
+  {
+    "codigo": "E05",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Diferencie criptografia simétrica e assimétrica, apresentando vantagens, limitações e usos típicos de cada abordagem."
+  },
+  {
+    "codigo": "E06",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Explique o papel de logs de sistemas e aplicações em uma investigação computacional e indique cuidados necessários para preservar seu valor probatório."
+  },
+  {
+    "codigo": "E07",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Discorra sobre virtualização e computação em nuvem e analise dois desafios que esses ambientes impõem à perícia digital."
+  },
+  {
+    "codigo": "E08",
+    "area": "103",
+    "tema": null,
+    "enunciado": "Explique a finalidade de funções hash criptográficas e discuta por que colisões e algoritmos obsoletos são relevantes em segurança e perícia."
+  },
+  {
+    "codigo": "E01",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Explique a diferença entre tensão e deformação e relacione esses conceitos ao comportamento de materiais submetidos a esforços."
+  },
+  {
+    "codigo": "E02",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Discorra sobre os principais mecanismos de corrosão de materiais metálicos e indique fatores que influenciam sua ocorrência."
+  },
+  {
+    "codigo": "E03",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Explique a finalidade de sondagens geotécnicas e sua importância para a escolha e avaliação de fundações."
+  },
+  {
+    "codigo": "E04",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Analise as principais causas de fissuração em edificações e indique informações que devem ser observadas em uma avaliação pericial."
+  },
+  {
+    "codigo": "E05",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Explique os conceitos de risco, condição insegura, ato inseguro, negligência, imprudência e imperícia no contexto da segurança do trabalho."
+  },
+  {
+    "codigo": "E06",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Descreva os princípios básicos de curto-circuito, proteção e aterramento em instalações elétricas e relacione-os à investigação de acidentes."
+  },
+  {
+    "codigo": "E07",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Explique a utilidade da Transformada de Fourier no processamento de sinais e indique aplicações possíveis em análise técnica."
+  },
+  {
+    "codigo": "E08",
+    "area": "104",
+    "tema": null,
+    "enunciado": "Conceitue avaliação de impacto ambiental e valoração de dano ambiental, explicando sua relevância para exames periciais de engenharia."
+  },
+  {
+    "codigo": "E01",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Explique os conceitos de farmacocinética e farmacodinâmica e diferencie os processos que cada área estuda."
+  },
+  {
+    "codigo": "E02",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Descreva absorção, distribuição, metabolismo e excreção de fármacos e explique como esses processos influenciam a concentração de uma substância no organismo."
+  },
+  {
+    "codigo": "E03",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Diferencie agonista e antagonista farmacológico e explique a relação entre receptor, afinidade e resposta biológica."
+  },
+  {
+    "codigo": "E04",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Explique os fundamentos gerais da toxicologia e diferencie exposição, dose, efeito e toxicidade."
+  },
+  {
+    "codigo": "E05",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Discorra sobre a importância da escolha, coleta, conservação e armazenamento de amostras em análises toxicológicas."
+  },
+  {
+    "codigo": "E06",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Explique o papel de métodos cromatográficos na separação e identificação de substâncias em contexto laboratorial."
+  },
+  {
+    "codigo": "E07",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Analise a importância de controles, padrões e validação analítica para a confiabilidade de um resultado químico ou toxicológico."
+  },
+  {
+    "codigo": "E08",
+    "area": "105",
+    "tema": null,
+    "enunciado": "Explique como biotransformação e formação de metabólitos podem interferir na interpretação de resultados toxicológicos."
+  },
+  {
+    "codigo": "E01",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Explique a diferença entre erro sistemático e erro aleatório em medições e descreva como a propagação de incertezas afeta um resultado experimental."
+  },
+  {
+    "codigo": "E02",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Discorra sobre conservação de energia e explique como esse princípio pode ser empregado na análise física de um evento."
+  },
+  {
+    "codigo": "E03",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Explique os conceitos de impulso e quantidade de movimento e relacione-os à análise de colisões."
+  },
+  {
+    "codigo": "E04",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Diferencie reflexão, refração, difração e interferência de ondas, indicando a condição física essencial de cada fenômeno."
+  },
+  {
+    "codigo": "E05",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Explique os fundamentos da óptica geométrica aplicáveis à formação de imagens por lentes e espelhos."
+  },
+  {
+    "codigo": "E06",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Descreva os princípios físicos do efeito Doppler e indique situações em que sua análise pode fornecer informação mensurável."
+  },
+  {
+    "codigo": "E07",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Explique a diferença entre grandezas escalares e vetoriais e mostre por que a decomposição vetorial é útil na análise de forças."
+  },
+  {
+    "codigo": "E08",
+    "area": "106",
+    "tema": null,
+    "enunciado": "Discorra sobre radioatividade, meia-vida e atividade, indicando cuidados conceituais necessários na interpretação de medições."
+  },
+  {
+    "codigo": "E01",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Explique como propriedades mineralógicas e cristalográficas podem auxiliar a identificação de minerais em uma análise pericial."
+  },
+  {
+    "codigo": "E02",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Diferencie rochas ígneas, sedimentares e metamórficas quanto à origem e aos principais processos de formação."
+  },
+  {
+    "codigo": "E03",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Explique a utilidade da microscopia óptica e de técnicas analíticas na caracterização de minerais e rochas."
+  },
+  {
+    "codigo": "E04",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Discorra sobre intemperismo e formação dos solos, relacionando processos físicos e químicos."
+  },
+  {
+    "codigo": "E05",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Explique os princípios básicos de estratigrafia e sua utilidade na interpretação da sequência de eventos geológicos."
+  },
+  {
+    "codigo": "E06",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Analise a importância da coleta representativa e da documentação de amostras geológicas para a reprodutibilidade do exame."
+  },
+  {
+    "codigo": "E07",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Explique como cartografia, geoprocessamento e geoposicionamento podem apoiar investigações envolvendo origem e localização de materiais."
+  },
+  {
+    "codigo": "E08",
+    "area": "107",
+    "tema": null,
+    "enunciado": "Discorra sobre processos erosivos e movimentos de massa, indicando fatores naturais e antrópicos que podem influenciá-los."
+  },
+  {
+    "codigo": "E01",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Explique a importância da anatomia de cabeça e pescoço para a interpretação de lesões e achados em exames odontolegais."
+  },
+  {
+    "codigo": "E02",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Discorra sobre a identificação humana por características odontológicas, indicando a importância da comparação entre dados ante mortem e post mortem."
+  },
+  {
+    "codigo": "E03",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Explique como desenvolvimento e erupção dentária podem contribuir para estimativas de idade, destacando limites dessa inferência."
+  },
+  {
+    "codigo": "E04",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Analise a importância do registro odontológico e da documentação radiográfica para procedimentos de identificação."
+  },
+  {
+    "codigo": "E05",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Explique os fundamentos gerais da traumatologia aplicada às estruturas dentárias e maxilofaciais e indique aspectos relevantes para descrição pericial."
+  },
+  {
+    "codigo": "E06",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Discorra sobre métodos de exame das arcadas dentárias e a necessidade de padronização e documentação dos achados."
+  },
+  {
+    "codigo": "E07",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Explique a contribuição da radiologia odontológica para identificação e análise pericial, indicando exemplos de características comparáveis."
+  },
+  {
+    "codigo": "E08",
+    "area": "108",
+    "tema": null,
+    "enunciado": "Analise os limites científicos de inferências de identidade baseadas em um único achado odontológico e a importância da convergência de evidências."
+  },
+  {
+    "codigo": "E01",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Explique os fatores que influenciam a velocidade de uma reação química e relacione-os à teoria das colisões e à energia de ativação."
+  },
+  {
+    "codigo": "E02",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Diferencie equilíbrio químico e estado estacionário e explique o efeito de alterações de concentração, pressão ou temperatura sobre um sistema em equilíbrio."
+  },
+  {
+    "codigo": "E03",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Explique os fundamentos da espectrofotometria e a relação entre absorbância, concentração e caminho óptico."
+  },
+  {
+    "codigo": "E04",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Discorra sobre cromatografia e explique os princípios gerais de separação entre fase móvel e fase estacionária."
+  },
+  {
+    "codigo": "E05",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Explique a diferença entre exatidão, precisão, sensibilidade e seletividade em um método analítico."
+  },
+  {
+    "codigo": "E06",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Analise a importância de calibração, branco, padrão, controle de qualidade e incerteza na produção de resultados analíticos confiáveis."
+  },
+  {
+    "codigo": "E07",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Explique os fundamentos de ácidos, bases, pH e soluções tampão e relacione-os ao controle de condições experimentais."
+  },
+  {
+    "codigo": "E08",
+    "area": "109",
+    "tema": null,
+    "enunciado": "Discorra sobre técnicas de preparo de amostras e explique como contaminação, perda de analito ou efeito de matriz podem comprometer um exame químico."
+  }
+]

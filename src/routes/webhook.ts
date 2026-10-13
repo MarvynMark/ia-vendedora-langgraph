@@ -24,6 +24,7 @@ import { agendarIntroPendente } from "../lib/intro-pendente.ts";
 import { logger } from "../lib/logger.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
+import { corretorAtende, tratarMensagemCorretor } from "../corretor/fluxo.ts";
 
 
 
@@ -170,6 +171,17 @@ export const webhookRouter = new Elysia()
       conversation_id: parsed.data.conversation.id,
       sender: parsed.data.sender.name,
     });
+
+    // Corretor de discursivas do Suporte 1: antes de qualquer automação de venda. Só age em
+    // comando "/..." ou com o modo correção aberto; o resto segue o caminho normal.
+    if (corretorAtende(payload.conversation.inbox_id, labels)) {
+      try {
+        const acao = await tratarMensagemCorretor(payload);
+        if (acao) return { status: "ok", action: acao };
+      } catch (e) {
+        logger.error("webhook", "Corretor falhou; mensagem segue o caminho normal", e);
+      }
+    }
 
     // Automação fixa: link do grupo de espera (funciona para qualquer conversa). Só para quem
     // PEDE o grupo — citar o grupo não é pedir (ver pedeGrupoDeEspera em webhook-filtros.ts).
