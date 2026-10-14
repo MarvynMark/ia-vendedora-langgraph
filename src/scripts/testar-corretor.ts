@@ -7,7 +7,7 @@
 //
 // Opções: --concurso (padrão pcdf), --area (código, ex.: 103), --questao (código do banco) ou
 // --enunciado (texto), --resposta (um .txt, ou fotos/PDF manuscritos, em ordem),
-// --vezes N (consistência: N correções com o mesmo espelho), --estimada N (simula a autoavaliação),
+// --vezes N (consistência: N correções com o mesmo espelho),
 // --reescrita arquivo.txt (simula o desafio de reescrita depois da correção).
 import { readFileSync } from "node:fs";
 import { buscarPerfil } from "../corretor/perfis/index.ts";
@@ -64,8 +64,7 @@ const entrada = {
 };
 const inicio = Date.now();
 const rodadas = await Promise.all(Array.from({ length: vezes }, () => avaliarResposta(entrada, linhas)));
-const estimada = args["estimada"]?.[0] ? Number(args["estimada"][0]) : null;
-const meta = { linhasEstimadas: estimadas, codigoQuestao: codigo, autoavaliacao: estimada, anteriores: [] };
+const meta = { linhasEstimadas: estimadas, codigoQuestao: codigo, anteriores: [] };
 
 for (const [n, { avaliacao, calculo }] of rodadas.entries()) {
   if (vezes > 1) {

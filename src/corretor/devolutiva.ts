@@ -40,20 +40,7 @@ function lista(itens: string[], numerada = false): string {
 export interface MetaDevolutiva {
   linhasEstimadas: boolean;
   codigoQuestao: string | null;
-  autoavaliacao: number | null;
   anteriores: CorrecaoSalva[];      // correções anteriores do aluno no concurso (mais recente primeiro)
-}
-
-/**
- * A estimativa do aluno ao lado da nota: treina a metacognição (saber julgar a própria resposta é
- * o que permite revisar na prova, sem corretor).
- */
-export function comentarioAutoavaliacao(estimada: number, nota: number): string {
-  const dif = estimada - nota;
-  const base = `Você estimou ${formatarNumero(estimada)}; a correção deu ${formatarNumero(nota)}.`;
-  if (Math.abs(dif) <= 1.5) return `🎯 ${base} Boa calibragem: você está sabendo julgar a própria resposta.`;
-  if (dif > 0) return `🧭 ${base} Você se avaliou acima. Costuma acontecer quando a gente confere o *tema* e não cada *item do comando* — na próxima, antes de entregar, confira item por item.`;
-  return `🧭 ${base} Você se avaliou abaixo: sua resposta está melhor do que você acha.`;
 }
 
 /**
@@ -80,7 +67,6 @@ export function mensagemPrincipal(perfil: PerfilConcurso, a: AvaliacaoIA, c: Cal
     `📝 *Correção — ${perfil.nome}*${meta.codigoQuestao ? ` · questão ${meta.codigoQuestao}` : ""}`,
     `*Nota estimada: ${formatarNumero(c.nq)} / ${formatarNumero(perfil.notaMaximaQuestao)}*\n${notas} · erros de português: ${c.ne}\n_rubrica didática Vestigium — não é nota oficial da banca_`,
     c.zero ? `⚠️ Pelo edital, esta questão seria zerada: ${motivoZero(c.zero, perfil, c.tl)}. O resto da correção mostra como evoluir.` : "",
-    meta.autoavaliacao != null ? comentarioAutoavaliacao(meta.autoavaliacao, c.nq) : "",
     evolucao ? `📈 *Sua evolução:* ${evolucao}${a.evolucao.trim() ? `\n${a.evolucao.trim()}` : ""}` : "",
     `✅ *O que você já domina*\n${a.dominado.oQue.trim()}${a.dominado.trecho.trim() ? `\n_"${semAspas(a.dominado.trecho)}"_` : ""}`,
     `🎯 *Seu ponto de virada*\n${a.pontoDeVirada.problema.trim()}\n\n*Por que importa:* ${a.pontoDeVirada.porQueImporta.trim()}\n*Como fazer:* ${a.pontoDeVirada.comoFazer.trim()}`,

@@ -4,7 +4,7 @@
 //     → concurso (se houver mais de um)  → área (só na 1ª vez; fica salva)
 //     → enunciado (texto, foto ou código do banco)  → resposta (fotos/PDF/texto, várias mensagens)
 //     → PRONTO → transcrição numerada → aluno confere (pode pedir ajuste) → CORRIGIR
-//     → (enquanto corrige: "que nota você acha que tirou?") → devolutiva com UM foco + desafio
+//     → devolutiva com UM foco + desafio
 //     → DETALHES / ERROS / MODELO sob demanda · REESCREVER → o aluno reescreve e recebe retorno
 //
 // Fora do modo correção, as mensagens do Suporte 1 seguem para a equipe como sempre: o fluxo só
@@ -32,7 +32,6 @@ import {
   interpretarArea,
   interpretarComando,
   interpretarConcurso,
-  interpretarNotaEstimada,
   linhasConsideradas,
   contarPalavras,
   linhasDeTextoDigitado,
@@ -130,7 +129,7 @@ export async function tratarMensagemCorretor(payload: ChatwootWebhookPayload): P
     case "enunciado": return etapaEnunciado(ctx, sessao, texto, anexos);
     case "resposta": return etapaResposta(ctx, sessao, texto, anexos, comando);
     case "confirmar": return etapaConfirmar(ctx, sessao, texto, anexos, comando);
-    case "corrigindo": return etapaCorrigindo(ctx, sessao, texto);
+    case "corrigindo": return etapaCorrigindo(ctx);
     case "pos_correcao": return etapaPosCorrecao(ctx, sessao, comando);
     case "reescrita": return etapaReescrita(ctx, sessao, texto, anexos, comando);
   }
@@ -364,11 +363,7 @@ async function executarCorrecao(ctx: Contexto): Promise<void> {
   if (!sessao?.transcricao || !sessao.enunciado) return;
   const perfil = buscarPerfil(sessao.concurso)!;
 
-  // Pergunta de metacognição enquanto a IA trabalha: o tempo de espera vira prática de julgar a
-  // própria resposta, que é o que o aluno vai precisar fazer sozinho na prova.
-  await ctx.enviar(`Corrigindo… ⏳ Leva cerca de 1 minuto.
-
-Enquanto isso, um exercício rápido: *de 0 a ${formatarNumero(perfil.notaMaximaQuestao)}, que nota você acha que tirou?* (opcional — responda só com o número)`);
+  await ctx.enviar("Corrigindo… ⏳ Leva cerca de 1 minuto.");
 
   const anteriores = await ultimasCorrecoes(ctx.telefone, perfil.codigo).catch(() => []);
   const { consideradas, descartadas } = linhasConsideradas(sessao.transcricao, perfil, sessao.linhasEstimadas);
@@ -386,8 +381,6 @@ Enquanto isso, um exercício rápido: *de 0 a ${formatarNumero(perfil.notaMaxima
     telefone: ctx.telefone,
   }, sessao.transcricao);
 
-  // Relê a sessão: a nota estimada pode ter chegado durante a correção.
-  const autoavaliacao = (await buscarSessao(ctx.conversaId))?.autoavaliacao ?? null;
   const correcaoId = await registrarCorrecao({
     telefone: ctx.telefone,
     conversaId: ctx.conversaId,
@@ -399,25 +392,18 @@ Enquanto isso, um exercício rápido: *de 0 a ${formatarNumero(perfil.notaMaxima
     avaliacao,
     calculo,
     nota: calculo.nq,
-    autoavaliacao,
+    autoavaliacao: null,
   });
   await atualizarSessao(ctx.conversaId, { etapa: "pos_correcao", correcaoId });
 
-  const meta = { linhasEstimadas: sessao.linhasEstimadas, codigoQuestao: sessao.codigoQuestao, autoavaliacao, anteriores };
+  const meta = { linhasEstimadas: sessao.linhasEstimadas, codigoQuestao: sessao.codigoQuestao, anteriores };
   for (const msg of mensagemPrincipal(perfil, avaliacao, calculo, meta)) await enviarMensagem(ctx.conta, ctx.conversaId, msg);
   logger.info("corretor", "Correção entregue", { conversa: ctx.conversaId, concurso: perfil.codigo, nota: calculo.nq, correcaoId });
 }
 
 // ── Depois da correção ──────────────────────────────────────────────────────────────────────────
 
-async function etapaCorrigindo(ctx: Contexto, sessao: Sessao, texto: string): Promise<string> {
-  const perfil = buscarPerfil(sessao.concurso)!;
-  const estimada = sessao.autoavaliacao == null ? interpretarNotaEstimada(texto, perfil.notaMaximaQuestao) : null;
-  if (estimada != null) {
-    await atualizarSessao(ctx.conversaId, { autoavaliacao: estimada });
-    await ctx.enviar("Anotado ✍️ Já já te mostro como ficou.");
-    return "corretor:autoavaliacao";
-  }
+async function etapaCorrigindo(ctx: Contexto): Promise<string> {
   await ctx.enviar("Sua correção está saindo ⏳ Leva cerca de 1 minuto.");
   return "corretor:aguarde";
 }

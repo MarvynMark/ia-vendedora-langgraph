@@ -47,17 +47,6 @@ export function interpretarComando(texto: string): Comando | null {
   return { tipo: "iniciar", concurso, codigo };
 }
 
-/**
- * Nota que o aluno estima para a própria resposta ("18", "18,5", "acho que uns 17"). Null se não
- * houver um número único dentro da escala — aí a mensagem não é uma autoavaliação.
- */
-export function interpretarNotaEstimada(texto: string, maximo: number): number | null {
-  const numeros = texto.replace(/(\d),(\d)/g, "$1.$2").match(/\d+(?:\.\d+)?/g) ?? [];
-  if (numeros.length !== 1 || texto.length > 40) return null;
-  const n = Number(numeros[0]);
-  return Number.isFinite(n) && n >= 0 && n <= maximo ? n : null;
-}
-
 /** "g5" → "G05". */
 export function padronizarCodigo(codigo: string): string {
   const letra = codigo[0]!.toUpperCase();

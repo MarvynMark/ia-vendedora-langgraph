@@ -12,9 +12,9 @@ import {
 } from "../../src/corretor/regras.ts";
 import { perfilPcdf } from "../../src/corretor/perfis/pcdf/perfil.ts";
 import { PERFIS } from "../../src/corretor/perfis/index.ts";
-import { comentarioAutoavaliacao, mensagemDetalhes, mensagemErros, mensagemModelo, mensagemPrincipal } from "../../src/corretor/devolutiva.ts";
+import { mensagemDetalhes, mensagemErros, mensagemModelo, mensagemPrincipal } from "../../src/corretor/devolutiva.ts";
 import { errosRecorrentes, historicoParaIA, linhaEvolucao } from "../../src/corretor/historico.ts";
-import { contarPalavras, interpretarNotaEstimada, palavrasMinimas } from "../../src/corretor/regras.ts";
+import { contarPalavras, palavrasMinimas } from "../../src/corretor/regras.ts";
 import type { CorrecaoSalva } from "../../src/corretor/sessao.ts";
 import type { AvaliacaoIA } from "../../src/corretor/tipos.ts";
 
@@ -74,14 +74,6 @@ describe("interpretarComando", () => {
     expect(interpretarComando("Modelo")).toEqual({ tipo: "modelo" });
     expect(interpretarComando("reescrever")).toEqual({ tipo: "reescrever" });
     expect(interpretarComando("quais foram meus erros?")).toBeNull();
-  });
-
-  test("nota estimada pelo aluno", () => {
-    expect(interpretarNotaEstimada("18", 25)).toBe(18);
-    expect(interpretarNotaEstimada("acho que uns 17,5", 25)).toBe(17.5);
-    expect(interpretarNotaEstimada("30", 25)).toBeNull();
-    expect(interpretarNotaEstimada("entre 15 e 18", 25)).toBeNull();
-    expect(interpretarNotaEstimada("ok", 25)).toBeNull();
   });
 
   test("pronto e cancelar", () => {
@@ -313,7 +305,7 @@ function correcaoAnterior(nota: number, tipos: string[], dias: number): Correcao
 }
 
 describe("devolutiva (divulgação progressiva)", () => {
-  const meta = { linhasEstimadas: false, codigoQuestao: "G01", autoavaliacao: null, anteriores: [] as CorrecaoSalva[] };
+  const meta = { linhasEstimadas: false, codigoQuestao: "G01", anteriores: [] as CorrecaoSalva[] };
 
   test("mensagem principal: nota + UM foco + antes → depois + desafio + menu, numa mensagem só", () => {
     const a = avaliacao();
@@ -380,14 +372,6 @@ describe("devolutiva (divulgação progressiva)", () => {
     expect(m).toContain("8 linha(s), abaixo do mínimo de 10");
   });
 
-  test("autoavaliação: calibrada, acima e abaixo", () => {
-    expect(comentarioAutoavaliacao(17, 16.5)).toContain("Boa calibragem");
-    expect(comentarioAutoavaliacao(22, 16)).toContain("item do comando");
-    expect(comentarioAutoavaliacao(12, 18)).toContain("melhor do que você acha");
-    const a = avaliacao();
-    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { ...meta, autoavaliacao: 22 });
-    expect(m).toContain("Você estimou 22,00; a correção deu 17,79.");
-  });
 });
 
 describe("histórico do aluno", () => {
@@ -413,7 +397,7 @@ describe("histórico do aluno", () => {
 
   test("mensagem principal mostra a evolução quando há histórico", () => {
     const a = avaliacao({ evolucao: "Agora você listou os requisitos." });
-    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { linhasEstimadas: false, codigoQuestao: null, autoavaliacao: null, anteriores });
+    const [m] = mensagemPrincipal(perfilPcdf, a, calcularNota(perfilPcdf, a, linhas(14)), { linhasEstimadas: false, codigoQuestao: null, anteriores });
     expect(m).toContain("📈 *Sua evolução:* 16,10 → 18,40 → *17,79*");
     expect(m).toContain("Agora você listou os requisitos.");
   });
