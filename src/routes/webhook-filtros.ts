@@ -63,3 +63,28 @@ export function pedeGrupoDeEspera(content: string): boolean {
   if (RE_MENCAO_GRUPO.test(c) && !RE_PEDIDO_GRUPO.test(c)) return false;
   return true;
 }
+
+// --- Grupo de espera: MÉDICO vs GERAL ---
+//
+// Médicos (trilha Médico Legista) têm uma lista de espera própria. O gatilho chega antes da IA
+// conversar, então a decisão usa o que já se sabe do lead: label "medico", formação do formulário
+// ou `qual_formacao` do contato (ver ehMedicoLead), e a própria mensagem ("grupo de espera dos
+// médicos", "sou médica"). Sem nenhum sinal, vai para o grupo geral.
+
+/** A mensagem se identifica como de médico ("grupo dos médicos", "sou médica")? Só a palavra
+ *  médico/médica: "medicina legal" é assunto de perito também, e biomédico/veterinário ficam fora. */
+export function mensagemEhDeMedico(content: string): boolean {
+  const c = (content ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return /(^|[^a-z])medic[oa]s?([^a-z]|$)/.test(c) && !/veterin/.test(c);
+}
+
+/** Texto com o link do grupo de espera certo para o lead. Mantém "grupo de espera" no texto: é
+ *  por essa expressão que o webhook detecta que o link já foi enviado. */
+export function mensagemGrupoDeEspera(
+  ehMedico: boolean,
+  links: { geral: string; medicos: string },
+): string {
+  return ehMedico
+    ? `Clique no link abaixo para entrar no grupo de espera de médicos:\n\n${links.medicos}`
+    : `Clique no link abaixo para entrar no grupo de espera:\n\n${links.geral}`;
+}

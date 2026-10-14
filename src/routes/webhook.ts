@@ -5,7 +5,8 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
-import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera } from "./webhook-filtros.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico } from "./webhook-filtros.ts";
+import { ehMedicoLead } from "../lib/medico.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
 import { limparHistorico, salvarMensagemSeNova } from "../db/memoria.ts";
@@ -205,8 +206,15 @@ export const webhookRouter = new Elysia()
         return { status: "ignored", reason: "grupo_espera_duplicado" };
       }
 
+      // Médico vai para a lista de espera de médicos; qualquer outra graduação, para a geral.
+      const ehMedico = mensagemEhDeMedico(content) || ehMedicoLead({
+        etiquetas: labels,
+        dadosFormulario: await buscarDadosFormulario(parsed.data.sender.phone_number ?? ""),
+        atributosContato: payload.sender.custom_attributes ?? {},
+      });
+      logger.info("webhook", `Grupo de espera: ${ehMedico ? "médicos" : "geral"}`);
       await enviarMensagem(idConta, idConversa,
-        `Clique no link abaixo para entrar no grupo de espera:\n\n${env.GRUPO_ESPERA_LINK}`
+        mensagemGrupoDeEspera(ehMedico, { geral: env.GRUPO_ESPERA_LINK, medicos: env.GRUPO_ESPERA_MEDICOS_LINK }),
       );
 
       // Para leads de formulário: agendar intro da IA (dispara ~2min depois pelo cron). A IA
