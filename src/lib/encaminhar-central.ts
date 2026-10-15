@@ -2,12 +2,13 @@
 // vendas para o painel comercial e financeiro. Fire-and-forget: falha aqui nunca afeta o
 // fluxo do bot. Sem CENTRAL_INGEST_URL configurado, não faz nada.
 //
-// O CPF é removido antes do envio — a Central não guarda CPF.
+// O CPF (e o api_token que a Guru inclui no corpo) é removido antes do envio.
 
 import { env } from "../config/env.ts";
 import { logger } from "./logger.ts";
 
-const CAMPOS_CPF = new Set(["doc", "documento", "cpf", "doc_contato"]);
+// CPF e o token que a Guru manda no próprio corpo do webhook.
+const CAMPOS_CPF = new Set(["doc", "documento", "cpf", "doc_contato", "api_token", "token"]);
 
 /** Cópia profunda do corpo sem nenhum campo de CPF, em qualquer nível. */
 export function semCpf(valor: unknown): unknown {
