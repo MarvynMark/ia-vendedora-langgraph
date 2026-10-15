@@ -4,6 +4,7 @@ import { processarPagamentoAprovado } from "./pagamento.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
+import { encaminharPagamentoParaCentral } from "../lib/encaminhar-central.ts";
 
 // Payload do Webhook Vendas da TMB (Tem Mais no Boleto).
 // Fonte: portal do produtor > Integrações > Webhook Vendas.
@@ -54,6 +55,8 @@ export const pagamentoTmbRouter = new Elysia()
         return { status: "error", reason: "unauthorized" };
       }
     }
+
+    encaminharPagamentoParaCentral("tmb", body);
 
     const parsed = tmbVendasPayloadSchema.safeParse(body);
     if (!parsed.success) {

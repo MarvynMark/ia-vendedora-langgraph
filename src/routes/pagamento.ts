@@ -19,6 +19,7 @@ import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
+import { encaminharPagamentoParaCentral } from "../lib/encaminhar-central.ts";
 
 
 let grafoFollowup: Awaited<ReturnType<typeof criarGrafoFollowUp>> | null = null;
@@ -61,6 +62,8 @@ export const pagamentoRouter = new Elysia()
   .post("/webhook/pagamento", async ({ body }) => {
     logger.info("pagamento", ">>> Webhook recebido", { temPayloadWrapper: !!(body as Record<string, unknown>)["payload"] });
     registrarWebhook("/webhook/pagamento", body, "recebido");
+    // Todos os status (aprovada, recusada, reembolsada…) vão para a Central — o financeiro precisa deles.
+    encaminharPagamentoParaCentral("guru", body);
 
     // A DMGuru envolve os dados em um campo "payload" — extrair antes de validar
     const rawBody = body as Record<string, unknown>;

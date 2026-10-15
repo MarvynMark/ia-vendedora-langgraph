@@ -190,3 +190,15 @@ describe("etiquetas extras", () => {
     expect(d.nome_completo).toBe("Ana");
   });
 });
+
+describe("parsearFormulario (UTMs)", () => {
+  test("campos utm_* viram chaves próprias e não poluem as colunas", () => {
+    const d = parsearFormulario({
+      "Qual é o seu nome completo?": "Maria Silva",
+      "utm_source": "facebook",
+      "UTM_Campaign": "[LEADS][PCDF]-[LP]",
+      "utm_medium": "  ",
+    });
+    expect(d).toEqual({ nome_completo: "Maria Silva", utm_source: "facebook", utm_campaign: "[LEADS][PCDF]-[LP]" });
+  });
+});

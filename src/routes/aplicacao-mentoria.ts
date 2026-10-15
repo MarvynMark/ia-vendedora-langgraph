@@ -89,11 +89,16 @@ const formularioSchema = z.record(z.string(), z.string());
  */
 export const CHAVE_ETIQUETAS_EXTRAS = "_etiquetas";
 
+export const CHAVES_UTM = new Set(["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]);
+
 export function parsearFormulario(raw: Record<string, string>): Record<string, string> {
   const resultado: Record<string, string> = {};
   const naoMapeadas: string[] = [];
   for (const [pergunta, resposta] of Object.entries(raw)) {
     if (pergunta === CHAVE_ETIQUETAS_EXTRAS) { resultado[CHAVE_ETIQUETAS_EXTRAS] = resposta; continue; }
+    // UTMs do formulário (campos ocultos): vão para o contato e alimentam a origem no painel.
+    const utm = pergunta.trim().toLowerCase();
+    if (CHAVES_UTM.has(utm)) { if (resposta.trim()) resultado[utm] = resposta.trim(); continue; }
     const coluna = colunaDaPergunta(pergunta);
     if (coluna && !(coluna in resultado)) {
       resultado[coluna] = resposta;
@@ -194,6 +199,7 @@ async function lancarNoChatwoot(d: Record<string, string>) {
     ...(d.ja_foi_aluno        ? { ja_foi_aluno: d.ja_foi_aluno } : {}),
     ...(d.disposto_investir   ? { disposto_investir: d.disposto_investir } : {}),
     ...(d.quando_pretende_entrar ? { quando_pretende_entrar: d.quando_pretende_entrar } : {}),
+    ...Object.fromEntries([...CHAVES_UTM].filter(k => d[k]).map(k => [k, d[k]])),
   };
 
   // Cria contato se não existir, ou atualiza atributos do existente
