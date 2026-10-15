@@ -35,3 +35,23 @@ export function encaminharPagamentoParaCentral(plataforma: "guru" | "tmb", body:
     .then(r => { if (!r.ok) logger.warn("central", `Central respondeu ${r.status} ao pagamento ${plataforma}`); })
     .catch(e => logger.warn("central", `Falha ao encaminhar pagamento ${plataforma} para a Central`, { erro: String(e) }));
 }
+
+/** Formulário de matrícula (DIM) para a Central, sem as perguntas de CPF. Mesmo esquema
+ *  fire-and-forget dos pagamentos: falha aqui não afeta o roteiro nem a planilha. */
+export function encaminharFormularioParaCentral(opts: {
+  respostas: Array<{ pergunta: string; resposta: string }>;
+  concurso: string | null;
+  recebidoEm: Date;
+}): void {
+  if (!env.CENTRAL_INGEST_URL || opts.respostas.length === 0) return;
+  const url = `${env.CENTRAL_INGEST_URL.replace(/\/$/, "")}/api/ingest/formulario-matricula`;
+  const respostas = opts.respostas.filter(r => !/\bcpf\b/i.test(r.pergunta));
+  void fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-central-chave": env.CENTRAL_INGEST_CHAVE },
+    body: JSON.stringify({ linhas: [{ respondido_em: opts.recebidoEm.toISOString(), origem: "Respondi (DIM)", concurso_ia: opts.concurso, respostas }] }),
+    signal: AbortSignal.timeout(8_000),
+  })
+    .then(r => { if (!r.ok) logger.warn("central", `Central respondeu ${r.status} ao formulário de matrícula`); })
+    .catch(e => logger.warn("central", "Falha ao encaminhar o formulário de matrícula para a Central", { erro: String(e) }));
+}

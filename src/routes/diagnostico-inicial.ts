@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { enviarMensagem } from "../services/chatwoot.ts";
 import { anexarCadastroAluno, planilhaAlunosConfigurada } from "../services/google-sheets.ts";
+import { encaminharFormularioParaCentral } from "../lib/encaminhar-central.ts";
 import {
   type Respostas,
   PROMPT_ROTEIRO,
@@ -54,6 +55,7 @@ async function processarDiagnostico(body: unknown, recebidoEm: Date) {
   } finally {
     // Grava na planilha mesmo se o roteiro falhar: o cadastro do aluno não pode depender da IA.
     await registrarNaPlanilha(body, respostas, saidaIA, recebidoEm);
+    encaminharFormularioParaCentral({ respostas, concurso: saidaIA.concurso, recebidoEm });
   }
 }
 
