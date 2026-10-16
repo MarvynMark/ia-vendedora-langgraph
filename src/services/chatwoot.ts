@@ -1123,7 +1123,7 @@ export async function listarKanbanTasks(
   stepId: number,
   page = 1,
 ): Promise<KanbanTaskResumo[]> {
-  const url = `${urlConta(accountId)}/kanban/tasks?board_id=${boardId}&step_id=${stepId}&page=${page}`;
+  const url = `${urlConta(accountId)}/kanban/tasks?board_id=${boardId}&board_step_id=${stepId}&page=${page}`;
   const res = await fetchComTimeout(url, { method: "GET", headers: headers() });
 
   if (!res.ok) {

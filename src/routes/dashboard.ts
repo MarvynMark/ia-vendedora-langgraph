@@ -31,7 +31,7 @@ function chatwootHeaders() {
 
 async function listarTasksStep(stepId: number, page = 1): Promise<unknown[]> {
   try {
-    const url = `${BASE_URL}/api/v1/accounts/${ACCOUNT_ID}/kanban/tasks?board_id=${BOARD_ID}&step_id=${stepId}&page=${page}`;
+    const url = `${BASE_URL}/api/v1/accounts/${ACCOUNT_ID}/kanban/tasks?board_id=${BOARD_ID}&board_step_id=${stepId}&page=${page}`;
     const res = await fetchComTimeout(url, { method: "GET", headers: chatwootHeaders(), timeout: 10000 });
     if (!res.ok) return [];
     const data = await res.json() as { tasks?: unknown[] };

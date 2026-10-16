@@ -60,7 +60,8 @@ export async function verificarFollowupsPendentes() {
         if (pagina.length < 25) break; // última página
         page++;
       }
-      // Filtrar client-side pois o step_id da API não filtra corretamente
+      // A API só filtra por board_step_id (step_id é ignorado e devolvia o board inteiro, ~110
+      // páginas por etapa a cada 5 min). O filtro local fica como garantia.
       tasks = tasks.filter(t => t.board_step_id === step.id);
       logger.info("followup-timer", `Step ${step.name}: ${tasks.length} tasks encontradas`);
     } catch (e) {
