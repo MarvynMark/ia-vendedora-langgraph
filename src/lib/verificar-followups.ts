@@ -40,7 +40,30 @@ async function obterGrafoFollowup() {
   return grafoFollowup;
 }
 
-export async function verificarFollowupsPendentes() {
+/** Ritmo de verificação por etapa (16/10/2026): cada passada lista o kanban do Chatwoot.
+ *  Novo Lead e Aguardando Pagamento têm toques de 5 e 20 min → a cada 10 min; Primeira mensagem e
+ *  Conexão (3h) → a cada 30 min; Nutrir (3 dias) → 2x por dia. */
+export const ETAPAS_RAPIDAS = [1, 8];
+export const ETAPAS_MEDIAS = [7, 10];
+export const ETAPAS_LENTAS = [12];
+/** Horários (Brasília) da passada de Nutrir, dentro do horário comercial. */
+export const HORAS_ETAPAS_LENTAS = [9, 15];
+
+const rodando = new Set<string>();
+
+export async function verificarFollowupsPendentes(etapas?: number[]) {
+  // Uma passada demorada não pode encavalar com a próxima do mesmo grupo.
+  const chave = etapas?.join(",") ?? "todas";
+  if (rodando.has(chave)) return;
+  rodando.add(chave);
+  try {
+    await verificarEtapas(etapas);
+  } finally {
+    rodando.delete(chave);
+  }
+}
+
+async function verificarEtapas(etapas?: number[]) {
   if (env.MODO_TESTE) {
     logger.debug("followup-timer", "Modo teste — verificação de follow-ups bloqueada");
     return;
@@ -49,7 +72,7 @@ export async function verificarFollowupsPendentes() {
   const accountId = env.CHATWOOT_ACCOUNT_ID;
   const boardId = env.KANBAN_BOARD_ID;
 
-  for (const step of STEPS_RASTREADOS) {
+  for (const step of STEPS_RASTREADOS.filter(st => !etapas || etapas.includes(st.id))) {
     // Buscar todas as páginas (API retorna 25 por página)
     let tasks: Awaited<ReturnType<typeof listarKanbanTasks>> = [];
     try {

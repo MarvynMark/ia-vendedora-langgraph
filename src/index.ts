@@ -16,7 +16,7 @@ import { leadBlackRouter } from "./routes/lead-black.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
 import { registrarMensagemRouter } from "./routes/registrar-mensagem.ts";
 import { verificarTemplatesPendentes } from "./lib/verificar-templates.ts";
-import { verificarFollowupsPendentes } from "./lib/verificar-followups.ts";
+import { verificarFollowupsPendentes, ETAPAS_RAPIDAS, ETAPAS_MEDIAS, ETAPAS_LENTAS, HORAS_ETAPAS_LENTAS } from "./lib/verificar-followups.ts";
 import { verificarIntrosPendentes } from "./lib/intro-pendente.ts";
 import { verificarLembretesSessao } from "./lib/lembretes-sessao.ts";
 import { agendaConfigurada } from "./services/google-calendar.ts";
@@ -85,14 +85,27 @@ setInterval(async () => {
   }
 }, 60_000);
 
-// Job: verificar follow-ups vencidos e agendar novos (a cada 5 minutos)
-setInterval(async () => {
+// Job: verificar follow-ups vencidos e agendar novos, com ritmo por etapa (ver verificar-followups.ts):
+// Novo Lead e Aguardando Pagamento a cada 10 min; Primeira mensagem e Conexão a cada 30 min;
+// Nutrir 2x por dia (9h e 15h). Cada passada lista o kanban no Chatwoot, então nada de 5 em 5 min.
+const followups = async (etapas: number[]) => {
   try {
-    await verificarFollowupsPendentes();
+    await verificarFollowupsPendentes(etapas);
   } catch (e) {
     logger.error("followup-timer", "Erro no job de follow-ups:", e);
   }
-}, 5 * 60_000);
+};
+setInterval(() => void followups(ETAPAS_RAPIDAS), 10 * 60_000);
+setInterval(() => void followups(ETAPAS_MEDIAS), 30 * 60_000);
+let ultimaPassadaLenta = "";
+setInterval(() => {
+  const agora = new Date();
+  const hora = Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hourCycle: "h23", timeZone: "America/Sao_Paulo" }).format(agora));
+  const marca = `${agora.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })} ${hora}`;
+  if (!HORAS_ETAPAS_LENTAS.includes(hora) || marca === ultimaPassadaLenta) return;
+  ultimaPassadaLenta = marca;
+  void followups(ETAPAS_LENTAS);
+}, 10 * 60_000);
 
 // Job: disparar intros pós-grupo-espera vencidas (a cada 30s; persistidas no banco, sobrevivem a deploy)
 setInterval(async () => {
