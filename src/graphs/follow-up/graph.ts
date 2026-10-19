@@ -142,14 +142,18 @@ export async function classificar(state: FollowUpStateType) {
 // passam por aqui — não são conversa de venda em aberto.
 const TIPOS_COM_RETOMADA = new Set(["followup", "lembrete", "nutrir", "template_abertura"]);
 
+// retomadaVencida é SEMPRE gravado (true ou false): o checkpointer guarda o estado por thread
+// (followup_<telefone>) e o invoke não o reenvia. 19/10/2026 (conv 9959): a retomada da tarde
+// deixou o true no checkpoint e, horas depois, o pagamento pediu boas-vindas e o roteador mandou
+// a retomada de novo — o aluno recebeu "como a gente tinha combinado" em vez do onboarding.
 export async function verificarRetomada(state: FollowUpStateType, agora = new Date()) {
-  if (!TIPOS_COM_RETOMADA.has(state.tipoFollowup)) return {};
+  if (!TIPOS_COM_RETOMADA.has(state.tipoFollowup)) return { retomadaVencida: false };
   const retomada = lerRetomada(state.description ?? "");
-  if (!retomada) return {};
+  if (!retomada) return { retomadaVencida: false };
   if (retomada.momento.getTime() > agora.getTime()) {
     await atualizarKanbanTask(state.accountId, state.taskId, { due_date: retomada.momento.toISOString() });
     logger.info("follow-up", `Retorno combinado ainda não chegou — nada enviado, card reagendado para ${retomada.momento.toISOString()}`, { taskId: state.taskId });
-    return { tipoFollowup: "ignorar" as const };
+    return { tipoFollowup: "ignorar" as const, retomadaVencida: false };
   }
   return { retomadaVencida: true };
 }

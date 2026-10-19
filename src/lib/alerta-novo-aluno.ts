@@ -13,6 +13,8 @@ export interface DadosAlertaNovoAluno {
   plano: string;
   /** Plataforma de origem da venda. Ausente = DMGuru. */
   origem?: "dmguru" | "tmb";
+  /** Aluno que já tinha comprado e comprou de novo (ver lib/renovacao.ts). */
+  renovacao?: boolean;
 }
 
 // Telefone chega em E.164 (+5562999996666) e sai legível para o time: (62) 99999-6666.
@@ -29,7 +31,7 @@ export function montarMensagemNovoAluno(dados: DadosAlertaNovoAluno): string {
   const plano = dados.origem === "tmb" ? `${dados.plano} - TMB` : dados.plano;
 
   return [
-    `✅✅ NOVO ALUNO MENTORIA: ${dados.nome}`,
+    dados.renovacao ? `🔁 RENOVAÇÃO MENTORIA: ${dados.nome}` : `✅✅ NOVO ALUNO MENTORIA: ${dados.nome}`,
     `Email: ${dados.email ?? "(não informado)"}`,
     `Telefone: ${formatarTelefoneBr(dados.telefone)}`,
     `CPF: ${formatarDocumento(dados.cpf)}`,

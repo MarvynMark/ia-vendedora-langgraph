@@ -77,4 +77,13 @@ describe("montarMensagemNovoAluno", () => {
     expect(linhas).toHaveLength(5);
     expect(linhas[3]).toStartWith("CPF: ");
   });
+
+  test("renovação troca só o cabeçalho e mantém as 5 linhas", () => {
+    const linhas = montarMensagemNovoAluno({
+      nome: "Gabrielle", email: "g@b.com", telefone: "+5511984010030",
+      plano: "Mentoria Vestigium - Perito Criminal - Anual", renovacao: true,
+    }).split("\n");
+    expect(linhas[0]).toBe("🔁 RENOVAÇÃO MENTORIA: Gabrielle");
+    expect(linhas).toHaveLength(5);
+  });
 });

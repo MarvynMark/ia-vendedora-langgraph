@@ -35,7 +35,7 @@ describe("verificarRetomada", () => {
   test("antes do dia: não envia nada e reagenda o card para 10:05 do dia combinado", async () => {
     const s = state({});
     const r = await verificarRetomada(s, ANTES);
-    expect(r).toEqual({ tipoFollowup: "ignorar" });
+    expect(r).toEqual({ tipoFollowup: "ignorar", retomadaVencida: false });
     expect(rotaClassificacao({ ...s, ...r })).toBe("ignorar");
     expect(atualizarCalls).toEqual([{ taskId: 42, dados: { due_date: "2026-10-12T13:05:00.000Z" } }]);
   });
@@ -56,13 +56,27 @@ describe("verificarRetomada", () => {
   test("sem retomada no card: segue a cadência normal", async () => {
     const s = state({ description: "🟢 - Concurso: PCDF\n🔁 - Follow-ups: 2" });
     const r = await verificarRetomada(s, ANTES);
-    expect(r).toEqual({});
+    expect(r).toEqual({ retomadaVencida: false });
     expect(rotaClassificacao({ ...s, ...r })).toBe("agente_followup");
   });
 
   test("boas-vindas (Ganho) não é segurada pela retomada", async () => {
     const r = await verificarRetomada(state({ tipoFollowup: "boas_vindas" }), ANTES);
-    expect(r).toEqual({});
+    expect(r).toEqual({ retomadaVencida: false });
     expect(atualizarCalls).toHaveLength(0);
+  });
+
+  // Conv 9959: retomada à tarde deixou retomadaVencida=true no checkpoint; à noite o pagamento
+  // pediu boas-vindas na mesma thread e o aluno recebeu a retomada de novo.
+  test("boas-vindas apaga o retomadaVencida que sobrou no checkpoint", async () => {
+    const s = state({ tipoFollowup: "boas_vindas", board_step: { id: 9, name: "Ganho" }, retomadaVencida: true });
+    const r = await verificarRetomada(s, NO_DIA);
+    expect(rotaClassificacao({ ...s, ...r })).toBe("agente_boas_vindas");
+  });
+
+  test("follow-up sem retomada no card também apaga o true que sobrou", async () => {
+    const s = state({ description: "🟢 - Concurso: PCDF\n🔁 - Follow-ups: 2", retomadaVencida: true });
+    const r = await verificarRetomada(s, NO_DIA);
+    expect(rotaClassificacao({ ...s, ...r })).toBe("agente_followup");
   });
 });

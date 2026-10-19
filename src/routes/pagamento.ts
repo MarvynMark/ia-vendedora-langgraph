@@ -19,6 +19,7 @@ import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
+import { classificarCompra, descricaoAposCompra } from "../lib/renovacao.ts";
 import { encaminharPagamentoParaCentral } from "../lib/encaminhar-central.ts";
 
 
@@ -283,6 +284,7 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     title?: string;
     description?: string;
     due_date?: string;
+    step_changed_at?: string;
   };
 
   logger.info("pagamento", "Kanban task encontrada:", { taskId: task.id, boardId: task.board_id });
@@ -305,32 +307,35 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     return;
   }
 
-  // Proteção contra duplicata antecipada (antes de qualquer ação)
-  if ((task.description ?? "").includes("boas-vindas: enviado")) {
-    logger.info("pagamento", "Boas-vindas já enviadas anteriormente — ignorando");
+  // Compra nova × reenvio da mesma compra × renovação de quem já é aluno (lib/renovacao.ts).
+  const agora = new Date();
+  const tipoCompra = classificarCompra(task.description ?? "", agora, task.step_changed_at);
+  if (tipoCompra === "duplicada") {
+    logger.info("pagamento", "Boas-vindas já enviadas para esta compra — ignorando", { taskId: task.id });
     return;
   }
+  const renovacao = tipoCompra === "renovacao";
+  const plano = dados.nomeOferta || dados.nomeProduto;
+  // Descrição final, persistida no Kanban abaixo e usada no invoke do grafo de boas-vindas.
+  const descricaoAtual = descricaoAposCompra(task.description ?? "", plano, agora);
 
   // Mover card para "Ganho" e setar due_date para agora (disparo imediato).
   // "boas-vindas: enviado" é incluído aqui para chegar ao Chatwoot antes do
   // evento kanban_task_overdue, evitando race condition com o followup.ts.
+  // Renovação não mexe no due_date: o aluno não recebe as boas-vindas de novo.
   try {
     await atualizarKanbanTask(accountId, task.id, {
       board_step_id: etapaGanho.id,
-      due_date: new Date().toISOString(),
-      description: [
-        task.description ?? "",
-        `💳 - Plano: ${dados.nomeOferta || dados.nomeProduto}`,
-        "boas-vindas: enviado",
-      ].filter(Boolean).join("\n"),
+      ...(renovacao ? {} : { due_date: agora.toISOString() }),
+      description: descricaoAtual,
     });
-    logger.info("pagamento", "Card movido para Ganho. TaskId:", task.id);
+    logger.info("pagamento", renovacao ? "Renovação registrada no card. TaskId:" : "Card movido para Ganho. TaskId:", task.id);
   } catch (e) {
     logger.error("pagamento", "Erro ao mover card para Ganho:", e);
     return;
   }
 
-  // Notificar grupo de suporte sobre novo aluno.
+  // Notificar grupo de suporte sobre novo aluno (ou renovação).
   // Ordem importa: enviar primeiro (Baileys enfileira a msg), depois reabrir
   // (Baileys entrega as msgs pendentes ao reabrir). Inverter a ordem causa falha.
   try {
@@ -339,8 +344,9 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
       email: dados.email,
       telefone: dados.telefone,
       cpf: dados.cpf,
-      plano: dados.nomeOferta || dados.nomeProduto || "Mentoria Vestigium",
+      plano: plano || "Mentoria Vestigium",
       origem: dados.origem,
+      renovacao,
     });
     await enviarMensagem(
       accountId,
@@ -378,12 +384,8 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     logger.warn("pagamento", "Erro ao remover etiqueta agente-on:", e);
   }
 
-  // Descrição final (já persista no Kanban acima) — usada no invoke do grafo
-  const descricaoAtual = [
-    task.description ?? "",
-    `💳 - Plano: ${dados.nomeOferta || dados.nomeProduto}`,
-    "boas-vindas: enviado",
-  ].filter(Boolean).join("\n");
+  // Quem renovou já fez o onboarding: o grupo foi avisado e o time segue daqui.
+  if (renovacao) return;
 
   // Disparar grafo de follow-up com tipo boas_vindas diretamente (não depender do webhook overdue)
   const telefone = dados.telefone ?? contato.phone_number ?? contato.email ?? String(contato.id);
