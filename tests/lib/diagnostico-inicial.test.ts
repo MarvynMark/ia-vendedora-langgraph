@@ -4,8 +4,8 @@ import {
   nomeDoAluno,
   whatsappDoAluno,
   duracaoEstimada,
-  separarSaidaIA,
-  montarMensagemRoteiro,
+  separarBolhas,
+  montarCabecalhoMensagemDim,
 } from "../../src/lib/diagnostico-inicial.ts";
 
 describe("extrairRespostas", () => {
@@ -84,18 +84,28 @@ describe("saída", () => {
     expect(duracaoEstimada("uma duas")).toBe("0min01s");
   });
 
-  test("separa a linha do concurso e junta o roteiro num parágrafo", () => {
-    expect(separarSaidaIA("CONCURSO: PCI-SC\n\nAna, seja bem-vinda.\nBora.")).toEqual({
+  test("separa o concurso e as 3 bolhas pelo separador ---", () => {
+    expect(separarBolhas("CONCURSO: PCI-SC\nAna, seja bem-vinda!\n---\nSua formação...\n\nSegundo parágrafo.\n---\nBora! 🚀")).toEqual({
       concurso: "PCI-SC",
-      roteiro: "Ana, seja bem-vinda. Bora.",
+      bolhas: ["Ana, seja bem-vinda!", "Sua formação...\n\nSegundo parágrafo.", "Bora! 🚀"],
     });
-    expect(separarSaidaIA("Ana, seja bem-vinda.").concurso).toBe("NÃO INFORMADO");
   });
 
-  test("cabeçalho no formato do exemplo", () => {
-    const msg = montarMensagemRoteiro({ nome: "Ana Souza", concurso: "PF", whatsapp: null, roteiro: "Ana, bora." });
-    expect(msg).toBe(
-      "Roteiro de boas-vindas: Ana Souza\nConcurso prioritário: PF\nWhatsApp do aluno: não informado\nDuração estimada: 0min01s\n\nAna, bora.",
+  test("sem separador, cai nos parágrafos; sem concurso, NÃO INFORMADO", () => {
+    expect(separarBolhas("Ana, bem-vinda.\n\nDiagnóstico.\n\nBora.")).toEqual({
+      concurso: "NÃO INFORMADO",
+      bolhas: ["Ana, bem-vinda.", "Diagnóstico.", "Bora."],
+    });
+  });
+
+  test("nunca passa de 3 bolhas: o excedente vai para a última", () => {
+    const { bolhas } = separarBolhas("CONCURSO: PF\nUm\n---\nDois\n---\nTrês\n---\nQuatro");
+    expect(bolhas).toEqual(["Um", "Dois", "Três\n\nQuatro"]);
+  });
+
+  test("cabeçalho para o Walker", () => {
+    expect(montarCabecalhoMensagemDim({ nome: "Ana Souza", concurso: "PF", whatsapp: null })).toBe(
+      "📝 Mensagem do Diagnóstico Inicial: Ana Souza\nConcurso prioritário: PF\nWhatsApp do aluno: não informado\n\nRevise e envie ao aluno as 3 mensagens abaixo, na ordem.",
     );
   });
 });

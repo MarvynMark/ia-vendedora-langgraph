@@ -20,6 +20,7 @@ import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
 import { classificarCompra, descricaoAposCompra } from "../lib/renovacao.ts";
+import { enviarRoteiroVideoCompra } from "../services/roteiro-video-compra.ts";
 import { encaminharPagamentoParaCentral } from "../lib/encaminhar-central.ts";
 
 
@@ -361,6 +362,17 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
   } catch (e) {
     logger.warn("pagamento", "Falha ao reabrir conversa do grupo:", e);
+  }
+
+  // Roteiro do vídeo de boas-vindas para o Walker gravar, a partir da aplicação da mentoria.
+  // Em paralelo e sem await: a IA leva segundos e uma falha nela não pode travar as boas-vindas.
+  if (!renovacao) {
+    void enviarRoteiroVideoCompra({
+      nome: dados.nome ?? contato.name,
+      plano: plano || "Mentoria Vestigium",
+      telefone: dados.telefone ?? contato.phone_number,
+      email: dados.email ?? contato.email,
+    }).catch((e) => logger.error("pagamento", "Erro ao gerar/enviar roteiro de vídeo:", e));
   }
 
   // Adicionar etiqueta "mentoria" se produto for Mentoria Vestigium

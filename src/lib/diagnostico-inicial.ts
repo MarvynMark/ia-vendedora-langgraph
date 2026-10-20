@@ -1,6 +1,7 @@
-// Roteiro de áudio de boas-vindas a partir do formulário "Diagnóstico Inicial – Vestigium"
-// (Respondi). O webhook recebe as respostas, a IA escreve o roteiro e o texto vai pelo WhatsApp
-// para quem grava o áudio (o Walker; em teste, o Gusthavo).
+// Mensagem de texto de boas-vindas a partir do formulário "Diagnóstico Inicial – Vestigium"
+// (Respondi). O webhook recebe as respostas, a IA escreve a mensagem em 3 bolhas e elas vão pelo
+// WhatsApp para o Walker revisar e mandar ao aluno. Até 19/10/2026 era um roteiro de áudio; o
+// roteiro de VÍDEO agora sai na compra, a partir da aplicação (lib/roteiro-video-compra.ts).
 //
 // As perguntas NÃO são mapeadas uma a uma: o formulário tem 39 e é reescrito com frequência
 // (ver o histórico de CAMPO_PADROES em routes/aplicacao-mentoria.ts). Todas as respostas vão
@@ -105,39 +106,42 @@ export const AUTORIDADE_WALKER =
   "A Mentoria Vestigium é sustentada em pilares da Ciência da Aprendizagem. Eu já fui aprovado em seis concursos e sei bem o caminho para a aprovação. Já aprovamos centenas de alunos para Perito Criminal e temos aprovados em todos os concursos de perito do Brasil.";
 export const BORDAO_WALKER = "Pode confiar, vamos trabalhar juntos que vai dar certo.";
 
-export const PROMPT_ROTEIRO = `Você é o assistente do Perito Walker, Perito Criminal e fundador da Mentoria Vestigium. Sua tarefa é escrever um ROTEIRO DE ÁUDIO de boas-vindas que o Walker vai gravar e enviar pelo WhatsApp para um novo aluno, com base nas respostas do formulário de diagnóstico.
+export const PROMPT_MENSAGEM_DIM = `Você é o assistente do Perito Walker, Perito Criminal e fundador da Mentoria Vestigium. Sua tarefa é escrever a MENSAGEM DE TEXTO de boas-vindas que o Walker vai revisar e enviar pelo WhatsApp para um novo aluno, com base nas respostas do formulário de diagnóstico. A mensagem sai em TRÊS bolhas (três mensagens seguidas no WhatsApp).
 
 Você vai receber TODAS as respostas do formulário no formato "pergunta: resposta". Use só estas informações: nome, formação, concursos que pensa em prestar e o edital escolhido para o planejamento individualizado (o prioritário), o que mais atrapalha a constância, disciplinas com facilidade e com dificuldade, tempo de estudo, como revisa o conteúdo, o propósito/motivo para ser aprovado, como organiza os estudos e o desempenho em simulados. Ignore o resto.
 
 ## FORMATO DE SAÍDA (exatamente assim, nada antes nem depois)
 CONCURSO: [concurso prioritário padronizado em MAIÚSCULAS, ex.: PCI-SC, PF, POLITEC-MT; se não houver, NÃO INFORMADO]
+[bolha 1]
+---
+[bolha 2]
+---
+[bolha 3]
 
-[roteiro em um único parágrafo]
+## CONTEÚDO DE CADA BOLHA
+BOLHA 1 — ACOLHIDA E PROPÓSITO:
+- Comece com "[Primeiro nome], seja bem-vindo(a) à Mentoria Vestigium!" com o gênero correto conforme o nome. Diga que este número é pessoal e exclusivo da Mentoria e que qualquer dúvida pode ser trazida direto por aqui.
+- Retome o motivo que o aluno escreveu, parafraseado na 2ª pessoa ("Você me contou que busca..."). Não copie literalmente, não corrija e não exagere. Valide em uma frase: é um motivo forte e legítimo, que vai mantê-lo(a) firme quando a motivação estiver baixa.
 
-## ESTRUTURA DO ROTEIRO (nesta ordem, um único parágrafo corrido)
-1. ABERTURA: "[Primeiro nome], seja bem-vindo(a) à Mentoria Vestigium." Em seguida, avise que este número é pessoal e exclusivo da Mentoria e que qualquer dúvida pode ser trazida direto por aqui. Use o gênero correto conforme o nome.
-
-2. PROPÓSITO: Retome o motivo que o aluno escreveu, parafraseado na 2ª pessoa ("Você mencionou que busca..."). Não copie literalmente, não corrija e não exagere. Feche validando em uma frase: é um motivo forte e legítimo, que vai mantê-lo(a) firme quando a motivação estiver baixa.
-
-3. PERFIL ACADÊMICO: Conecte a formação às disciplinas de facilidade e trate-as como um ativo ("...é um ativo poderoso"). Se a formação tiver relação direta com a área pericial (Farmácia, Química, Biologia, Medicina, Odontologia, Engenharias, Física, TI), destaque essa vantagem. Depois cite as disciplinas de dificuldade como "áreas que vamos trabalhar com foco e técnica". Agrupe matérias quando fizer sentido (ex.: "os Direitos").
-
-4. DIAGNÓSTICO DA REVISÃO (o centro do roteiro): Comente o método de revisão que o aluno informou e ligue-o diretamente ao obstáculo de constância que ele marcou. Seja honesto, mas nunca julgador. Use a lógica abaixo:
+BOLHA 2 — DIAGNÓSTICO:
+- Conecte a formação às disciplinas de facilidade e trate-as como um ativo. Se a formação tiver relação direta com a área pericial (Farmácia, Química, Biologia, Medicina, Odontologia, Engenharias, Física, TI), destaque essa vantagem. Cite as disciplinas de dificuldade como "áreas que vamos trabalhar com foco e técnica". Agrupe matérias quando fizer sentido (ex.: "os Direitos").
+- Comente o método de revisão que o aluno informou e ligue-o ao obstáculo de constância que ele marcou. Seja honesto, mas nunca julgador:
    - Releio o PDF / Assisto à aula novamente: dá falsa sensação de domínio, mas não fixa o conteúdo.
-   - Releio ou assisto e depois faço questões: o caminho é bom, mas reler antes de testar consome tempo e mascara o que de fato ainda não foi aprendido.
+   - Releio ou assisto e depois faço questões: o caminho é bom, mas reler antes de testar consome tempo e mascara o que ainda não foi aprendido.
    - Vou direto para questões: ótimo instinto, porque testar é a forma mais eficiente de aprender. Falta só organizar os intervalos.
    - Questões e flashcards: excelente base. Agora é colocar isso dentro de um cronograma de revisões espaçadas.
    - Não sei revisar: normalize ("a maioria nunca aprendeu a revisar") e diga que isso é exatamente o que a mentoria vai ensinar.
    Ligue ao obstáculo: ansiedade/insegurança → "isso pode alimentar sua ansiedade"; esquecimento rápido → "é exatamente por isso que o conteúdo escapa"; falta de tempo → "você gasta o pouco tempo que tem no que menos retém"; procrastinação/falta de motivação/concentração → "sem ver evolução, a motivação cai"; um misto → combine os dois efeitos principais.
-   Feche com a solução: "Vamos estruturar sua revisão com intervalos planejados para transformar esse conhecimento em memória de longo prazo e dar regularidade ao seu aprendizado."
+- Feche com a solução: vamos estruturar sua revisão com intervalos planejados para transformar o conteúdo em memória de longo prazo e dar regularidade ao seu estudo.
 
-5. AUTORIDADE (texto fixo, copie exatamente): "${AUTORIDADE_WALKER}"
-
-6. FECHAMENTO (texto fixo, copie exatamente): "${BORDAO_WALKER} Você agora faz parte da família Vestigium. Bora."
+BOLHA 3 — AUTORIDADE E FECHAMENTO:
+- Texto fixo, copie exatamente: "${AUTORIDADE_WALKER}"
+- Termine com o texto fixo, copie exatamente: "${BORDAO_WALKER} Você agora faz parte da família Vestigium. Bora! 🚀"
 
 ## REGRAS DE ESTILO
-- Escrito para ser FALADO: frases curtas e diretas, tom de mentor próximo, firme e acolhedor. Use "você" e "pra".
-- Entre 170 e 210 palavras no roteiro, para dar cerca de 1 minuto e 15 segundos de áudio.
-- Um único parágrafo, sem tópicos, emojis, hashtags, aspas ou abreviações difíceis de ler em voz alta (escreva "Raciocínio Lógico", não "RLM").
+- Escrito para ser LIDO no WhatsApp, na voz do Walker em primeira pessoa: tom de mentor próximo, firme e acolhedor. Use "você" e "pra".
+- Cada bolha com 40 a 90 palavras (NUNCA mais de 90), em 1 ou 2 parágrafos curtos. Na bolha 2, escolha o essencial: uma frase para a formação e as matérias, o resto para a revisão.
+- No máximo um emoji por bolha (o da bolha 3 já está no texto fixo). Sem tópicos, hashtags, negrito ou markdown.
 - Use só o primeiro nome do aluno, e apenas uma vez, na abertura.
 - NÃO mencione idade, filhos, rotina de trabalho, sono, estresse nem dados pessoais sensíveis. NÃO invente informações que o aluno não deu.
 - Se uma informação não veio ou não faz sentido, pule o trecho correspondente sem comentar a ausência.
@@ -147,27 +151,32 @@ export function montarEntradaIA(respostas: Respostas): string {
   return respostas.map(r => `${r.pergunta}: ${r.resposta}`).join("\n");
 }
 
-/** Separa a linha "CONCURSO: X" do roteiro devolvido pela IA. */
-export function separarSaidaIA(texto: string): { concurso: string; roteiro: string } {
+/**
+ * Separa a linha "CONCURSO: X" e as bolhas (divididas por uma linha "---"). Se a IA não usar o
+ * separador, cai nos parágrafos; bolhas a mais são juntadas na última, para nunca passar de 3.
+ */
+export function separarBolhas(texto: string): { concurso: string; bolhas: string[] } {
   const limpo = texto.trim();
   const m = limpo.match(/^CONCURSO:\s*(.+)$/im);
   const concurso = m?.[1]?.trim() || "NÃO INFORMADO";
-  const roteiro = (m ? limpo.replace(m[0], "") : limpo).trim().replace(/\s*\n+\s*/g, " ");
-  return { concurso, roteiro };
+  const corpo = (m ? limpo.replace(m[0], "") : limpo).trim();
+  let bolhas = corpo.split(/^\s*-{3,}\s*$/m).map(b => b.trim()).filter(Boolean);
+  if (bolhas.length === 1) bolhas = corpo.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  if (bolhas.length > 3) bolhas = [...bolhas.slice(0, 2), bolhas.slice(2).join("\n\n")];
+  return { concurso, bolhas };
 }
 
-export function montarMensagemRoteiro(opts: {
+/** Primeira mensagem para o Walker: quem é o aluno. As bolhas vão logo depois, uma por mensagem. */
+export function montarCabecalhoMensagemDim(opts: {
   nome: string;
   concurso: string;
   whatsapp: string | null;
-  roteiro: string;
 }): string {
   return [
-    `Roteiro de boas-vindas: ${opts.nome}`,
+    `📝 Mensagem do Diagnóstico Inicial: ${opts.nome}`,
     `Concurso prioritário: ${opts.concurso}`,
     `WhatsApp do aluno: ${opts.whatsapp ?? "não informado"}`,
-    `Duração estimada: ${duracaoEstimada(opts.roteiro)}`,
     "",
-    opts.roteiro,
+    "Revise e envie ao aluno as 3 mensagens abaixo, na ordem.",
   ].join("\n");
 }

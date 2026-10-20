@@ -164,3 +164,68 @@ export async function listarAplicacoes(inicio: Date, fim: Date): Promise<Aplicac
     criadoEm: r.criado_em,
   }));
 }
+
+/** Respostas da aplicação da mentoria que entram no roteiro de vídeo da compra. */
+export interface AplicacaoAluno {
+  concurso: string | null;
+  formacao: string | null;
+  nivel: string | null;
+  jaFoiAluno: string | null;
+  maiorDificuldade: string | null;
+  motivo: string | null;
+  expectativa: string | null;
+  oQueFaltou: string | null;
+  diferencaComMentor: string | null;
+  criadoEm: Date;
+}
+
+/**
+ * Aplicação mais recente do comprador: pelos últimos 8 dígitos do WhatsApp (mesmo match de
+ * buscarDadosFormulario) e, se não achar, pelo e-mail — o checkout às vezes tem outro telefone.
+ * Ficam de fora idade, plano B e as perguntas de investimento: não entram num vídeo de boas-vindas.
+ */
+export async function buscarAplicacaoAluno(telefone?: string, email?: string): Promise<AplicacaoAluno | null> {
+  const ultimos8 = (telefone ?? "").replace(/\D/g, "").slice(-8);
+  const emailLimpo = (email ?? "").trim().toLowerCase();
+  if (ultimos8.length < 8 && !emailLimpo) return null;
+  try {
+    const result = await pool.query<{
+      concurso_desejado: string | null;
+      area_graduacao: string | null;
+      nivel_concurseiro: string | null;
+      ja_foi_aluno: string | null;
+      maior_dificuldade: string | null;
+      motivo_mentoria: string | null;
+      expectativa_mentoria: string | null;
+      o_que_faltou: string | null;
+      diferenca_com_mentor: string | null;
+      criado_em: Date;
+    }>(
+      `SELECT concurso_desejado, area_graduacao, nivel_concurseiro, ja_foi_aluno, maior_dificuldade,
+              motivo_mentoria, expectativa_mentoria, o_que_faltou, diferenca_com_mentor, criado_em
+       FROM leads_formulario_mentoria
+       WHERE ($1 <> '' AND RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) = $1)
+          OR ($2 <> '' AND LOWER(TRIM(email)) = $2)
+       ORDER BY (RIGHT(REGEXP_REPLACE(whatsapp, '\\D', '', 'g'), 8) = $1) DESC, criado_em DESC
+       LIMIT 1`,
+      [ultimos8.length === 8 ? ultimos8 : "", emailLimpo],
+    );
+    const d = result.rows[0];
+    if (!d) return null;
+    return {
+      concurso: d.concurso_desejado,
+      formacao: d.area_graduacao,
+      nivel: d.nivel_concurseiro,
+      jaFoiAluno: d.ja_foi_aluno,
+      maiorDificuldade: d.maior_dificuldade,
+      motivo: d.motivo_mentoria,
+      expectativa: d.expectativa_mentoria,
+      oQueFaltou: d.o_que_faltou,
+      diferencaComMentor: d.diferenca_com_mentor,
+      criadoEm: d.criado_em,
+    };
+  } catch (e) {
+    logger.warn("db-formulario", "Erro ao buscar aplicação do aluno:", e);
+    return null;
+  }
+}
