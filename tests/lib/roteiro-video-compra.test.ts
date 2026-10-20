@@ -68,3 +68,18 @@ describe("saída", () => {
     expect(msg).toContain("WhatsApp do aluno: (não informado)");
   });
 });
+
+describe("respostas obrigatórias", () => {
+  test("o prompt exige primeiro passo, dificuldade e expectativa, cada uma no seu trecho", () => {
+    expect(PROMPT_ROTEIRO_VIDEO).toContain('"O que te fez dar o primeiro passo (motivo)" → item 2');
+    expect(PROMPT_ROTEIRO_VIDEO).toContain('"Maior dificuldade" → item 3');
+    expect(PROMPT_ROTEIRO_VIDEO).toContain('"O que espera da mentoria" → item 4');
+  });
+
+  test("os rótulos da entrada batem com os que o prompt cita", () => {
+    const entrada = montarEntradaVideo({ nome: "Yan", plano: "6 meses", aplicacao: APLICACAO });
+    expect(entrada).toContain("O que te fez dar o primeiro passo (motivo): ");
+    expect(entrada).toContain("Maior dificuldade: ");
+    expect(entrada).toContain("O que espera da mentoria: ");
+  });
+});

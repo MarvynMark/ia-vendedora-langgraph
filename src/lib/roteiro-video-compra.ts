@@ -19,25 +19,34 @@ CONCURSO: [concurso desejado padronizado em MAIÚSCULAS, ex.: PCI-SC, PF, POLITE
 
 [roteiro em um único parágrafo]
 
+## O QUE O ROTEIRO PRECISA USAR
+O vídeo tem de soar feito SÓ pra este aluno. Quando vierem na aplicação, estas três respostas são OBRIGATÓRIAS, cada uma com seu próprio trecho, citando o conteúdo concreto do que ele(a) escreveu (parafraseado, sem copiar literalmente, sem corrigir e sem exagerar):
+- "O que te fez dar o primeiro passo (motivo)" → item 2.
+- "Maior dificuldade" → item 3.
+- "O que espera da mentoria" → item 4.
+Use também, quando vierem e couberem: concurso desejado, formação, nível de concurseiro, o que faltou para a aprovação até aqui, o que seria diferente com um mentor e se já foi aluno da Vestigium (se já foi, trate como um retorno: "que bom ter você de volta").
+
 ## ESTRUTURA DO ROTEIRO (nesta ordem, um único parágrafo corrido)
 1. ABERTURA: "[Primeiro nome], seja bem-vindo(a) à Mentoria Vestigium!" com o gênero correto conforme o nome. Diga, em uma frase, que gravou este vídeo especialmente pra ele(a).
 
-2. OBJETIVO: Cite o concurso que ele(a) quer e retome o motivo da mentoria, parafraseado na 2ª pessoa ("Você me contou na sua aplicação que..."). Não copie literalmente, não corrija e não exagere.
+2. PRIMEIRO PASSO E OBJETIVO: Cite o concurso que ele(a) quer e retome o que o(a) fez dar o primeiro passo, na 2ª pessoa ("Você me contou na sua aplicação que..."). Valide em uma frase curta.
 
-3. O QUE VAMOS RESOLVER: Pegue a maior dificuldade e, se houver, o que faltou para a aprovação até aqui. Mostre, sem julgar, que é exatamente isso que a mentoria trabalha: planejamento individualizado, acompanhamento de perto e revisões organizadas. Se ele(a) disse o que espera do mentor ou o que seria diferente com um mentor, conecte em uma frase. Se a formação tiver relação direta com a área pericial (Farmácia, Química, Biologia, Medicina, Odontologia, Engenharias, Física, TI), destaque como vantagem.
+3. DIFICULDADE: Retome a maior dificuldade com as palavras do aluno e, se houver, o que faltou para a aprovação até aqui. Mostre, sem julgar, como a mentoria ataca exatamente isso (planejamento individualizado, acompanhamento de perto, revisões organizadas — escolha o que se aplica, não liste tudo). Se a formação tiver relação direta com a área pericial (Farmácia, Química, Biologia, Medicina, Odontologia, Engenharias, Física, TI), destaque como vantagem em meia frase.
 
-4. PRÓXIMO PASSO: Peça que ele(a) preencha hoje o Diagnóstico Inicial, que está na página de primeiros passos, porque é com ele que o planejamento individualizado é montado.
+4. EXPECTATIVA: Retome o que ele(a) espera da mentoria (e, se houver, o que seria diferente com um mentor) e responda como um compromisso seu, do Walker, sem prometer aprovação ("É isso que eu vou fazer com você: ...").
 
-5. AUTORIDADE (texto fixo, copie exatamente): "${AUTORIDADE_WALKER}"
+5. PRÓXIMO PASSO: Peça que ele(a) preencha hoje o Diagnóstico Inicial, que está na página de primeiros passos, porque é com ele que o planejamento individualizado é montado.
 
-6. FECHAMENTO (texto fixo, copie exatamente): "${BORDAO_WALKER} Você agora faz parte da família Vestigium. Bora."
+6. AUTORIDADE (texto fixo, copie exatamente): "${AUTORIDADE_WALKER}"
+
+7. FECHAMENTO (texto fixo, copie exatamente): "${BORDAO_WALKER} Você agora faz parte da família Vestigium. Bora."
 
 ## VERSÃO SEM APLICAÇÃO
-Use só os itens 1, 4, 5 e 6, entre 80 e 110 palavras. Não diga que a aplicação está faltando e não invente objetivo nem dificuldade.
+Use só os itens 1, 5, 6 e 7, entre 80 e 110 palavras. Não diga que a aplicação está faltando e não invente objetivo, dificuldade nem expectativa.
 
 ## REGRAS DE ESTILO
 - Escrito para ser FALADO em vídeo: frases curtas e diretas, tom de mentor próximo, firme e acolhedor. Use "você" e "pra".
-- Com aplicação: entre 130 e 170 palavras (NUNCA mais de 170), para dar cerca de 1 minuto de vídeo. Os textos fixos dos itens 5 e 6 já ocupam umas 60 palavras: seja enxuto nos itens 2 e 3.
+- Com aplicação: entre 200 e 240 palavras (NUNCA mais de 250), para dar cerca de 1min30 de vídeo. Os textos fixos dos itens 6 e 7 já ocupam umas 60 palavras: gaste o resto nos itens 2, 3 e 4, que são o que torna o vídeo pessoal.
 - Um único parágrafo, sem tópicos, emojis, hashtags, aspas ou abreviações difíceis de ler em voz alta (escreva "Raciocínio Lógico", não "RLM").
 - Use só o primeiro nome do aluno, e apenas uma vez, na abertura.
 - NÃO mencione o valor pago, idade nem dados pessoais sensíveis. NÃO invente informações que o aluno não deu e NÃO prometa aprovação.
