@@ -35,6 +35,10 @@ const MEMORIA = "[convite enviado] Convite do encontro ao vivo \"Próximos concu
   "quarta 21/10 às 21h30 no YouTube, com o Walker e a médica legista Natália Basan. " +
   "Link da live: https://www.youtube.com/watch?v=yyRL-WCCrG0";
 
+// Preferência: o template com a arte "AO VIVO" e o botão Confirmar (respondido pelo webhook com o link).
+// Se ele ainda não estiver aprovado e sincronizado no Chatwoot, vai o de texto com o link no corpo.
+const TEMPLATE_AOVIVO_IMG = "encontro_legista_aovivo_2110";
+const IMAGEM_AOVIVO = "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBM3JEQVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--332f37abad3d48190253eab337a6d3204960aadd/encontro_legista_aovivo_2110.jpg";
 const TEMPLATE_AOVIVO = "encontro_legista_aovivo";
 const TEXTO_AOVIVO = "🔴 *ESTAMOS AO VIVO!*\n\nO encontro *Próximos concursos de Médico Legista e tira-dúvidas*, com o Walker e a médica legista Natália Basan, já começou.\n\nEntra agora e manda sua dúvida no chat 👇\nhttps://www.youtube.com/watch?v=yyRL-WCCrG0";
 
@@ -180,7 +184,21 @@ async function verificar() {
 
 // Quem abriu o convite (status "read" na Meta) recebe o aviso de que a live começou.
 // Sem texto livre: às 21h30 a maioria está fora da janela de 24h, então vai o template.
+async function templateAprovado(nome: string): Promise<boolean> {
+  const res = await fetchComTimeout(`${env.CHATWOOT_BASE_URL}/api/v1/accounts/${ACC}/inboxes/${INBOX}`, {
+    headers: { api_access_token: env.CHATWOOT_API_TOKEN },
+  });
+  const inbox = (await res.json()) as { message_templates?: Array<{ name: string; status: string }> };
+  return (inbox.message_templates ?? []).some((t) => t.name === nome && t.status.toUpperCase() === "APPROVED");
+}
+
 async function aovivo(valendo: boolean) {
+  const comImagem = await templateAprovado(TEMPLATE_AOVIVO_IMG);
+  const templateParams = comImagem
+    ? { name: TEMPLATE_AOVIVO_IMG, category: "UTILITY", language: "pt_BR", processed_params: { body: {}, header: { media_url: IMAGEM_AOVIVO, media_type: "image" } } }
+    : { name: TEMPLATE_AOVIVO, category: "MARKETING", language: "pt_BR", processed_params: {} };
+  const conteudo = comImagem ? TEXTO : TEXTO_AOVIVO;
+  console.log(`Template: ${templateParams.name}`);
   const enviados = await jaEnviados();
   const f = Bun.file(LEDGER_AOVIVO);
   const jaAvisados = new Set((await f.exists()) ? (await f.text()).split("\n").filter(Boolean).map((l) => l.split("\t")[0]) : []);
@@ -199,8 +217,7 @@ async function aovivo(valendo: boolean) {
         method: "POST",
         headers: { api_access_token: env.CHATWOOT_API_TOKEN, "content-type": "application/json" },
         body: JSON.stringify({
-          message_type: "outgoing", content_type: "text", content: TEXTO_AOVIVO,
-          template_params: { name: TEMPLATE_AOVIVO, category: "MARKETING", language: "pt_BR", processed_params: {} },
+          message_type: "outgoing", content_type: "text", content: conteudo, template_params: templateParams,
         }),
       });
       if (!res.ok) throw new Error(`Chatwoot ${res.status}: ${(await res.text()).slice(0, 200)}`);

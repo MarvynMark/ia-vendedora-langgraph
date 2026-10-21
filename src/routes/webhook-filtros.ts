@@ -104,6 +104,11 @@ export const CONVITES_EVENTO: Record<string, string> = {
     "🎙️ Walker Duarte (perito criminal) e Natália Basan (médica legista)\n\n" +
     "O link é este 👇🏻\nhttps://www.youtube.com/watch?v=yyRL-WCCrG0\n\n" +
     "Entra agora e toca no sininho para o YouTube te avisar quando começar.",
+  encontro_legista_aovivo_2110:
+    "🔴 *Estamos AO VIVO agora!*\n\n" +
+    "*Próximos concursos de Médico Legista e tira-dúvidas*\n" +
+    "🎙️ Walker Duarte (perito criminal) e Natália Basan (médica legista)\n\n" +
+    "Entra por aqui e manda sua dúvida no chat 👇🏻\nhttps://www.youtube.com/watch?v=yyRL-WCCrG0",
 };
 
 const JANELA_CONVITE_SEG = 4 * 86_400;
