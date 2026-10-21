@@ -5,6 +5,7 @@
 //   bun run src/scripts/disparo-encontro-legista.ts teste <idConversa>         # manda o template para uma conversa
 //   bun run src/scripts/disparo-encontro-legista.ts enviar [--limite N] [--enviar]
 //   bun run src/scripts/disparo-encontro-legista.ts verificar                  # status de entrega na Meta
+//   bun run src/scripts/disparo-encontro-legista.ts aovivo [--enviar]          # "estamos ao vivo" para quem LEU o convite
 //
 // Template `encontro_legista_2110` (UTILITY, imagem + botões Confirmar / Parar mensagens). Quem toca
 // "Confirmar" recebe o link pelo webhook (respostaConfirmacaoEvento em routes/webhook-filtros.ts).
@@ -24,6 +25,7 @@ const ACC = env.CHATWOOT_ACCOUNT_ID;
 const INBOX = Number(env.CHATWOOT_INBOX_ID);
 const LISTA = "output/disparo-encontro-legista-2110.json";
 const LEDGER = "output/disparo-encontro-legista-enviados.tsv";
+const LEDGER_AOVIVO = "output/disparo-encontro-legista-aovivo.tsv";
 
 const TEMPLATE = "encontro_legista_2110";
 const TEXTO = "AVISO IMPORTANTE\n\nSeu pedido de acesso o evento online, foi recebido com sucesso.\n\nToque em confirmar 👇🏻";
@@ -32,6 +34,9 @@ const IMAGEM = "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfc
 const MEMORIA = "[convite enviado] Convite do encontro ao vivo \"Próximos concursos de Médico Legista e tira-dúvidas\", " +
   "quarta 21/10 às 21h30 no YouTube, com o Walker e a médica legista Natália Basan. " +
   "Link da live: https://www.youtube.com/watch?v=yyRL-WCCrG0";
+
+const TEMPLATE_AOVIVO = "encontro_legista_aovivo";
+const TEXTO_AOVIVO = "🔴 *ESTAMOS AO VIVO!*\n\nO encontro *Próximos concursos de Médico Legista e tira-dúvidas*, com o Walker e a médica legista Natália Basan, já começou.\n\nEntra agora e manda sua dúvida no chat 👇\nhttps://www.youtube.com/watch?v=yyRL-WCCrG0";
 
 interface Alvo {
   nome: string; whatsapp: string; formacao: string; aplicou: string;
@@ -173,6 +178,45 @@ async function verificar() {
   console.log(JSON.stringify(status));
 }
 
+// Quem abriu o convite (status "read" na Meta) recebe o aviso de que a live começou.
+// Sem texto livre: às 21h30 a maioria está fora da janela de 24h, então vai o template.
+async function aovivo(valendo: boolean) {
+  const enviados = await jaEnviados();
+  const f = Bun.file(LEDGER_AOVIVO);
+  const jaAvisados = new Set((await f.exists()) ? (await f.text()).split("\n").filter(Boolean).map((l) => l.split("\t")[0]) : []);
+  const status: Record<string, number> = {};
+  let ok = 0, falhas = 0;
+  for (const [tel, resto] of enviados) {
+    if (jaAvisados.has(tel)) continue;
+    const [convId, msgId] = resto.split("\t");
+    const msgs = ((await listarMensagens(ACC, convId!)) as any).payload ?? [];
+    const s = msgs.find((x: any) => String(x.id) === msgId)?.status ?? "não encontrada";
+    status[s] = (status[s] ?? 0) + 1;
+    if (s !== "read") continue;
+    if (!valendo) { ok++; continue; }
+    try {
+      const res = await fetchComTimeout(`${env.CHATWOOT_BASE_URL}/api/v1/accounts/${ACC}/conversations/${convId}/messages`, {
+        method: "POST",
+        headers: { api_access_token: env.CHATWOOT_API_TOKEN, "content-type": "application/json" },
+        body: JSON.stringify({
+          message_type: "outgoing", content_type: "text", content: TEXTO_AOVIVO,
+          template_params: { name: TEMPLATE_AOVIVO, category: "MARKETING", language: "pt_BR", processed_params: {} },
+        }),
+      });
+      if (!res.ok) throw new Error(`Chatwoot ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const id = ((await res.json()) as { id: number }).id;
+      await appendFile(LEDGER_AOVIVO, `${tel}\t${convId}\t${id}\n`);
+      ok++;
+      console.log(`✓ ${tel} conv ${convId}`);
+    } catch (e) {
+      falhas++;
+      console.log(`✗ ${tel} conv ${convId}: ${(e as Error).message.slice(0, 160)}`);
+    }
+  }
+  console.log(`Status do convite: ${JSON.stringify(status)}`);
+  console.log(valendo ? `${ok} avisados, ${falhas} falhas` : `Dry-run: ${ok} leram e receberiam. Use --enviar.`);
+}
+
 const [cmd, arg, ...flags] = process.argv.slice(2);
 if (cmd === "montar") {
   await montar();
@@ -182,7 +226,9 @@ if (cmd === "montar") {
   const todos = [arg, ...flags].filter(Boolean) as string[];
   const i = todos.indexOf("--limite");
   await enviar(i >= 0 ? Number(todos[i + 1]) : Infinity, todos.includes("--enviar"));
+} else if (cmd === "aovivo") {
+  await aovivo(arg === "--enviar");
 } else if (cmd === "verificar") {
   await verificar();
-} else console.log("uso: montar | teste <idConversa> | enviar [--limite N] [--enviar] | verificar");
+} else console.log("uso: montar | teste <idConversa> | enviar [--limite N] [--enviar] | verificar | aovivo [--enviar]");
 await pool.end();
