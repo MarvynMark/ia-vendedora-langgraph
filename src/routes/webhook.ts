@@ -5,7 +5,7 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
-import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico } from "./webhook-filtros.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento } from "./webhook-filtros.ts";
 import { ehMedicoLead } from "../lib/medico.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
@@ -172,6 +172,27 @@ export const webhookRouter = new Elysia()
       conversation_id: parsed.data.conversation.id,
       sender: parsed.data.sender.name,
     });
+
+    // Botão "Confirmar" de convite de evento: manda o link da live, com ou sem "agente-on".
+    // Só consulta o Chatwoot quando a mensagem é exatamente "Confirmar".
+    if (/^confirmar$/i.test(content.trim())) {
+      const idConta = parsed.data.account.id.toString();
+      const idConversa = parsed.data.conversation.id.toString();
+      const msgs = await listarMensagens(idConta, idConversa) as { payload?: Parameters<typeof respostaConfirmacaoEvento>[1] };
+      const resposta = respostaConfirmacaoEvento(content, msgs.payload ?? [], Date.now() / 1000);
+      if (resposta) {
+        await enviarMensagem(idConta, idConversa, resposta);
+        const telefone = parsed.data.sender.phone_number ?? "";
+        if (telefone) {
+          await salvarMensagemSeNova(telefone, {
+            type: "ai", content: resposta, tool_calls: [], invalid_tool_calls: [], response_metadata: {},
+            additional_kwargs: { origem: "confirmacao_evento" },
+          });
+        }
+        logger.info("webhook", "Confirmação de evento: link enviado", { conversa: idConversa });
+        return { status: "ok", action: "confirmacao_evento" };
+      }
+    }
 
     // Corretor de discursivas do Suporte 1: antes de qualquer automação de venda. Só age em
     // comando "/..." ou com o modo correção aberto; o resto segue o caminho normal.

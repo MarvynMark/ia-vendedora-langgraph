@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico } from "../../src/routes/webhook-filtros.ts";
+import { pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, CONVITES_EVENTO } from "../../src/routes/webhook-filtros.ts";
 
 // Conv 6890: a lead contou que tinha visto um vídeo "que você mandou no grupo de espera" e recebeu,
 // um segundo depois, o convite pra entrar no grupo — onde ela já estava, e acabara de provar.
@@ -58,5 +58,27 @@ describe("grupo de espera: médicos vs geral", () => {
     expect(mensagemEhDeMedico("estudo medicina legal, quero entrar no grupo")).toBe(false);
     expect(mensagemEhDeMedico("sou biomédico, quero entrar no grupo")).toBe(false);
     expect(mensagemEhDeMedico("sou médico veterinário, quero entrar no grupo")).toBe(false);
+  });
+});
+
+describe("respostaConfirmacaoEvento", () => {
+  const agora = 2_000_000_000;
+  const convite = { message_type: 1, content: "AVISO IMPORTANTE", created_at: agora - 3600, additional_attributes: { template_params: { name: "encontro_legista_2110" } } };
+
+  test("Confirmar depois do convite devolve o link", () => {
+    const r = respostaConfirmacaoEvento(" confirmar ", [convite], agora);
+    expect(r).toContain("https://www.youtube.com/watch?v=yyRL-WCCrG0");
+  });
+
+  test("outra mensagem, ou Confirmar sem convite, não dispara", () => {
+    expect(respostaConfirmacaoEvento("Confirmar presença amanhã", [convite], agora)).toBeNull();
+    expect(respostaConfirmacaoEvento("Confirmar", [{ ...convite, additional_attributes: { template_params: { name: "encontro_pcmg_2110" } } }], agora)).toBeNull();
+    expect(respostaConfirmacaoEvento("Confirmar", [{ message_type: 1, content: "oi", created_at: agora }], agora)).toBeNull();
+  });
+
+  test("responde uma vez só e não responde convite velho", () => {
+    const link = { message_type: 1, content: CONVITES_EVENTO.encontro_legista_2110!, created_at: agora - 60 };
+    expect(respostaConfirmacaoEvento("Confirmar", [convite, link], agora)).toBeNull();
+    expect(respostaConfirmacaoEvento("Confirmar", [{ ...convite, created_at: agora - 5 * 86_400 }], agora)).toBeNull();
   });
 });

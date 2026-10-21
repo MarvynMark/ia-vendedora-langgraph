@@ -88,3 +88,54 @@ export function mensagemGrupoDeEspera(
     ? `Clique no link abaixo para entrar no grupo de espera de médicos:\n\n${links.medicos}`
     : `Clique no link abaixo para entrar no grupo de espera:\n\n${links.geral}`;
 }
+
+// --- Convite de evento: botão "Confirmar" do template ---
+//
+// O template do convite (imagem + "Toque em confirmar 👇🏻") tem um botão de resposta rápida.
+// Quem toca manda só a palavra "Confirmar", e o link da live tem que chegar mesmo que a conversa
+// esteja sem "agente-on" (a maioria dos leads do disparo não tem) — por isso a resposta é fixa,
+// decidida aqui, e não pela IA. Cada template de convite aponta para a sua mensagem com o link.
+
+export const CONVITES_EVENTO: Record<string, string> = {
+  encontro_legista_2110:
+    "Presença confirmada! ✅\n\n" +
+    "*Próximos concursos de Médico Legista e tira-dúvidas*\n" +
+    "📅 Quarta-feira, 21/10, às 21h30, ao vivo no YouTube\n" +
+    "🎙️ Walker Duarte (perito criminal) e Natália Basan (médica legista)\n\n" +
+    "O link é este 👇🏻\nhttps://www.youtube.com/watch?v=yyRL-WCCrG0\n\n" +
+    "Entra agora e toca no sininho para o YouTube te avisar quando começar.",
+};
+
+const JANELA_CONVITE_SEG = 4 * 86_400;
+
+interface MensagemConversa {
+  message_type: number;
+  content?: string | null;
+  created_at?: number;
+  additional_attributes?: { template_params?: { name?: string } } | null;
+}
+
+/**
+ * O lead tocou "Confirmar" num convite de evento que recebeu nos últimos 4 dias? Devolve a
+ * mensagem com o link, ou null. Responde uma vez só: se o link já saiu depois do convite, null.
+ */
+export function respostaConfirmacaoEvento(
+  content: string,
+  mensagens: MensagemConversa[],
+  agoraSeg: number,
+): string | null {
+  if (!/^confirmar$/i.test((content ?? "").trim())) return null;
+  const saidas = mensagens
+    .filter((m) => m.message_type === 1)
+    .sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
+  for (let i = saidas.length - 1; i >= 0; i--) {
+    const nome = saidas[i]!.additional_attributes?.template_params?.name;
+    const resposta = nome ? CONVITES_EVENTO[nome] : undefined;
+    if (!resposta) continue;
+    if (agoraSeg - (saidas[i]!.created_at ?? 0) > JANELA_CONVITE_SEG) return null;
+    const link = resposta.match(/https:\/\/\S+/)?.[0] ?? resposta;
+    const jaRespondeu = saidas.slice(i + 1).some((m) => (m.content ?? "").includes(link));
+    return jaRespondeu ? null : resposta;
+  }
+  return null;
+}
