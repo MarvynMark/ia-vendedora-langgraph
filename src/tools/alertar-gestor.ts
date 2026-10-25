@@ -2,6 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { enviarMensagem, avisarGrupo } from "../services/chatwoot.ts";
 import { reivindicarAlertaGestor, liberarAlertaGestor } from "../db/alertas.ts";
+import { avaliarAlertaQuente } from "../lib/alerta-quente.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -11,6 +12,8 @@ interface ContextoAlertarGestor {
   idConta: string;
   idConversa: string;
   ultimaMensagem: string;
+  /** Falas da IA dos turnos anteriores (o grafo já carregou o histórico; o turno atual não está nele). */
+  falasIaAnteriores: readonly string[];
 }
 
 // Alerta o gestor sobre um lead QUENTE (quase certo) SEM pausar a IA — diferente do Escalar_humano,
@@ -23,6 +26,22 @@ export function criarToolAlertarGestor(contexto: ContextoAlertarGestor) {
   return tool(
     async (input: { motivo: string }) => {
       const nomeDisplay = contexto.nome || "(sem nome)";
+
+      // 0. Barreira em código (lib/alerta-quente.ts): o prompt proíbe alertar decisão, preço travado
+      // e "tô pronta pra começar" antes do valor, e o modelo alertava mesmo assim (~15 de 29 falsos
+      // em 14 dias). Bloqueio NÃO reivindica a trava: se o lead avançar, o próximo alerta sai.
+      const decisao = avaliarAlertaQuente({
+        falasIaAnteriores: contexto.falasIaAnteriores,
+        ultimaMensagem: contexto.ultimaMensagem,
+        motivo: input.motivo,
+      });
+      if (!decisao.enviar) {
+        logger.info("tool:alertar-gestor", `Alerta barrado na conversa ${contexto.idConversa} (${decisao.razao}): ${input.motivo}`);
+        return JSON.stringify({
+          resultado: "nao_enviado",
+          motivo: "Ainda não é compromisso de pagamento. Siga a conversa normalmente e só chame de novo quando o lead, já sabendo o valor, disser que vai pagar.",
+        });
+      }
 
       // 1. Nota PRIVADA na conversa do lead (visível só para a equipe, nunca para o lead).
       try {

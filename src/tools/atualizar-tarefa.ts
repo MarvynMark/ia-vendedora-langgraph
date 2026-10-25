@@ -104,7 +104,7 @@ export function criarToolAtualizarTarefa(contexto: ContextoAtualizarTarefaMainAg
         description: z.string().describe("Descrição da tarefa"),
         retomarEm: z.string().optional().describe("Só quando o lead combinou um retorno num dia: a data no formato AAAA-MM-DD (use as datas de referência). Sem data dita mas topou o retorno: próximo dia útil."),
         cancelarRetomada: z.boolean().optional().describe("true só quando o card tem \"Retomar em\" e o lead voltou ANTES do dia querendo seguir agora (pediu o link, vai pagar). Sem isso o card continua esperando a data."),
-        retomarContexto: z.string().optional().describe("Junto com retomarEm: o combinado em poucas palavras (ex.: \"vai decidir na próxima semana, travou no valor do Anual\")."),
+        retomarContexto: z.string().optional().describe("Junto com retomarEm: o combinado em poucas palavras (ex.: \"retomar segunda de manhã; quer ver com a família\")."),
       }),
     },
   );

@@ -40,6 +40,8 @@ interface ContextoMainAgent {
    * do texto, então um áudio chamado aqui chegava ANTES do "Olá, aqui é o Perito Walker" (conv 9476).
    */
   semMidia?: boolean;
+  /** Falas da IA nos turnos anteriores — a barreira do Alertar_gestor exige o preço já mostrado. */
+  falasIaAnteriores?: readonly string[];
 }
 
 export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): StructuredToolInterface[] {
@@ -86,6 +88,7 @@ export function criarToolsAgenteVestigium(contexto: ContextoMainAgent): Structur
       idConta: contexto.idConta,
       idConversa: contexto.idConversa,
       ultimaMensagem: contexto.mensagem,
+      falasIaAnteriores: contexto.falasIaAnteriores ?? [],
     }),
     criarToolAtualizarTarefa({ idConta: contexto.idConta, tarefa }, etapasDescricao),
     criarToolReagirMensagem({

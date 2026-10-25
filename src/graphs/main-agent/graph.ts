@@ -480,6 +480,7 @@ async function executarAgente(state: MainAgentStateType) {
     promocao: trilha === "antigo" && promocaoAtiva() && !ehMedicoLead({ etiquetas: state.etiquetas, dadosFormulario: state.dadosFormulario, atributosContato: state.atributosContato }),
     // Abertura disparada pelo cron da intro: só a Mensagem 1, sem mídia (conv 9476).
     semMidia: String(state.idMensagem).startsWith("intro_"),
+    falasIaAnteriores: historico.filter((m) => m.type === "ai").map((m) => m.content ?? ""),
   });
 
   const model = new ChatOpenAI({

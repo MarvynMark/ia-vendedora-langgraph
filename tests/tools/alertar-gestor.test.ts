@@ -46,6 +46,8 @@ const criar = (idConversa: string) =>
   criarToolAlertarGestor({
     telefone: "+5511999999999", nome: "Ana", idConta: "8", idConversa,
     ultimaMensagem: "vou pagar dia 10",
+    // a barreira (lib/alerta-quente.ts) exige o preço já mostrado num turno anterior
+    falasIaAnteriores: ["Fica em 12x de R$ 394 no cartão."],
   });
 
 describe("Alertar_gestor", () => {
@@ -112,5 +114,20 @@ describe("Alertar_gestor", () => {
     calls.length = 0;
     await criar("100").invoke({ motivo: "ia pagar dia 10" });
     expect(calls.length).toBe(2);
+  });
+
+  test("lead que ainda não viu o preço não vira alerta no grupo nem nota (conv 10966)", async () => {
+    const tool = criarToolAlertarGestor({
+      telefone: "+5531997128620", nome: "Janaina", idConta: "8", idConversa: "10966",
+      ultimaMensagem: "Ainda não",
+      falasIaAnteriores: ["Você tá pronta pra começar agora ou ainda tá se organizando?"],
+    });
+
+    const retorno = await tool.invoke({ motivo: "Janaina está pronta para começar e não tem material. Vai pagar agora." });
+
+    expect(calls.length).toBe(0);
+    expect(JSON.parse(retorno as string).resultado).toBe("nao_enviado");
+    // bloqueio não queima a trava: quando o lead avançar, o alerta ainda pode sair
+    expect(reivindicadas.has("10966")).toBe(false);
   });
 });

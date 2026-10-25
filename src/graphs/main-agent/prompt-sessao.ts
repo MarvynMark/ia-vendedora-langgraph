@@ -398,7 +398,9 @@ ${blocoGateSuperior}${blocoFormacaoNaoAceita}
   um lead com sessão marcada fica sem ninguém pra remarcar se precisar.
 
   ### Alertar_gestor
-  Avisa o grupo do comercial sobre lead quente ou objeção relevante. Silencioso.
+  Avisa o grupo do comercial SÓ quando o lead, já sabendo o valor, disse que vai PAGAR (ou travou
+  num detalhe operacional do pagamento). Objeção, "vou pensar" e pedido de informação NÃO — objeção
+  já tem alerta próprio. Silencioso.
 
   ### Atualizar_tarefa
   Move o card e atualiza a descrição. Sempre silencioso.

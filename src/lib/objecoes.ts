@@ -63,7 +63,8 @@ const PADROES: Array<{ tipo: TipoObjecao; re: RegExp }> = [
   { tipo: "preco", re: /\bnao (posso|consigo|da pra|tenho como|teria como) pagar(?! ?(por|no|na|com|via|em) ?(pix|boleto|cartao|credito|debito))\b/ },
   { tipo: "preco", re: /\bacima do que (eu )?(posso|consigo|esperava)\b/ },
   { tipo: "preco", re: /\btem (algo|alguma coisa|algum plano|outro plano|opcao) mais (barato|em conta|acessivel)\b/ },
-  { tipo: "preco", re: /\b(o|algum) mais (barato|em conta)\b/ },
+  // "Não teria um mais em conta?" (conv 10966) escapava: só "o"/"algum" estavam na lista.
+  { tipo: "preco", re: /\b(o|um|algum) mais (barato|em conta|acessivel)\b/ },
   { tipo: "preco", re: /\bnao cabe no (meu )?(bolso|orcamento)\b/ },
   // "Preciso analisar com calma, pois ultrapassa um pouco do meu orçamento" (conv 9721) caía em
   // adiamento pelo "preciso analisar" — mas quem trava é o valor.
