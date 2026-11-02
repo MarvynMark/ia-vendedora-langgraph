@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, CONVITES_EVENTO } from "../../src/routes/webhook-filtros.ts";
+import { pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, CONVITES_EVENTO, respostaVerDetalhes, CONVITES_BLACK, primeiroNome } from "../../src/routes/webhook-filtros.ts";
 
 // Conv 6890: a lead contou que tinha visto um vídeo "que você mandou no grupo de espera" e recebeu,
 // um segundo depois, o convite pra entrar no grupo — onde ela já estava, e acabara de provar.
@@ -80,5 +80,36 @@ describe("respostaConfirmacaoEvento", () => {
     const link = { message_type: 1, content: CONVITES_EVENTO.encontro_legista_2110!, created_at: agora - 60 };
     expect(respostaConfirmacaoEvento("Confirmar", [convite, link], agora)).toBeNull();
     expect(respostaConfirmacaoEvento("Confirmar", [{ ...convite, created_at: agora - 5 * 86_400 }], agora)).toBeNull();
+  });
+});
+
+describe("respostaVerDetalhes", () => {
+  const agora = 2_000_000_000;
+  const convite = (nome: string) => ({ message_type: 1, content: "Seu registro…", created_at: agora - 3600, additional_attributes: { template_params: { name: nome } } });
+
+  test("cada template devolve a sequência do seu grupo, com o link na última mensagem", () => {
+    for (const [nome, seq] of Object.entries(CONVITES_BLACK)) {
+      const r = respostaVerDetalhes(" Ver detalhes ", [convite(nome)], agora);
+      expect(r?.template).toBe(nome);
+      const msgs = r!.sequencia.mensagens("Maria");
+      expect(msgs[0]).toContain("Maria");
+      expect(msgs.at(-1)).toContain(seq.link);
+    }
+    expect(CONVITES_BLACK.convite_black_alunos!.link).not.toBe(CONVITES_BLACK.convite_black_leads!.link);
+  });
+
+  test("não dispara sem convite, com outro texto ou depois do link já enviado", () => {
+    const c = convite("convite_black_leads");
+    expect(respostaVerDetalhes("Ver detalhes", [{ message_type: 1, content: "oi", created_at: agora }], agora)).toBeNull();
+    expect(respostaVerDetalhes("quero ver detalhes do plano", [c], agora)).toBeNull();
+    const link = { message_type: 1, content: `Entra 👇🏻\n${CONVITES_BLACK.convite_black_leads!.link}`, created_at: agora - 60 };
+    expect(respostaVerDetalhes("Ver detalhes", [c, link], agora)).toBeNull();
+    expect(respostaVerDetalhes("Ver detalhes", [{ ...c, created_at: agora - 5 * 86_400 }], agora)).toBeNull();
+  });
+
+  test("primeiroNome", () => {
+    expect(primeiroNome("MARIA da silva")).toBe("Maria");
+    expect(primeiroNome("+55 62 99999-0000")).toBeNull();
+    expect(primeiroNome("")).toBeNull();
   });
 });

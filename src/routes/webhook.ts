@@ -5,7 +5,7 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
-import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento } from "./webhook-filtros.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome } from "./webhook-filtros.ts";
 import { ehMedicoLead } from "../lib/medico.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
@@ -16,6 +16,7 @@ import {
   adicionarEtiquetas,
   buscarConversa,
   enviarMensagem,
+  enviarArquivo,
   listarMensagens,
   atualizarContato,
   atualizarAtributosConversa,
@@ -23,6 +24,7 @@ import {
 } from "../services/chatwoot.ts";
 import { agendarIntroPendente } from "../lib/intro-pendente.ts";
 import { logger } from "../lib/logger.ts";
+import { fetchComTimeout } from "../lib/fetch-with-timeout.ts";
 import { env } from "../config/env.ts";
 import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { corretorAtende, tratarMensagemCorretor } from "../corretor/fluxo.ts";
@@ -191,6 +193,36 @@ export const webhookRouter = new Elysia()
         }
         logger.info("webhook", "Confirmação de evento: link enviado", { conversa: idConversa });
         return { status: "ok", action: "confirmacao_evento" };
+      }
+    }
+
+    // Botão "Ver detalhes" dos convites da Black 2026: arte + sequência + link do grupo do público.
+    if (/^ver detalhes$/i.test(content.trim())) {
+      const idConta = parsed.data.account.id.toString();
+      const idConversa = parsed.data.conversation.id.toString();
+      const msgs = await listarMensagens(idConta, idConversa) as { payload?: Parameters<typeof respostaVerDetalhes>[1] };
+      const r = respostaVerDetalhes(content, msgs.payload ?? [], Date.now() / 1000);
+      if (r) {
+        try {
+          const img = await fetchComTimeout(r.sequencia.imagem, { timeout: 30_000 });
+          if (img.ok) await enviarArquivo(idConta, idConversa, new Uint8Array(await img.arrayBuffer()), `${r.template}.jpg`, "image/jpeg");
+        } catch (e) {
+          logger.warn("webhook", "Convite Black: arte não foi enviada, segue o texto", { conversa: idConversa, erro: (e as Error).message });
+        }
+        const textos = r.sequencia.mensagens(primeiroNome(parsed.data.sender.name));
+        for (const t of textos) {
+          await Bun.sleep(1200);
+          await enviarMensagem(idConta, idConversa, t);
+        }
+        const telefone = parsed.data.sender.phone_number ?? "";
+        if (telefone) {
+          await salvarMensagemSeNova(telefone, {
+            type: "ai", content: textos.join("\n\n"), tool_calls: [], invalid_tool_calls: [], response_metadata: {},
+            additional_kwargs: { origem: "convite_black", template: r.template },
+          });
+        }
+        logger.info("webhook", "Convite Black: sequência enviada", { conversa: idConversa, template: r.template });
+        return { status: "ok", action: "convite_black" };
       }
     }
 

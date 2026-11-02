@@ -144,3 +144,89 @@ export function respostaConfirmacaoEvento(
   }
   return null;
 }
+
+// --- Convites da Black 2026: botão "Ver detalhes" do template ---
+//
+// Mesmo princípio do "Confirmar": o template UTILITY é curto e transacional ("Seu registro … foi
+// confirmado"); o toque no botão abre a janela de 24h e aí sai a sequência livre — a arte, as
+// mensagens e, por último, o link do grupo do público certo. Resposta fixa, sem a IA, com ou sem
+// "agente-on". Disparo: src/scripts/disparo-convite-black.ts.
+
+export interface SequenciaConvite {
+  /** URL pública da arte (anexo de nota privada da conv 3896: o blob do Chatwoot não expira). */
+  imagem: string;
+  /** Link do grupo; vai na última mensagem e serve para saber se a sequência já saiu. */
+  link: string;
+  mensagens: (primeiroNome: string | null) => string[];
+}
+
+const saudacao = (nome: string | null) => (nome ? `Excelente, ${nome}!! 🚀` : "Excelente!! 🚀");
+
+export const CONVITES_BLACK: Record<string, SequenciaConvite> = {
+  convite_black_leads: {
+    imagem: "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBNEhxQVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--4f1ca9a6613a519c67b63cb23a342acc8c1f9ca4/convite_black_leads.jpg",
+    link: "https://chat.whatsapp.com/KNtt3cuiTPO41AHWEzq0Y5",
+    mensagens: (nome) => [
+      saudacao(nome),
+      "🎉 Você acaba de entrar na lista da *BLACK VESTIGIUM 2026*",
+      "📅 *Anota na agenda:* domingo, 08/11, às 20h, AO VIVO no YouTube com o Perito Walker.",
+      "⚠️ *ATENÇÃO:* o link da live e TODOS os avisos da Black vão SOMENTE no Grupo VIP.",
+      "Quem não entra no grupo fica sem o link da live e sem os avisos da oferta 😬\n\nEntra agora, é rápido 👇🏻\nhttps://chat.whatsapp.com/KNtt3cuiTPO41AHWEzq0Y5",
+    ],
+  },
+  convite_black_alunos: {
+    imagem: "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBNExxQVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--90a1911243c53db0bf88878975e01d561677431d/convite_black_alunos.jpg",
+    link: "https://chat.whatsapp.com/FGvOpeUse37684e2BKhEaZ",
+    mensagens: (nome) => [
+      saudacao(nome),
+      "🎉 Você está na lista da *BLACK EXCLUSIVA DE ALUNOS* Vestigium",
+      "📅 *Anota na agenda:* sexta, 06/11, às 10h, as condições de alunos são liberadas ANTES do público.",
+      "⚠️ *ATENÇÃO:* a condição de alunos sai SOMENTE no grupo de alunos. Ela não vai para o grupo da Black nem para o Instagram.",
+      "Quem não entra no grupo fica sem a condição exclusiva 😬\n\nEntra agora, é rápido 👇🏻\nhttps://chat.whatsapp.com/FGvOpeUse37684e2BKhEaZ",
+    ],
+  },
+  convite_black_medicos: {
+    imagem: "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBNFBxQVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--78d8d7ce8d6f8ada45c82f213764d5e2a6817e24/convite_black_medicos.jpg",
+    link: "https://chat.whatsapp.com/Cu9GVmjY0bMHkD80mQ96yv",
+    mensagens: (nome) => [
+      saudacao(nome),
+      "🎉 Você está na lista da *BLACK DE MÉDICO LEGISTA* Vestigium",
+      "📅 *Anota na agenda:* domingo, 08/11, às 20h, liberamos a MELHOR condição do ano para médicos.",
+      "⚠️ *ATENÇÃO:* a condição e TODOS os avisos vão SOMENTE no grupo de médicos.",
+      "Quem não entra no grupo fica sem a condição e sem os avisos 😬\n\nEntra agora, é rápido 👇🏻\nhttps://chat.whatsapp.com/Cu9GVmjY0bMHkD80mQ96yv",
+    ],
+  },
+};
+// v2: o v1 foi reclassificado para MARKETING ("a melhor condição do ano" no corpo); mesma sequência.
+CONVITES_BLACK.convite_black_medicos_v2 = CONVITES_BLACK.convite_black_medicos!;
+
+/** Primeiro nome apresentável a partir do nome do contato; null se for número ou vazio. */
+export function primeiroNome(nome: string | null | undefined): string | null {
+  const p = (nome ?? "").trim().split(/\s+/)[0] ?? "";
+  if (!/^[\p{L}]{2,}$/u.test(p)) return null;
+  return p[0]!.toUpperCase() + p.slice(1).toLowerCase();
+}
+
+/**
+ * O lead tocou "Ver detalhes" num convite da Black recebido nos últimos 4 dias? Devolve o nome do
+ * template e a sequência, ou null. Uma vez só: se o link do grupo já saiu depois do convite, null.
+ */
+export function respostaVerDetalhes(
+  content: string,
+  mensagens: MensagemConversa[],
+  agoraSeg: number,
+): { template: string; sequencia: SequenciaConvite } | null {
+  if (!/^ver detalhes$/i.test((content ?? "").trim())) return null;
+  const saidas = mensagens
+    .filter((m) => m.message_type === 1)
+    .sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
+  for (let i = saidas.length - 1; i >= 0; i--) {
+    const nome = saidas[i]!.additional_attributes?.template_params?.name;
+    const sequencia = nome ? CONVITES_BLACK[nome] : undefined;
+    if (!sequencia) continue;
+    if (agoraSeg - (saidas[i]!.created_at ?? 0) > JANELA_CONVITE_SEG) return null;
+    const jaRespondeu = saidas.slice(i + 1).some((m) => (m.content ?? "").includes(sequencia.link));
+    return jaRespondeu ? null : { template: nome!, sequencia };
+  }
+  return null;
+}
