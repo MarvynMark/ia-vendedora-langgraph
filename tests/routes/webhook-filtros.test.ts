@@ -113,3 +113,20 @@ describe("respostaVerDetalhes", () => {
     expect(primeiroNome("")).toBeNull();
   });
 });
+
+describe("respostaVerDetalhes — botão Quero meu acesso e convite tocado", () => {
+  const agora = 2_000_000_000;
+  const conv = (id: number, nome: string, t: number) => ({ id, message_type: 1, content: "Seu registro…", created_at: agora - t, additional_attributes: { template_params: { name: nome } } });
+  const leads = conv(1, "convite_black_leads_acesso", 600);
+  const alunos = conv(2, "convite_black_alunos_acesso", 300);
+
+  test("aceita 'Quero meu acesso'", () => {
+    expect(respostaVerDetalhes("Quero meu acesso", [leads], agora)?.template).toBe("convite_black_leads_acesso");
+  });
+
+  test("com in_reply_to, responde ao convite tocado e não ao mais recente", () => {
+    expect(respostaVerDetalhes("Quero meu acesso", [leads, alunos], agora, 1)?.template).toBe("convite_black_leads_acesso");
+    expect(respostaVerDetalhes("Quero meu acesso", [leads, alunos], agora, 2)?.template).toBe("convite_black_alunos_acesso");
+    expect(respostaVerDetalhes("Quero meu acesso", [leads, alunos], agora)?.template).toBe("convite_black_alunos_acesso");
+  });
+});

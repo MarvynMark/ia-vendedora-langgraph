@@ -114,6 +114,7 @@ export const CONVITES_EVENTO: Record<string, string> = {
 const JANELA_CONVITE_SEG = 4 * 86_400;
 
 interface MensagemConversa {
+  id?: number;
   message_type: number;
   content?: string | null;
   created_at?: number;
@@ -199,6 +200,14 @@ export const CONVITES_BLACK: Record<string, SequenciaConvite> = {
 };
 // v2: o v1 foi reclassificado para MARKETING ("a melhor condição do ano" no corpo); mesma sequência.
 CONVITES_BLACK.convite_black_medicos_v2 = CONVITES_BLACK.convite_black_medicos!;
+// *_acesso: botão "Quero meu acesso". "Ver detalhes" colidia com um gatilho antigo do app
+// Vestigium WTD (regressivas de jan/2025), que respondia junto com um vídeo e outro grupo.
+CONVITES_BLACK.convite_black_leads_acesso = CONVITES_BLACK.convite_black_leads!;
+CONVITES_BLACK.convite_black_alunos_acesso = CONVITES_BLACK.convite_black_alunos!;
+CONVITES_BLACK.convite_black_medicos_acesso = CONVITES_BLACK.convite_black_medicos!;
+
+/** Texto dos botões de resposta rápida dos convites da Black. */
+export const BOTAO_CONVITE_BLACK = /^(ver detalhes|quero meu acesso)$/i;
 
 /** Primeiro nome apresentável a partir do nome do contato; null se for número ou vazio. */
 export function primeiroNome(nome: string | null | undefined): string | null {
@@ -215,12 +224,16 @@ export function respostaVerDetalhes(
   content: string,
   mensagens: MensagemConversa[],
   agoraSeg: number,
+  /** id da mensagem do convite em que o lead tocou (content_attributes.in_reply_to). */
+  emRespostaA?: number | null,
 ): { template: string; sequencia: SequenciaConvite } | null {
-  if (!/^ver detalhes$/i.test((content ?? "").trim())) return null;
+  if (!BOTAO_CONVITE_BLACK.test((content ?? "").trim())) return null;
   const saidas = mensagens
     .filter((m) => m.message_type === 1)
     .sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
-  for (let i = saidas.length - 1; i >= 0; i--) {
+  // Com o id do convite tocado, responde exatamente a ele; sem, ao convite mais recente.
+  const alvo = emRespostaA ? saidas.findIndex((m) => m.id === emRespostaA) : -1;
+  for (let i = alvo >= 0 ? alvo : saidas.length - 1; i >= 0; i--) {
     const nome = saidas[i]!.additional_attributes?.template_params?.name;
     const sequencia = nome ? CONVITES_BLACK[nome] : undefined;
     if (!sequencia) continue;

@@ -185,7 +185,8 @@ const TEXTOS: Record<Publico, string> = {
   medicos: "Seu registro na BLACK DE MÉDICO LEGISTA foi confirmado.\n\nAs condições para médicos serão liberadas dia 08/11 às 20h.\n\n👇🏻 Toque no botão abaixo para ver os detalhes de acesso",
 };
 // medicos_v2: o v1 virou MARKETING na Meta por causa de "a melhor condição do ano".
-const template = (p: Publico) => (p === "medicos" ? "convite_black_medicos_v2" : `convite_black_${p}`);
+// *_acesso: botão "Quero meu acesso" ("Ver detalhes" colidia com um gatilho antigo do app Vestigium WTD).
+const template = (p: Publico) => `convite_black_${p}_acesso`;
 const ledger = (p: Publico) => `${SAIDA}-${p}-enviados.tsv`;
 
 async function enviarConvite(p: Publico, convId: number): Promise<number> {

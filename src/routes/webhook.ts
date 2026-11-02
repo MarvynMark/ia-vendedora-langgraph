@@ -5,7 +5,7 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
-import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome } from "./webhook-filtros.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome, BOTAO_CONVITE_BLACK } from "./webhook-filtros.ts";
 import { ehMedicoLead } from "../lib/medico.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
@@ -197,15 +197,26 @@ export const webhookRouter = new Elysia()
     }
 
     // Botão "Ver detalhes" dos convites da Black 2026: arte + sequência + link do grupo do público.
-    if (/^ver detalhes$/i.test(content.trim())) {
+    if (BOTAO_CONVITE_BLACK.test(content.trim())) {
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
       const msgs = await listarMensagens(idConta, idConversa) as { payload?: Parameters<typeof respostaVerDetalhes>[1] };
-      const r = respostaVerDetalhes(content, msgs.payload ?? [], Date.now() / 1000);
+      const emRespostaA = Number((payload as { content_attributes?: { in_reply_to?: number } }).content_attributes?.in_reply_to) || null;
+      const r = respostaVerDetalhes(content, msgs.payload ?? [], Date.now() / 1000, emRespostaA);
       if (r) {
         try {
           const img = await fetchComTimeout(r.sequencia.imagem, { timeout: 30_000 });
-          if (img.ok) await enviarArquivo(idConta, idConversa, new Uint8Array(await img.arrayBuffer()), `${r.template}.jpg`, "image/jpeg");
+          if (img.ok) {
+            const enviada = await enviarArquivo(idConta, idConversa, new Uint8Array(await img.arrayBuffer()), `${r.template}.jpg`, "image/jpeg") as { id?: number };
+            // A Meta entrega imagem depois de texto enviado em seguida: sem esperar, a arte chegava
+            // no fim da sequência (teste de 02/11). Espera a Meta confirmar a arte, até ~12s.
+            for (let i = 0; i < 12 && enviada?.id; i++) {
+              await Bun.sleep(1000);
+              const lista = (await listarMensagens(idConta, idConversa) as { payload?: Array<{ id: number; status?: string }> }).payload ?? [];
+              const s = lista.find((m) => m.id === enviada.id)?.status;
+              if (s === "delivered" || s === "read" || s === "failed") break;
+            }
+          }
         } catch (e) {
           logger.warn("webhook", "Convite Black: arte não foi enviada, segue o texto", { conversa: idConversa, erro: (e as Error).message });
         }
