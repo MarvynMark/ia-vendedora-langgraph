@@ -243,3 +243,58 @@ export function respostaVerDetalhes(
   }
   return null;
 }
+
+// --- Black 2026: pedido de grupo e pergunta sobre a Black depois do convite ---
+//
+// Quem recebeu o convite e pede "o link do grupo" tem que ir para o grupo DO CONVITE (alunos,
+// médicos ou leads), não para o grupo de espera. E quem pergunta da Black (preço, condição,
+// desconto, como comprar) é atendido por humano, que vende a preço de Black: o sistema pausa a
+// IA e avisa o comercial, sem depender de o LLM decidir escalar.
+
+/** Até quando um convite da Black vale como contexto da conversa (fim da campanha: 13/11). */
+export const JANELA_CAMPANHA_BLACK_SEG = 14 * 86_400;
+
+/** Convite da Black mais recente recebido na conversa dentro da janela da campanha, ou null. */
+export function conviteBlackRecente(
+  mensagens: MensagemConversa[],
+  agoraSeg: number,
+): { template: string; sequencia: SequenciaConvite } | null {
+  const saidas = mensagens
+    .filter((m) => m.message_type === 1)
+    .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+  for (const m of saidas) {
+    const nome = m.additional_attributes?.template_params?.name;
+    const sequencia = nome ? CONVITES_BLACK[nome] : undefined;
+    if (!sequencia) continue;
+    return agoraSeg - (m.created_at ?? 0) <= JANELA_CAMPANHA_BLACK_SEG ? { template: nome!, sequencia } : null;
+  }
+  return null;
+}
+
+const RE_BLACK = /\bblack\b/i;
+const RE_OFERTA = /\b(pre[cç]os?|valor(es)?|quanto|custa|desconto|condi[cç](ão|ao|ões|oes)|oferta|promo[cç][aã]o|cupom|comprar|compra|pagar|pagamento|parcel\w*|pix|boleto|cart[aã]o|investimento|matr[ií]cula|assinar|garantir|vaga)\b/i;
+
+/**
+ * O lead está perguntando da Black? "black" na mensagem basta (qualquer conversa); depois de um
+ * convite da Black, perguntar de preço/condição/compra também conta.
+ */
+export function perguntaDaBlack(content: string, recebeuConvite: boolean): boolean {
+  const c = (content ?? "").trim();
+  if (!c || BOTAO_CONVITE_BLACK.test(c)) return false;
+  return RE_BLACK.test(c) || (recebeuConvite && RE_OFERTA.test(c));
+}
+
+/** Marca da nota privada da escalação da Black: é por ela que não se escala duas vezes seguidas. */
+export const MARCA_ESCALACAO_BLACK = "Pergunta sobre a Black 2026";
+
+/** Já houve escalação da Black nesta conversa nas últimas 12h? (evita alertas repetidos) */
+export function jaEscaladoBlack(mensagens: Array<MensagemConversa & { private?: boolean }>, agoraSeg: number): boolean {
+  return mensagens.some(
+    (m) => m.private && (m.content ?? "").includes(MARCA_ESCALACAO_BLACK) && agoraSeg - (m.created_at ?? 0) < 12 * 3600,
+  );
+}
+
+/** Público do convite, para o alerta do comercial. */
+export function publicoDoConvite(template: string): string {
+  return template.includes("alunos") ? "ALUNO (cupom de aluno)" : template.includes("medicos") ? "MÉDICO" : "LEAD";
+}

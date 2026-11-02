@@ -186,6 +186,15 @@ const TEXTOS: Record<Publico, string> = {
 };
 // medicos_v2: o v1 virou MARKETING na Meta por causa de "a melhor condição do ano".
 // *_acesso: botão "Quero meu acesso" ("Ver detalhes" colidia com um gatilho antigo do app Vestigium WTD).
+// O que a IA passa a saber quando o lead voltar a falar. Perguntas sobre a Black já são pausadas
+// e passadas ao comercial pelo webhook (perguntaDaBlack); isto cobre o que escapar do filtro.
+const ESCALAR = "Se a pessoa perguntar da Black (preço, condição, desconto, como comprar), NÃO informe valores nem cupom: use Escalar_humano para o comercial atender com a condição Black.";
+const MEMORIA: Record<Publico, string> = {
+  leads: `[convite da Black enviado] Convidei para a BLACK VESTIGIUM 2026: aula AO VIVO no YouTube no domingo, 08/11, às 20h; a oferta é revelada só na live. O link da live e os avisos vão SOMENTE no Grupo VIP: https://chat.whatsapp.com/KNtt3cuiTPO41AHWEzq0Y5. ${ESCALAR}`,
+  alunos: `[convite da Black enviado] Esta pessoa é ALUNA ou ex-aluna da mentoria. Convidei para a BLACK EXCLUSIVA DE ALUNOS: as condições de alunos saem SOMENTE no grupo de alunos na sexta, 06/11, às 10h: https://chat.whatsapp.com/FGvOpeUse37684e2BKhEaZ. Não trate como lead novo. ${ESCALAR}`,
+  medicos: `[convite da Black enviado] Médico(a) ou estudante de medicina. Convidei para a BLACK DE MÉDICO LEGISTA: as condições para médicos saem no domingo, 08/11, às 20h, SOMENTE no grupo de médicos: https://chat.whatsapp.com/Cu9GVmjY0bMHkD80mQ96yv. ${ESCALAR}`,
+};
+
 const template = (p: Publico) => `convite_black_${p}_acesso`;
 const ledger = (p: Publico) => `${SAIDA}-${p}-enviados.tsv`;
 
@@ -245,7 +254,7 @@ async function enviar(p: Publico, limite: number, valendo: boolean) {
       const msgId = await enviarConvite(p, convId);
       await appendFile(ledger(p), `${a.whatsapp}\t${convId}\t${msgId}\n`);
       await salvarMensagemSeNova(telefone, {
-        type: "ai", content: `[convite enviado] ${TEXTOS[p]}`, tool_calls: [], invalid_tool_calls: [], response_metadata: {},
+        type: "ai", content: MEMORIA[p], tool_calls: [], invalid_tool_calls: [], response_metadata: {},
         additional_kwargs: { origem: "disparo-convite-black", template: template(p) },
       });
       ok++;

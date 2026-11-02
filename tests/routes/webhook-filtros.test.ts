@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, CONVITES_EVENTO, respostaVerDetalhes, CONVITES_BLACK, primeiroNome } from "../../src/routes/webhook-filtros.ts";
+import { pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, CONVITES_EVENTO, respostaVerDetalhes, CONVITES_BLACK, primeiroNome, perguntaDaBlack, conviteBlackRecente, jaEscaladoBlack, MARCA_ESCALACAO_BLACK, publicoDoConvite } from "../../src/routes/webhook-filtros.ts";
 
 // Conv 6890: a lead contou que tinha visto um vídeo "que você mandou no grupo de espera" e recebeu,
 // um segundo depois, o convite pra entrar no grupo — onde ela já estava, e acabara de provar.
@@ -128,5 +128,35 @@ describe("respostaVerDetalhes — botão Quero meu acesso e convite tocado", () 
     expect(respostaVerDetalhes("Quero meu acesso", [leads, alunos], agora, 1)?.template).toBe("convite_black_leads_acesso");
     expect(respostaVerDetalhes("Quero meu acesso", [leads, alunos], agora, 2)?.template).toBe("convite_black_alunos_acesso");
     expect(respostaVerDetalhes("Quero meu acesso", [leads, alunos], agora)?.template).toBe("convite_black_alunos_acesso");
+  });
+});
+
+describe("Black 2026: pergunta da Black, convite recente e escalação", () => {
+  const agora = 2_000_000_000;
+  const convite = (nome: string, idade: number) => ({ id: 1, message_type: 1, content: "Seu registro…", created_at: agora - idade, additional_attributes: { template_params: { name: nome } } });
+
+  test("perguntaDaBlack: 'black' sempre; preço/condição só depois do convite; botão nunca", () => {
+    expect(perguntaDaBlack("Qual o valor da Black?", false)).toBe(true);
+    expect(perguntaDaBlack("vai ter black esse ano?", false)).toBe(true);
+    expect(perguntaDaBlack("quanto custa?", false)).toBe(false);
+    expect(perguntaDaBlack("quanto custa?", true)).toBe(true);
+    expect(perguntaDaBlack("consigo parcelar no cartão?", true)).toBe(true);
+    expect(perguntaDaBlack("obrigado, já entrei", true)).toBe(false);
+    expect(perguntaDaBlack("Quero meu acesso", true)).toBe(false);
+    expect(perguntaDaBlack("blackout aqui na cidade", false)).toBe(false);
+  });
+
+  test("conviteBlackRecente: dentro da janela da campanha e só templates da Black", () => {
+    expect(conviteBlackRecente([convite("convite_black_alunos_acesso", 5 * 86_400)], agora)?.sequencia.link).toBe(CONVITES_BLACK.convite_black_alunos!.link);
+    expect(conviteBlackRecente([convite("convite_black_leads_acesso", 20 * 86_400)], agora)).toBeNull();
+    expect(conviteBlackRecente([convite("encontro_legista_2110", 3600)], agora)).toBeNull();
+  });
+
+  test("jaEscaladoBlack: só a nota privada da Black nas últimas 12h", () => {
+    const nota = { message_type: 1, private: true, content: `🔔 ${MARCA_ESCALACAO_BLACK} — público: LEAD`, created_at: agora - 3600 };
+    expect(jaEscaladoBlack([nota], agora)).toBe(true);
+    expect(jaEscaladoBlack([{ ...nota, created_at: agora - 13 * 3600 }], agora)).toBe(false);
+    expect(jaEscaladoBlack([{ ...nota, private: false }], agora)).toBe(false);
+    expect(publicoDoConvite("convite_black_alunos_acesso")).toContain("ALUNO");
   });
 });

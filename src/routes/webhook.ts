@@ -5,7 +5,8 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
-import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome, BOTAO_CONVITE_BLACK } from "./webhook-filtros.ts";
+import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome, BOTAO_CONVITE_BLACK, conviteBlackRecente, perguntaDaBlack, jaEscaladoBlack, publicoDoConvite, MARCA_ESCALACAO_BLACK } from "./webhook-filtros.ts";
+import { escalarParaHumano } from "../tools/escalar-humano.ts";
 import { ehMedicoLead } from "../lib/medico.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
@@ -248,9 +249,46 @@ export const webhookRouter = new Elysia()
       }
     }
 
+    // Black 2026 (com ou sem "agente-on"): quem recebeu convite e pede o grupo vai para o grupo DO
+    // CONVITE; quem pergunta da Black é pausado e passado ao comercial, que vende a preço de Black.
+    // Só consulta o Chatwoot quando a mensagem pode ser um desses dois casos.
+    const pedeGrupo = pedeGrupoDeEspera(content);
+    if (pedeGrupo || perguntaDaBlack(content, true)) {
+      const idConta = parsed.data.account.id.toString();
+      const idConversa = parsed.data.conversation.id.toString();
+      const agora = Date.now() / 1000;
+      const msgs = ((await listarMensagens(idConta, idConversa)) as {
+        payload?: Array<{ id?: number; message_type: number; private?: boolean; content?: string | null; created_at?: number; additional_attributes?: { template_params?: { name?: string } } | null }>;
+      }).payload ?? [];
+      const convite = conviteBlackRecente(msgs, agora);
+
+      if (pedeGrupo && convite) {
+        const jaMandou = msgs.some((m) => m.message_type === 1 && (m.content ?? "").includes(convite.sequencia.link) && agora - (m.created_at ?? 0) < 600);
+        if (!jaMandou) await enviarMensagem(idConta, idConversa, `Clique no link abaixo para entrar no grupo 👇🏻\n\n${convite.sequencia.link}`);
+        logger.info("webhook", "Convite Black: pedido de grupo → grupo do convite", { conversa: idConversa, template: convite.template, duplicado: jaMandou });
+        return { status: "ok", action: "convite_black_grupo" };
+      }
+
+      if (perguntaDaBlack(content, !!convite)) {
+        if (!jaEscaladoBlack(msgs, agora)) {
+          const publico = convite ? publicoDoConvite(convite.template) : "sem convite da Black";
+          await escalarParaHumano({
+            telefone: parsed.data.sender.phone_number ?? "",
+            nome: parsed.data.sender.name ?? "",
+            idConta,
+            idConversa,
+            idInbox: String(payload.conversation.inbox_id ?? env.CHATWOOT_INBOX_ID),
+            ultimaMensagem: content,
+          }, `${MARCA_ESCALACAO_BLACK} — público: ${publico}. Atender e vender a preço de Black.`);
+          logger.info("webhook", "Black: pergunta escalada ao comercial", { conversa: idConversa, publico });
+        }
+        return { status: "ok", action: "black_humano" };
+      }
+    }
+
     // Automação fixa: link do grupo de espera (funciona para qualquer conversa). Só para quem
     // PEDE o grupo — citar o grupo não é pedir (ver pedeGrupoDeEspera em webhook-filtros.ts).
-    if (pedeGrupoDeEspera(content)) {
+    if (pedeGrupo) {
       logger.info("webhook", "Pedido de grupo de espera detectado");
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
