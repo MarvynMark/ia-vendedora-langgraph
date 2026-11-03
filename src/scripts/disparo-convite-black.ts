@@ -206,12 +206,23 @@ const ledger = (p: Publico) => `${SAIDA}-${p}-enviados.tsv`;
 
 // Lembrete: template próprio, com data perto ("amanhã"/"hoje"), para quem leu e não tocou.
 // Alunos na véspera (05/11 19h), leads e médicos no dia da live (08/11 10h).
-const R = "\n\n👇🏻 Toque no botão abaixo para ativar seu acesso";
+// v2: a v1 ("ainda não foi ativado" + "hoje/amanhã") foi reclassificada para MARKETING em 03/11.
+// Formato de lembrete de evento registrado; a urgência vem do dia do envio e da arte.
+const R = "\n\n👇🏻 Toque no botão abaixo para ver os detalhes de acesso";
 const LEMBRETES: Record<Publico, { template: string; texto: string; imagem: string }> = {
-  alunos: { template: "lembrete_black_alunos", texto: "Seu acesso à BLACK EXCLUSIVA DE ALUNOS ainda não foi ativado.\n\nAs condições de alunos serão liberadas amanhã, 06/11, às 10h." + R, imagem: CONVITES_BLACK.convite_black_alunos!.imagem },
-  leads: { template: "lembrete_black_leads", texto: "Seu acesso à BLACK VESTIGIUM ainda não foi ativado.\n\nA aula ao vivo acontece hoje, 08/11, às 20h." + R, imagem: CONVITES_BLACK.convite_black_leads!.imagem },
-  medicos: { template: "lembrete_black_medicos", texto: "Seu acesso à BLACK DE MÉDICO LEGISTA ainda não foi ativado.\n\nAs condições para médicos serão liberadas hoje, 08/11, às 20h." + R, imagem: CONVITES_BLACK.convite_black_medicos!.imagem },
+  alunos: { template: "lembrete_black_alunos_v2", texto: "Lembrete do seu registro na BLACK EXCLUSIVA DE ALUNOS.\n\nAs condições de alunos serão liberadas dia 06/11 às 10h." + R, imagem: CONVITES_BLACK.convite_black_alunos!.imagem },
+  leads: { template: "lembrete_black_leads_v2", texto: "Lembrete do seu registro na BLACK VESTIGIUM.\n\nA aula ao vivo acontecerá dia 08/11 às 20h." + R, imagem: CONVITES_BLACK.convite_black_leads!.imagem },
+  medicos: { template: "lembrete_black_medicos_v2", texto: "Lembrete do seu registro na BLACK DE MÉDICO LEGISTA.\n\nAs condições para médicos serão liberadas dia 08/11 às 20h." + R, imagem: CONVITES_BLACK.convite_black_medicos!.imagem },
 };
+
+/** Lembrete só sai como UTILITY (decisão do Gusthavo, 03/11/2026): consulta a categoria na Meta. */
+async function categoriaNaMeta(nome: string): Promise<string | null> {
+  const inbox = await chamar(`${BASE}/inboxes/${INBOX}`);
+  const { business_account_id: waba, api_key: tok } = inbox.provider_config ?? {};
+  const r = await fetchComTimeout(`https://graph.facebook.com/v21.0/${waba}/message_templates?name=${nome}&fields=name,status,category`, { headers: { Authorization: `Bearer ${tok}` } });
+  const t = (((await r.json()) as any).data ?? []).find((x: any) => x.name === nome);
+  return t && t.status === "APPROVED" ? t.category : null;
+}
 
 async function enviarConvite(p: Publico, convId: number, modo: "convite" | "lembrete" = "convite"): Promise<number> {
   const t = modo === "lembrete"
@@ -299,6 +310,8 @@ const RE_OPTOUT = /cancelar recebimento|parar (de )?receber|n[aã]o (quero|desej
  * escreveu, não foi escalado e não pediu para sair. Ledger próprio: lembra uma vez só.
  */
 async function lembrete(p: Publico, valendo: boolean) {
+  const cat = await categoriaNaMeta(LEMBRETES[p].template);
+  if (cat !== "UTILITY") { console.log(`${p} lembrete: NÃO ENVIADO — ${LEMBRETES[p].template} está ${cat ?? "não aprovado"} (só sai como UTILITY)`); return; }
   const enviados = [...(await jaEnviados(p)).entries()];
   const arqLedger = `${SAIDA}-${p}-lembrete.tsv`;
   const f = Bun.file(arqLedger);

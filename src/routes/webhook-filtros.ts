@@ -210,6 +210,9 @@ CONVITES_BLACK.convite_black_medicos_acesso = CONVITES_BLACK.convite_black_medic
 CONVITES_BLACK.lembrete_black_leads = CONVITES_BLACK.convite_black_leads!;
 CONVITES_BLACK.lembrete_black_alunos = CONVITES_BLACK.convite_black_alunos!;
 CONVITES_BLACK.lembrete_black_medicos = CONVITES_BLACK.convite_black_medicos!;
+CONVITES_BLACK.lembrete_black_leads_v2 = CONVITES_BLACK.convite_black_leads!;
+CONVITES_BLACK.lembrete_black_alunos_v2 = CONVITES_BLACK.convite_black_alunos!;
+CONVITES_BLACK.lembrete_black_medicos_v2 = CONVITES_BLACK.convite_black_medicos!;
 
 /** Texto dos botões de resposta rápida dos convites da Black. */
 export const BOTAO_CONVITE_BLACK = /^(ver detalhes|quero meu acesso)$/i;
