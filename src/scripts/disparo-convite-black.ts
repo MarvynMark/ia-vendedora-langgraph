@@ -115,9 +115,13 @@ async function montar(arquivoCsv: string, arquivoMatriculados: string) {
   const mat = parseCsv(await Bun.file(arquivoMatriculados).text());
   const cabM = mat[1]!;
   const colM = (ini: string) => cabM.findIndex((h) => h.trim().startsWith(ini));
-  const [mNome, mTel, mCancelou] = [colM("Nome Completo"), colM("Telefone"), colM("Cancelou a Mentoria")];
-  if ([mNome, mTel, mCancelou].includes(-1)) throw new Error("planilha de matriculados: colunas não encontradas");
-  const chavesAlunos = new Set<string>(), chavesCancelados = new Set<string>();
+  const [mNome, mTel, mCancelou, mCompra] = [colM("Nome Completo"), colM("Telefone"), colM("Cancelou a Mentoria"), colM("Data Compra")];
+  if ([mNome, mTel, mCancelou, mCompra].includes(-1)) throw new Error("planilha de matriculados: colunas não encontradas");
+  // Quem comprou nos últimos 30 dias fica fora do convite de alunos (decidido em 02/11/2026): ainda
+  // está no prazo de arrependimento ou acabou de pagar a tabela, e a condição de renovação só geraria
+  // reembolso e atrito. Continua fora também de leads/médicos (é matriculado).
+  const corteRecentes = Date.now() - 30 * 86_400_000;
+  const chavesAlunos = new Set<string>(), chavesCancelados = new Set<string>(), chavesRecentes = new Set<string>();
   const porAluno = new Map<string, { nome: string; tel: string }>();
   let semTelefone = 0;
   for (const l of mat.slice(2)) {
@@ -126,13 +130,15 @@ async function montar(arquivoCsv: string, arquivoMatriculados: string) {
     const k = chave(tel);
     chavesAlunos.add(k);
     if ((l[mCancelou] ?? "").trim().toUpperCase() === "SIM") chavesCancelados.add(k);
+    const compra = (l[mCompra] ?? "").match(/(\d+)\/(\d+)\/(\d{4})/);
+    if (compra && new Date(`${compra[3]}-${compra[2]!.padStart(2, "0")}-${compra[1]!.padStart(2, "0")}T00:00:00-03:00`).getTime() >= corteRecentes) chavesRecentes.add(k);
     porAluno.set(k, { nome: (l[mNome] ?? "").trim(), tel });
   }
-  const alunos: Alvo[] = [...porAluno.entries()].filter(([k]) => !chavesCancelados.has(k)).map(([, a]) => ({
+  const alunos: Alvo[] = [...porAluno.entries()].filter(([k]) => !chavesCancelados.has(k) && !chavesRecentes.has(k)).map(([, a]) => ({
     nome: a.nome, whatsapp: a.tel.startsWith("55") ? a.tel : `55${a.tel}`, formacao: null, aplicou: null,
     contato: null, telefoneContato: null, conv: null,
   }));
-  console.log(`matriculados: ${porAluno.size} números únicos, ${chavesCancelados.size} cancelados, ${semTelefone} linhas sem telefone`);
+  console.log(`matriculados: ${porAluno.size} números únicos, ${chavesCancelados.size} cancelados, ${chavesRecentes.size} compraram nos últimos 30 dias, ${semTelefone} linhas sem telefone`);
 
   // 2. Formulário de aplicação: o CSV exportado da planilha do Google Forms (desde 04/2025) é
   // bem mais completo que a tabela leads_formulario_mentoria (só desde a migração do n8n).
@@ -198,14 +204,26 @@ const MEMORIA: Record<Publico, string> = {
 const template = (p: Publico) => `convite_black_${p}_acesso`;
 const ledger = (p: Publico) => `${SAIDA}-${p}-enviados.tsv`;
 
-async function enviarConvite(p: Publico, convId: number): Promise<number> {
+// Lembrete: template próprio, com data perto ("amanhã"/"hoje"), para quem leu e não tocou.
+// Alunos na véspera (05/11 19h), leads e médicos no dia da live (08/11 10h).
+const R = "\n\n👇🏻 Toque no botão abaixo para ativar seu acesso";
+const LEMBRETES: Record<Publico, { template: string; texto: string; imagem: string }> = {
+  alunos: { template: "lembrete_black_alunos", texto: "Seu acesso à BLACK EXCLUSIVA DE ALUNOS ainda não foi ativado.\n\nAs condições de alunos serão liberadas amanhã, 06/11, às 10h." + R, imagem: CONVITES_BLACK.convite_black_alunos!.imagem },
+  leads: { template: "lembrete_black_leads", texto: "Seu acesso à BLACK VESTIGIUM ainda não foi ativado.\n\nA aula ao vivo acontece hoje, 08/11, às 20h." + R, imagem: CONVITES_BLACK.convite_black_leads!.imagem },
+  medicos: { template: "lembrete_black_medicos", texto: "Seu acesso à BLACK DE MÉDICO LEGISTA ainda não foi ativado.\n\nAs condições para médicos serão liberadas hoje, 08/11, às 20h." + R, imagem: CONVITES_BLACK.convite_black_medicos!.imagem },
+};
+
+async function enviarConvite(p: Publico, convId: number, modo: "convite" | "lembrete" = "convite"): Promise<number> {
+  const t = modo === "lembrete"
+    ? LEMBRETES[p]
+    : { template: template(p), texto: TEXTOS[p], imagem: CONVITES_BLACK[template(p)]!.imagem };
   const j = await chamar(`${BASE}/conversations/${convId}/messages`, {
     method: "POST",
     body: JSON.stringify({
-      message_type: "outgoing", content_type: "text", content: TEXTOS[p],
+      message_type: "outgoing", content_type: "text", content: t.texto,
       template_params: {
-        name: template(p), category: "UTILITY", language: "pt_BR",
-        processed_params: { body: {}, header: { media_url: CONVITES_BLACK[template(p)]!.imagem, media_type: "image" } },
+        name: t.template, category: "UTILITY", language: "pt_BR",
+        processed_params: { body: {}, header: { media_url: t.imagem, media_type: "image" } },
       },
     }),
   });
@@ -241,7 +259,7 @@ async function enviar(p: Publico, limite: number, valendo: boolean) {
 
   let ok = 0, falhas = 0;
   const fora: Record<string, number> = {};
-  await emLotes(lista, 3, async (a) => {
+  await emLotes(lista, 3, async (a) => comLimite(60_000, async () => {
     try {
       const { convId, telefone, novo } = await resolverConversa(a);
       // Na hora do envio: fica fora quem está bloqueado ou conversou nas últimas 2h.
@@ -263,8 +281,47 @@ async function enviar(p: Publico, limite: number, valendo: boolean) {
       console.log(`✗ ${a.nome} (${a.whatsapp}): ${(e as Error).message.slice(0, 160)}`);
       logger.error("disparo-convite-black", "falha no envio", { publico: p, telefone: a.whatsapp, erro: (e as Error).message });
     }
-  });
+  }).catch((e) => { falhas++; console.log(`✗ ${a.nome} (${a.whatsapp}): ${(e as Error).message}`); }));
   console.log(`\n${ok} enviados, ${falhas} falhas · fora: ${JSON.stringify(fora)}`);
+}
+
+/** Um contato travado (fetch ou banco sem resposta) não pode parar o disparo inteiro: em 02/11 o
+ *  lote 4 dos leads ficou 10h parado num único contato. */
+function comLimite<T>(ms: number, fn: () => Promise<T>): Promise<T> {
+  return Promise.race([fn(), new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`tempo esgotado (${ms / 1000}s)`)), ms))]);
+}
+
+/** Pediu para não receber mais ("Cancelar recebimento", "sair", "parar"...). */
+const RE_OPTOUT = /cancelar recebimento|parar (de )?receber|n[aã]o (quero|desejo) (mais )?receber|^(sair|parar|pare|stop|descadastrar)$|parar mensagens/i;
+
+/**
+ * Lembrete: reenvia o convite para quem LEU e não fez nada depois — não tocou no botão, não
+ * escreveu, não foi escalado e não pediu para sair. Ledger próprio: lembra uma vez só.
+ */
+async function lembrete(p: Publico, valendo: boolean) {
+  const enviados = [...(await jaEnviados(p)).entries()];
+  const arqLedger = `${SAIDA}-${p}-lembrete.tsv`;
+  const f = Bun.file(arqLedger);
+  const jaLembrados = new Set((await f.exists()) ? (await f.text()).split("\n").filter(Boolean).map((l) => l.split("\t")[0]) : []);
+  let ok = 0, falhas = 0;
+  const fora: Record<string, number> = {};
+  const conta = (m: string) => { fora[m] = (fora[m] ?? 0) + 1; };
+  await emLotes(enviados.filter(([tel]) => !jaLembrados.has(tel)), 3, async ([tel, [convId, msgId]]) => comLimite(60_000, async () => {
+    const msgs: any[] = ((await listarMensagens(ACC, convId!)) as any).payload ?? [];
+    const convite = msgs.find((x) => String(x.id) === msgId);
+    if (convite?.status !== "read") return conta(convite?.status ? `convite ${convite.status}` : "convite não encontrado");
+    const depois = msgs.filter((x) => x.id > Number(msgId));
+    if (depois.some((x) => x.message_type === 0 && RE_OPTOUT.test((x.content ?? "").trim()))) return conta("pediu para sair");
+    if (depois.some((x) => x.message_type === 0)) return conta("interagiu");
+    if (depois.some((x) => x.private && /Pergunta sobre a Black/.test(x.content ?? ""))) return conta("escalado");
+    const conv: any = await buscarConversa(ACC, Number(convId));
+    if (conv.meta?.sender?.blocked) return conta("bloqueado");
+    if (!valendo) { ok++; return; }
+    const id = await enviarConvite(p, Number(convId), "lembrete");
+    await appendFile(arqLedger, `${tel}\t${convId}\t${id}\n`);
+    ok++;
+  }).catch((e) => { falhas++; console.log(`✗ ${tel}: ${(e as Error).message.slice(0, 120)}`); }));
+  console.log(`${p} lembrete: ${valendo ? `${ok} enviados, ${falhas} falhas` : `dry-run: ${ok} receberiam`} · fora: ${JSON.stringify(fora)}`);
 }
 
 // Status que a Meta devolveu (sent/delivered/read/failed) para cada envio do ledger.
@@ -285,9 +342,11 @@ const [cmd, arg, ...resto] = process.argv.slice(2);
 const publico = PUBLICOS.find((x) => x === arg);
 if (cmd === "montar" && arg && resto[0]) await montar(arg, resto[0]);
 else if (cmd === "teste" && publico && resto[0]) console.log(`✓ ${template(publico)} → conv ${resto[0]} (msg ${await enviarConvite(publico, Number(resto[0]))})`);
+else if (cmd === "teste-lembrete" && publico && resto[0]) console.log(`✓ ${LEMBRETES[publico].template} → conv ${resto[0]} (msg ${await enviarConvite(publico, Number(resto[0]), "lembrete")})`);
 else if (cmd === "enviar" && publico) {
   const i = resto.indexOf("--limite");
   await enviar(publico, i >= 0 ? Number(resto[i + 1]) : Infinity, resto.includes("--enviar"));
 } else if (cmd === "verificar" && publico) await verificar(publico);
-else console.log("uso: montar <respostas.csv> <matriculados.csv> | teste <publico> <conv> | enviar <publico> [--limite N] [--enviar] | verificar <publico>");
+else if (cmd === "lembrete" && publico) await lembrete(publico, resto.includes("--enviar"));
+else console.log("uso: montar <respostas.csv> <matriculados.csv> | teste <publico> <conv> | enviar <publico> [--limite N] [--enviar] | verificar <publico> | lembrete <publico> [--enviar]");
 await pool.end();
