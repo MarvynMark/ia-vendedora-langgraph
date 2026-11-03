@@ -72,6 +72,27 @@ async function acharContato(tel: string): Promise<{ id: number; phone_number: st
   return c ? { id: c.id, phone_number: c.phone_number } : null;
 }
 
+/** Todos os contatos com este telefone (com e sem o 9 — o Chatwoot tem muitos duplicados). */
+async function contatosDoTelefone(tel: string): Promise<Array<{ id: number; phone_number: string }>> {
+  const j = await chamar(`${BASE}/contacts/search?q=${tel.slice(-8)}`);
+  return (j.payload ?? []).filter((x: any) => x.phone_number && chave(x.phone_number) === chave(tel));
+}
+
+/**
+ * Conversas na inbox comercial de TODOS os contatos do telefone, da mais ativa para a menos.
+ * A mais ativa é a que a pessoa usa: é nela que as respostas chegam. Em 02–03/11 o convite saiu
+ * pelo duplicado sem o 9 e a resposta caiu em outra conversa (ver src/lib/convite-duplicatas.ts).
+ */
+async function convsDoTelefone(tel: string): Promise<Array<{ id: number; ultima: number; contato: { id: number; phone_number: string } }>> {
+  const out: Array<{ id: number; ultima: number; contato: { id: number; phone_number: string } }> = [];
+  for (const c of await contatosDoTelefone(tel)) {
+    for (const v of (await buscarConversasDoContato(ACC, c.id).catch(() => [])) as any[]) {
+      if (v.inbox_id === INBOX) out.push({ id: v.id, ultima: v.last_activity_at ?? 0, contato: c });
+    }
+  }
+  return out.sort((a, b) => b.ultima - a.ultima);
+}
+
 async function convDaInbox(contato: number): Promise<number | null> {
   const convs = await buscarConversasDoContato(ACC, contato).catch(() => []);
   return convs.filter((v) => v.inbox_id === INBOX).sort((a, b) => b.id - a.id)[0]?.id ?? null;
@@ -210,9 +231,9 @@ const ledger = (p: Publico) => `${SAIDA}-${p}-enviados.tsv`;
 // Formato de lembrete de evento registrado; a urgência vem do dia do envio e da arte.
 const R = "\n\n👇🏻 Toque no botão abaixo para ver os detalhes de acesso";
 const LEMBRETES: Record<Publico, { template: string; texto: string; imagem: string }> = {
-  alunos: { template: "lembrete_black_alunos_v2", texto: "Lembrete do seu registro na BLACK EXCLUSIVA DE ALUNOS.\n\nAs condições de alunos serão liberadas dia 06/11 às 10h." + R, imagem: CONVITES_BLACK.convite_black_alunos!.imagem },
-  leads: { template: "lembrete_black_leads_v2", texto: "Lembrete do seu registro na BLACK VESTIGIUM.\n\nA aula ao vivo acontecerá dia 08/11 às 20h." + R, imagem: CONVITES_BLACK.convite_black_leads!.imagem },
-  medicos: { template: "lembrete_black_medicos_v2", texto: "Lembrete do seu registro na BLACK DE MÉDICO LEGISTA.\n\nAs condições para médicos serão liberadas dia 08/11 às 20h." + R, imagem: CONVITES_BLACK.convite_black_medicos!.imagem },
+  alunos: { template: "lembrete_black_alunos_v2", texto: "Lembrete do seu registro na BLACK EXCLUSIVA DE ALUNOS.\n\nAs condições de alunos serão liberadas dia 06/11 às 10h." + R, imagem: "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBL250QVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--ff3991ed1401226ec7fb7963243aea62c8071e03/lembrete_black_alunos.jpg" },
+  leads: { template: "lembrete_black_leads_v2", texto: "Lembrete do seu registro na BLACK VESTIGIUM.\n\nA aula ao vivo acontecerá dia 08/11 às 20h." + R, imagem: "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBL2Z0QVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--df58dd03e0a9753e9cccd6d31edc058911b5e86c/lembrete_black_leads.jpg" },
+  medicos: { template: "lembrete_black_medicos_v2", texto: "Lembrete do seu registro na BLACK DE MÉDICO LEGISTA.\n\nAs condições para médicos serão liberadas dia 08/11 às 20h." + R, imagem: "https://chat.stkd.site/rails/active_storage/blobs/redirect/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBL0h0QVE9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--330bf6409ed4ad36513f9b671b5a77828411905c/lembrete_black_medicos.jpg" },
 };
 
 /** Lembrete só sai como UTILITY (decisão do Gusthavo, 03/11/2026): consulta a categoria na Meta. */
@@ -249,12 +270,12 @@ async function jaEnviados(p: Publico): Promise<Map<string, string[]>> {
 
 /** Contato e conversa na inbox comercial; cria o que faltar. */
 async function resolverConversa(a: Alvo): Promise<{ convId: number; telefone: string; novo: boolean }> {
-  const c = await acharContato(a.whatsapp);
-  if (c) {
-    const conv = await convDaInbox(c.id);
-    if (conv) return { convId: conv, telefone: c.phone_number, novo: false };
-    return { convId: (await criarConversa(ACC, { inbox_id: INBOX, contact_id: c.id })).id, telefone: c.phone_number, novo: true };
-  }
+  const convs = await convsDoTelefone(a.whatsapp);
+  if (convs[0]) return { convId: convs[0].id, telefone: convs[0].contato.phone_number, novo: false };
+  const contatos = await contatosDoTelefone(a.whatsapp);
+  // Sem conversa: prefere o contato com o 9 (13 dígitos com o 55), que é o formato atual.
+  const c = contatos.find((x) => x.phone_number.replace(/\D/g, "").length === 13) ?? contatos[0];
+  if (c) return { convId: (await criarConversa(ACC, { inbox_id: INBOX, contact_id: c.id })).id, telefone: c.phone_number, novo: true };
   const telefone = `+${a.whatsapp}`;
   const novo = await criarContato(ACC, { name: a.nome || telefone, phone_number: telefone });
   const convId = (await criarConversa(ACC, { inbox_id: INBOX, contact_id: novo.id, source_id: a.whatsapp })).id;
@@ -320,18 +341,23 @@ async function lembrete(p: Publico, valendo: boolean) {
   const fora: Record<string, number> = {};
   const conta = (m: string) => { fora[m] = (fora[m] ?? 0) + 1; };
   await emLotes(enviados.filter(([tel]) => !jaLembrados.has(tel)), 3, async ([tel, [convId, msgId]]) => comLimite(60_000, async () => {
-    const msgs: any[] = ((await listarMensagens(ACC, convId!)) as any).payload ?? [];
+    // Junta as conversas de todos os contatos do telefone: o convite pode ter saído pelo duplicado
+    // e o toque/resposta ter chegado na conversa verdadeira.
+    const convs = await convsDoTelefone(tel);
+    const ids = [...new Set([Number(convId), ...convs.map((c) => c.id)])];
+    const msgs: any[] = (await Promise.all(ids.map(async (id) => ((await listarMensagens(ACC, String(id))) as any).payload ?? []))).flat();
     const convite = msgs.find((x) => String(x.id) === msgId);
     if (convite?.status !== "read") return conta(convite?.status ? `convite ${convite.status}` : "convite não encontrado");
     const depois = msgs.filter((x) => x.id > Number(msgId));
     if (depois.some((x) => x.message_type === 0 && RE_OPTOUT.test((x.content ?? "").trim()))) return conta("pediu para sair");
     if (depois.some((x) => x.message_type === 0)) return conta("interagiu");
     if (depois.some((x) => x.private && /Pergunta sobre a Black/.test(x.content ?? ""))) return conta("escalado");
-    const conv: any = await buscarConversa(ACC, Number(convId));
+    const destino = convs[0]?.id ?? Number(convId);
+    const conv: any = await buscarConversa(ACC, destino);
     if (conv.meta?.sender?.blocked) return conta("bloqueado");
     if (!valendo) { ok++; return; }
-    const id = await enviarConvite(p, Number(convId), "lembrete");
-    await appendFile(arqLedger, `${tel}\t${convId}\t${id}\n`);
+    const id = await enviarConvite(p, destino, "lembrete");
+    await appendFile(arqLedger, `${tel}\t${destino}\t${id}\n`);
     ok++;
   }).catch((e) => { falhas++; console.log(`✗ ${tel}: ${(e as Error).message.slice(0, 120)}`); }));
   console.log(`${p} lembrete: ${valendo ? `${ok} enviados, ${falhas} falhas` : `dry-run: ${ok} receberiam`} · fora: ${JSON.stringify(fora)}`);

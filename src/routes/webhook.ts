@@ -7,6 +7,7 @@ import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
 import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome, BOTAO_CONVITE_BLACK, conviteBlackRecente, perguntaDaBlack, jaEscaladoBlack, publicoDoConvite, MARCA_ESCALACAO_BLACK } from "./webhook-filtros.ts";
 import { escalarParaHumano } from "../tools/escalar-humano.ts";
+import { mensagensComConviteDeDuplicatas } from "../lib/convite-duplicatas.ts";
 import { ehMedicoLead } from "../lib/medico.ts";
 import { limparLock, liberarLock } from "../db/lock.ts";
 import { estaEncerrando, rastrear } from "../lib/processamentos-ativos.ts";
@@ -201,9 +202,10 @@ export const webhookRouter = new Elysia()
     if (BOTAO_CONVITE_BLACK.test(content.trim())) {
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
-      const msgs = await listarMensagens(idConta, idConversa) as { payload?: Parameters<typeof respostaVerDetalhes>[1] };
+      // Junta o convite que tenha saído por um contato duplicado (com/sem o 9): ver convite-duplicatas.ts.
+      const msgs = await mensagensComConviteDeDuplicatas(idConta, idConversa, parsed.data.sender.phone_number ?? "", Number(payload.conversation.inbox_id ?? env.CHATWOOT_INBOX_ID));
       const emRespostaA = Number((payload as { content_attributes?: { in_reply_to?: number } }).content_attributes?.in_reply_to) || null;
-      const r = respostaVerDetalhes(content, msgs.payload ?? [], Date.now() / 1000, emRespostaA);
+      const r = respostaVerDetalhes(content, msgs, Date.now() / 1000, emRespostaA);
       if (r) {
         try {
           const img = await fetchComTimeout(r.sequencia.imagem, { timeout: 30_000 });
@@ -257,9 +259,7 @@ export const webhookRouter = new Elysia()
       const idConta = parsed.data.account.id.toString();
       const idConversa = parsed.data.conversation.id.toString();
       const agora = Date.now() / 1000;
-      const msgs = ((await listarMensagens(idConta, idConversa)) as {
-        payload?: Array<{ id?: number; message_type: number; private?: boolean; content?: string | null; created_at?: number; additional_attributes?: { template_params?: { name?: string } } | null }>;
-      }).payload ?? [];
+      const msgs = await mensagensComConviteDeDuplicatas(idConta, idConversa, parsed.data.sender.phone_number ?? "", Number(payload.conversation.inbox_id ?? env.CHATWOOT_INBOX_ID));
       const convite = conviteBlackRecente(msgs, agora);
 
       if (pedeGrupo && convite) {
