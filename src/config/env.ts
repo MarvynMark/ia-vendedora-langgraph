@@ -94,6 +94,8 @@ export const env = {
   CENTRAL_INGEST_CHAVE: process.env["CENTRAL_INGEST_CHAVE"] ?? "",
 
   KANBAN_BOARD_ID: Number(process.env["KANBAN_BOARD_ID"] ?? "1"),
+  // Quadro "Renovação - Mentoria Vestigium" (cards criados pela rotina de retenção da Central).
+  KANBAN_BOARD_RENOVACAO_ID: Number(process.env["KANBAN_BOARD_RENOVACAO_ID"] ?? "14"),
   GRUPO_ESPERA_LINK: process.env["GRUPO_ESPERA_LINK"] ?? "https://chat.whatsapp.com/IV5ub2oizto08ulrTaNuTO?mode=gi_t",
   // Lista de espera só de médicos (trilha Médico Legista). Quem não é médico segue no link acima.
   GRUPO_ESPERA_MEDICOS_LINK: process.env["GRUPO_ESPERA_MEDICOS_LINK"] ?? "https://chat.whatsapp.com/IFGQty2tgpADETAbYJmbMs?mode=gi_t",

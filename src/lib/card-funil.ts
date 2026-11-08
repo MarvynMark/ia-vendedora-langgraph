@@ -28,3 +28,14 @@ export function escolherConversaDoFunil<T extends ConversaComCard>(
       Number(c.kanban_task["board_id"]) === boardIdFunil,
   );
 }
+
+// Quem tem card no quadro de renovação já é aluno — a rotina de retenção da Central só cria card
+// ali para aluno com plano ativo/vencendo. A compra dele é RENOVAÇÃO mesmo quando o card do funil
+// não mostra isso: card antigo sem "boas-vindas: enviado" (Leandra Rosique, 08/11) ou nenhum card
+// no funil, caindo no fallback (Eliza Nunes, 08/11). Sem isso o grupo via "NOVO ALUNO" e a aluna
+// recebia de novo as boas-vindas de quem acabou de entrar.
+export function temCardDeRenovacao(conversas: ConversaComCard[], boardIdRenovacao: number): boolean {
+  return conversas.some(
+    (c) => c.kanban_task && Number(c.kanban_task["board_id"]) === boardIdRenovacao,
+  );
+}

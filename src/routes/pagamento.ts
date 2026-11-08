@@ -19,7 +19,7 @@ import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
-import { escolherConversaDoFunil } from "../lib/card-funil.ts";
+import { escolherConversaDoFunil, temCardDeRenovacao } from "../lib/card-funil.ts";
 import { enviarAvisoGrupo } from "../services/aviso-grupo.ts";
 import { classificarCompra, descricaoAposCompra } from "../lib/renovacao.ts";
 import { enviarRoteiroVideoCompra } from "../services/roteiro-video-compra.ts";
@@ -313,7 +313,11 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
 
   // Compra nova × reenvio da mesma compra × renovação de quem já é aluno (lib/renovacao.ts).
   const agora = new Date();
-  const tipoCompra = classificarCompra(task.description ?? "", agora, task.step_changed_at);
+  let tipoCompra = classificarCompra(task.description ?? "", agora, task.step_changed_at);
+  if (tipoCompra === "nova" && temCardDeRenovacao(conversas, env.KANBAN_BOARD_RENOVACAO_ID)) {
+    logger.info("pagamento", "Contato tem card no quadro de renovação — tratando como renovação", { taskId: task.id });
+    tipoCompra = "renovacao";
+  }
   if (tipoCompra === "duplicada") {
     logger.info("pagamento", "Boas-vindas já enviadas para esta compra — ignorando", { taskId: task.id });
     return;
