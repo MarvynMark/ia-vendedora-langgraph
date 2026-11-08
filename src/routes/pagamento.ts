@@ -19,6 +19,8 @@ import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
+import { escolherConversaDoFunil } from "../lib/card-funil.ts";
+import { enviarAvisoGrupo } from "../services/aviso-grupo.ts";
 import { classificarCompra, descricaoAposCompra } from "../lib/renovacao.ts";
 import { enviarRoteiroVideoCompra } from "../services/roteiro-video-compra.ts";
 import { encaminharPagamentoParaCentral } from "../lib/encaminhar-central.ts";
@@ -231,14 +233,15 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     return;
   }
 
-  // Pegar a conversa mais recente que tenha kanban_task
-  let conversaComTask = conversas.find(c => c.kanban_task && Object.keys(c.kanban_task).length > 0);
+  // Pegar a conversa mais recente com card NO FUNIL — o card do quadro de renovação não tem
+  // "Ganho" e abortava antes de avisar o grupo (lib/card-funil.ts).
+  let conversaComTask = escolherConversaDoFunil(conversas, env.KANBAN_BOARD_ID);
 
   // Fallback: contato encontrado mas sem card no Kanban — criar conversa na API Comercial e card automaticamente
   if (!conversaComTask?.kanban_task) {
     logger.warn("pagamento", "Sem kanban_task para contato — criando conversa e card automaticamente:", contato.id);
     try {
-      const board = await buscarKanbanBoard(accountId, 1) as {
+      const board = await buscarKanbanBoard(accountId, env.KANBAN_BOARD_ID) as {
         steps?: Array<{ id: number; name: string }>;
       };
       const ganhoStep = (board.steps ?? []).find(s => s.name.toLowerCase() === "ganho");
@@ -251,7 +254,7 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
         contact_id: contato.id,
       });
       const novaTask = await criarKanbanTask(accountId, {
-        board_id: 1,
+        board_id: env.KANBAN_BOARD_ID,
         board_step_id: ganhoStep.id,
         title: contato.name,
         conversation_id: novaConversa.id,
@@ -262,7 +265,7 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
         inbox_id: Number(env.CHATWOOT_INBOX_ID),
         kanban_task: {
           id: novaTask.id,
-          board_id: 1,
+          board_id: env.KANBAN_BOARD_ID,
           title: contato.name,
           description: undefined,
         },
@@ -336,9 +339,8 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
     return;
   }
 
-  // Notificar grupo de suporte sobre novo aluno (ou renovação).
-  // Ordem importa: enviar primeiro (Baileys enfileira a msg), depois reabrir
-  // (Baileys entrega as msgs pendentes ao reabrir). Inverter a ordem causa falha.
+  // Notificar grupo de suporte sobre novo aluno (ou renovação). O envio reabre a conversa do
+  // grupo e reenvia se o WhatsApp recusar a entrega (services/aviso-grupo.ts).
   try {
     const mensagemGrupo = montarMensagemNovoAluno({
       nome: dados.nome ?? contato.name,
@@ -349,19 +351,10 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
       origem: dados.origem,
       renovacao,
     });
-    await enviarMensagem(
-      accountId,
-      env.CHATWOOT_ALERT_CONVERSATION_ID,
-      mensagemGrupo,
-    );
+    await enviarAvisoGrupo(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID, mensagemGrupo);
     logger.info("pagamento", "Notificação de novo aluno enviada ao grupo de suporte");
   } catch (e) {
     logger.error("pagamento", "Erro ao enviar notificação ao grupo de suporte:", e);
-  }
-  try {
-    await reabrirConversa(accountId, env.CHATWOOT_ALERT_CONVERSATION_ID);
-  } catch (e) {
-    logger.warn("pagamento", "Falha ao reabrir conversa do grupo:", e);
   }
 
   // Roteiro do vídeo de boas-vindas para o Walker gravar, a partir da aplicação da mentoria.
