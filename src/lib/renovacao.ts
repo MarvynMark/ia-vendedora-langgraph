@@ -52,7 +52,7 @@ export function classificarCompra(descricao: string, agora: Date, stepChangedAt?
 
 /**
  * Descrição do card após uma compra aprovada: troca a linha do plano e a da última compra pelas
- * novas (o card mantém uma só de cada — linkPrimeirosPassos lê a primeira "Plano:") e garante o
+ * novas (o card mantém uma só de cada — linkOnboarding lê a primeira "Plano:") e garante o
  * marcador de boas-vindas no fim.
  */
 export function descricaoAposCompra(descricao: string, plano: string, agora: Date): string {

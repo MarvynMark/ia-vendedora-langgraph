@@ -147,11 +147,17 @@ export const CONTEUDO_TEMPLATES: Record<string, string> = {
   sessao_link_1h:
     "Opa! Nossa conversa é daqui a pouco, às {{1}}. É por aqui: {{2}} — te espero!",
 
-  // --- Boas-vindas pós-compra (fallback fora da janela) — {{1}} = primeiro nome, 1:1 com a Meta ---
+  // --- Boas-vindas pós-compra antigas (primeiros-passos; substituídas pelas de onboarding em 11/11/2026) — {{1}} = primeiro nome, 1:1 com a Meta ---
   boas_vindas_perito:
     "🚀 [Nome], parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 https://lp.mentoriavestigium.com.br/primeiros-passos-perito\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.",
   boas_vindas_medico:
     "🚀 [Nome], parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 https://lp.mentoriavestigium.com.br/primeiros-passos-medico\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.",
+
+  // --- Boas-vindas pós-compra com a página de onboarding única (11/11/2026) — {{1}} = primeiro nome, 1:1 com a Meta ---
+  boas_vindas_onboarding:
+    "🚀 [Nome], parabéns por entrar para a Mentoria Vestigium!\n\nMontei uma página com o seu passo a passo de entrada: os vídeos que gravei, o acesso à plataforma, a ficha do aluno e os nossos canais de atendimento. Está tudo lá, em um lugar só.\n\n👉 https://lp.mentoriavestigium.com.br/onboarding\n\nReserva uns 20 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.",
+  boas_vindas_onboarding_estrat:
+    "🚀 [Nome], parabéns por entrar para a Mentoria Vestigium!\n\nMontei uma página com o seu passo a passo de entrada: os vídeos que gravei, o acesso à plataforma, a ficha do aluno e os nossos canais de atendimento. Está tudo lá, em um lugar só.\n\n👉 https://lp.mentoriavestigium.com.br/onboarding-estrategia\n\nReserva uns 20 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.",
 
   // --- Promoção do Dia do Cliente (18/09/2026, um dia só) — sem variável, texto 1:1 com a Meta ---
   dia_cliente_quente_v2:
@@ -220,4 +226,6 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   // Boas-vindas pós-compra — {{1}} = primeiro nome.
   boas_vindas_perito: { language: "pt_BR", bodyVars: 1 },
   boas_vindas_medico: { language: "pt_BR", bodyVars: 1 },
+  boas_vindas_onboarding: { language: "pt_BR", bodyVars: 1 },
+  boas_vindas_onboarding_estrat: { language: "pt_BR", bodyVars: 1 },
 };

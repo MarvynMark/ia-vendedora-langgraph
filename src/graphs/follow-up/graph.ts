@@ -492,28 +492,36 @@ async function agenteLembrete(state: FollowUpStateType) {
   return { respostaAgente: "" };
 }
 
-// Páginas de onboarding "Primeiros passos". Substituem a antiga sequência de 6 mensagens:
-// vídeo de apresentação, acesso à plataforma, Laudo Inicial, grupos oficiais e suporte
-// estão todos dentro da página, com checklist de progresso.
-const LINK_PRIMEIROS_PASSOS_PERITO = "https://lp.mentoriavestigium.com.br/primeiros-passos-perito";
-const LINK_PRIMEIROS_PASSOS_MEDICO = "https://lp.mentoriavestigium.com.br/primeiros-passos-medico";
+// Página de onboarding pós-compra (11/11/2026): uma só para perito e médico, com vídeos,
+// acesso à plataforma, ficha do aluno e canais. Os links curtos redirecionam (lp-aprova-perito/
+// _redirects), então dá para trocar o destino sem template novo na Meta. A versão com Estratégia
+// mostra também o vídeo e o cadastro no Estratégia Concursos.
+// Substituiu as páginas "primeiros-passos-perito/medico" (que hoje redirecionam para esta).
+export const LINK_ONBOARDING = "https://lp.mentoriavestigium.com.br/onboarding";
+export const LINK_ONBOARDING_ESTRATEGIA = "https://lp.mentoriavestigium.com.br/onboarding-estrategia";
 
-// A trilha do aluno vem do plano que o webhook de pagamento grava no card
+// O plano vem do webhook de pagamento, que grava no card o nome da oferta
 // ("💳 - Plano: Mentoria Vestigium - Médico Legista - 12 meses"). Só a linha do plano é
-// analisada: o resto da description carrega marcadores de follow-up que poderiam dar
-// falso positivo. Sem plano identificável, cai na página de perito (maioria dos alunos).
-export function linkPrimeirosPassos(description: string): string {
+// analisada: o resto da description carrega marcadores de follow-up que poderiam dar falso
+// positivo. Tem Estratégia: plano com "Estratégia" ou "Premium" no nome, e todo médico.
+export function linkOnboarding(description: string): string {
   const linhaPlano = description.match(/Plano:\s*(.+)/i)?.[1] ?? "";
-  return /m[ée]dic|legista/i.test(linhaPlano)
-    ? LINK_PRIMEIROS_PASSOS_MEDICO
-    : LINK_PRIMEIROS_PASSOS_PERITO;
+  return /estrat[ée]gia|premium|m[ée]dic|legista/i.test(linhaPlano)
+    ? LINK_ONBOARDING_ESTRATEGIA
+    : LINK_ONBOARDING;
 }
 
-// Fallback fora da janela de 24h: um template por trilha, com o link fixo e {{1}} = primeiro nome.
+// Fallback fora da janela de 24h: um template por link, com o link fixo e {{1}} = primeiro nome.
 // 11/10/2026 (conv 8563): a aluna comprou dias depois da última mensagem dela, a boas-vindas saiu
 // como texto livre, a Meta recusou ("janela de 24 horas encerrada") e ela ficou sem o onboarding.
+// (boas_vindas_onboarding_estrategia, sem o "_estrat", foi aprovado com o link quebrado: não usar.)
 export function templateBoasVindas(link: string): string {
-  return link === LINK_PRIMEIROS_PASSOS_MEDICO ? "boas_vindas_medico" : "boas_vindas_perito";
+  return link === LINK_ONBOARDING_ESTRATEGIA ? "boas_vindas_onboarding_estrat" : "boas_vindas_onboarding";
+}
+
+/** Texto da boas-vindas: idêntico ao dos templates (só o nome entra como {{1}}). */
+export function mensagemBoasVindas(primeiroNome: string, link: string): string {
+  return `🚀 ${primeiroNome}, parabéns por entrar para a Mentoria Vestigium!\n\nMontei uma página com o seu passo a passo de entrada: os vídeos que gravei, o acesso à plataforma, a ficha do aluno e os nossos canais de atendimento. Está tudo lá, em um lugar só.\n\n👉 ${link}\n\nReserva uns 20 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.`;
 }
 
 async function agenteBoasVindas(state: FollowUpStateType) {
@@ -522,9 +530,9 @@ async function agenteBoasVindas(state: FollowUpStateType) {
   // Só o primeiro nome deixa a saudação mais natural (evita "Renan Martins Paludo").
   // Alinhado aos demais agentes do grafo, que já usam o primeiro nome.
   const primeiroNome = primeiroNomeSaudacao(state.title, "aluno(a)");
-  const link = linkPrimeirosPassos(state.description ?? "");
+  const link = linkOnboarding(state.description ?? "");
 
-  const msg = `🚀 ${primeiroNome}, parabéns por entrar para a Mentoria Vestigium!\nSua matrícula já está liberada.\n\nMontei uma página com o seu passo a passo de entrada: o vídeo que gravei, o acesso à plataforma, o Laudo Inicial e os grupos oficiais. Está tudo lá, em um lugar só.\n\n👉 ${link}\n\nReserva 5 minutos e faz agora, na ordem. Qualquer dúvida, é só me chamar por aqui.`;
+  const msg = mensagemBoasVindas(primeiroNome, link);
 
   const dentroJanela = (await msRestantesJanela24h(state.accountId, state.conversationId)) > 0;
 
