@@ -521,7 +521,7 @@ export function linkOnboarding(description: string): string {
 // destino pelos redirecionamentos do site: primeiros-passos-perito → onboarding normal e
 // primeiros-passos-medico → onboarding com Estratégia (o texto dos dois só difere no link).
 // Quando `status` disser SINCRONIZADO para os dois, troque para true.
-export const TEMPLATES_ONBOARDING_SINCRONIZADOS = false;
+export const TEMPLATES_ONBOARDING_SINCRONIZADOS = true;
 
 export function templateBoasVindas(link: string): string {
   const estrategia = link === LINK_ONBOARDING_ESTRATEGIA;
