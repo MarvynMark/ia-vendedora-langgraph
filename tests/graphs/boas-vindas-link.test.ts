@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   linkOnboarding, templateBoasVindas, mensagemBoasVindas,
-  LINK_ONBOARDING, LINK_ONBOARDING_ESTRATEGIA,
+  LINK_ONBOARDING, LINK_ONBOARDING_ESTRATEGIA, TEMPLATES_ONBOARDING_SINCRONIZADOS,
 } from "../../src/graphs/follow-up/graph.ts";
 import { CONTEUDO_TEMPLATES, TEMPLATE_META } from "../../src/lib/templates.ts";
 
@@ -46,15 +46,21 @@ describe("linkOnboarding", () => {
 });
 
 describe("templateBoasVindas", () => {
-  test("cada link usa o template com o próprio link", () => {
-    expect(templateBoasVindas(PADRAO)).toBe("boas_vindas_onboarding");
-    expect(templateBoasVindas(ESTRATEGIA)).toBe("boas_vindas_onboarding_estrat");
+  test("cada link usa um template que leva ao mesmo destino", () => {
+    if (TEMPLATES_ONBOARDING_SINCRONIZADOS) {
+      expect(templateBoasVindas(PADRAO)).toBe("boas_vindas_onboarding");
+      expect(templateBoasVindas(ESTRATEGIA)).toBe("boas_vindas_onboarding_estrat");
+    } else {
+      // Ponte: os antigos redirecionam (primeiros-passos-medico → onboarding com Estratégia).
+      expect(templateBoasVindas(PADRAO)).toBe("boas_vindas_perito");
+      expect(templateBoasVindas(ESTRATEGIA)).toBe("boas_vindas_medico");
+    }
   });
 
-  test("texto registrado no CRM é igual ao texto livre e aponta pro mesmo link", () => {
-    for (const link of [PADRAO, ESTRATEGIA]) {
-      const nome = templateBoasVindas(link) as keyof typeof CONTEUDO_TEMPLATES;
-      expect(CONTEUDO_TEMPLATES[nome]).toBe(mensagemBoasVindas("[Nome]", link));
+  test("templates novos: texto do CRM igual ao texto livre e mesmo link", () => {
+    const novos = { boas_vindas_onboarding: PADRAO, boas_vindas_onboarding_estrat: ESTRATEGIA } as const;
+    for (const [nome, link] of Object.entries(novos)) {
+      expect(CONTEUDO_TEMPLATES[nome as keyof typeof CONTEUDO_TEMPLATES]).toBe(mensagemBoasVindas("[Nome]", link));
       expect(TEMPLATE_META[nome]?.bodyVars).toBe(1);
     }
   });

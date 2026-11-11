@@ -515,8 +515,18 @@ export function linkOnboarding(description: string): string {
 // 11/10/2026 (conv 8563): a aluna comprou dias depois da última mensagem dela, a boas-vindas saiu
 // como texto livre, a Meta recusou ("janela de 24 horas encerrada") e ela ficou sem o onboarding.
 // (boas_vindas_onboarding_estrategia, sem o "_estrat", foi aprovado com o link quebrado: não usar.)
+//
+// PONTE (11/11/2026): os templates novos foram aprovados na Meta, mas o Chatwoot ainda não os
+// sincronizou, e template não sincronizado falha no envio. Até lá, os antigos levam ao mesmo
+// destino pelos redirecionamentos do site: primeiros-passos-perito → onboarding normal e
+// primeiros-passos-medico → onboarding com Estratégia (o texto dos dois só difere no link).
+// Quando `status` disser SINCRONIZADO para os dois, troque para true.
+export const TEMPLATES_ONBOARDING_SINCRONIZADOS = false;
+
 export function templateBoasVindas(link: string): string {
-  return link === LINK_ONBOARDING_ESTRATEGIA ? "boas_vindas_onboarding_estrat" : "boas_vindas_onboarding";
+  const estrategia = link === LINK_ONBOARDING_ESTRATEGIA;
+  if (!TEMPLATES_ONBOARDING_SINCRONIZADOS) return estrategia ? "boas_vindas_medico" : "boas_vindas_perito";
+  return estrategia ? "boas_vindas_onboarding_estrat" : "boas_vindas_onboarding";
 }
 
 /** Texto da boas-vindas: idêntico ao dos templates (só o nome entra como {{1}}). */
@@ -541,7 +551,10 @@ async function agenteBoasVindas(state: FollowUpStateType) {
       await enviarMensagem(state.accountId, state.conversationId, msg);
     } else {
       // O texto do template é idêntico ao msg (só o nome entra como {{1}}).
-      await enviarTemplateComHistorico(state, templateBoasVindas(link), msg, primeiroNome);
+      // O histórico guarda o texto do template que de fato sai (na ponte, o antigo).
+      const nome = templateBoasVindas(link);
+      const texto = (CONTEUDO_TEMPLATES as Record<string, string>)[nome]?.replace("[Nome]", primeiroNome) ?? msg;
+      await enviarTemplateComHistorico(state, nome, texto, primeiroNome);
     }
     logger.info("follow-up", "boas-vindas enviada", { link, janela: dentroJanela });
   } catch (e) {
