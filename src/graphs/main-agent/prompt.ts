@@ -5,6 +5,7 @@ import { ehMedicoLead } from "../../lib/medico.ts";
 import { BLOCO_PAPEL, BLOCO_PERSONALIDADE, BLOCO_RAG } from "./prompt-blocos.ts";
 import { promocaoAtiva, blocoPromocao } from "../../lib/promocao.ts";
 import { aulaAoVivoAtiva, blocoAulaAoVivo } from "../../lib/aula-ao-vivo.ts";
+import { blackNovembroAtiva, blocoBlackNovembroPerito, blocoBlackNovembroMedico, lembreteBlackNovembro } from "../../lib/black-novembro.ts";
 
 // Aprendizados destilados das conversas de compradores (gerado por scripts/analisar-compradores.ts
 // e revisado pela equipe). Lido uma vez no load do módulo; se o arquivo não existir, fica vazio.
@@ -59,6 +60,10 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   const blocoPromo = !ehMedico && promocaoAtiva() ? blocoPromocao() : "";
   // Aula ao vivo de 28/09 (convite com botão "Quero participar"). Ver lib/aula-ao-vivo.ts.
   const blocoAula = aulaAoVivoAtiva() ? blocoAulaAoVivo() : "";
+  // Black estendida (12 a 30/11/2026): preços e links da Black para todo lead, perito e médico.
+  // Some sozinha depois de 30/11, 23h59. Ver lib/black-novembro.ts.
+  const blackAtiva = blackNovembroAtiva();
+  const blocoBlack = blackAtiva ? (ehMedico ? blocoBlackNovembroMedico() : blocoBlackNovembroPerito()) : "";
 
   const blocoMedicoPitch = ehMedico
     ? `  **GATE DE ROTEAMENTO — decida qual bloco usar ANTES de escrever qualquer preço, nesta ordem:**
@@ -115,7 +120,7 @@ export function gerarPromptAgentePrincipal(ctx: ContextoPrompt): string {
   // Valores DINÂMICOS do lead (mudam por lead) — montados aqui e inseridos no FIM do prompt.
   // Motivo: manter as ~18k tokens de regras como um PREFIXO ESTÁVEL, que a OpenAI cacheia entre
   // leads/chamadas (o cache exige prefixo idêntico ≥1024 tk; com estes valores no topo, cacheava 0).
-  const blocoDadosLead = `${ehMedico ? `  **⚠️ ESTE LEAD É MÉDICO — trilha Médico Legista OBRIGATÓRIA.** Detectado de forma determinística (label "medico" e/ou formação com "medic", inclusive typos como "Mediciba"). SÓ ofereça planos **Médico Legista**. É PROIBIDO oferecer Trimestral, Anual ou Semestral genéricos de Perito Criminal, MESMO com reclamação de preço.\n` : ""}  **Nome do lead**: ${primeiroNome || "(não disponível)"}
+  const blocoDadosLead = `${blackAtiva ? lembreteBlackNovembro(ehMedico) : ""}${ehMedico ? `  **⚠️ ESTE LEAD É MÉDICO — trilha Médico Legista OBRIGATÓRIA.** Detectado de forma determinística (label "medico" e/ou formação com "medic", inclusive typos como "Mediciba"). SÓ ofereça planos **Médico Legista**. É PROIBIDO oferecer Trimestral, Anual ou Semestral genéricos de Perito Criminal, MESMO com reclamação de preço.\n` : ""}  **Nome do lead**: ${primeiroNome || "(não disponível)"}
 
   Dados preenchidos pelo lead no formulário de aplicação (formato: Campo: Valor | Campo: Valor):
 
@@ -313,7 +318,7 @@ ${blocoMedicoTratamento}</como-usar-dados>
 
   > "Tô pronto" = ele se comprometeu sozinho: siga pro PITCH DE PREÇO. Hesitou = a objeção apareceu antes do preço, trate-a primeiro. NÃO reenvie vídeo, áudio nem imagem.
 
-${blocoPromo}${blocoAula}
+${blocoPromo}${blocoAula}${blocoBlack}
   ## PITCH DE PREÇO (após o lead confirmar que é o momento dele)
 
   **OBRIGATÓRIO antes de enviar o preço: chame "Atualizar_tarefa" para mover o card para "Aguardando Pagamento" e incluir a linha "status: proposta_apresentada" na descrição da task (mantendo o restante da descrição existente).**

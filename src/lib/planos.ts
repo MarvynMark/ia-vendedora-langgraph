@@ -14,7 +14,11 @@ export type PlanoId =
   | "semestral"
   | "trimestral"
   | "medico_semestral"
-  | "medico_anual";
+  | "medico_anual"
+  | "black_anual_material"
+  | "black_anual"
+  | "black_semestral"
+  | "black_medico_anual";
 
 interface Plano {
   id: PlanoId;
@@ -32,6 +36,18 @@ interface Plano {
 // Ordem importa na detecção por nome: "anual completo" tem que ser testado antes de "anual",
 // e os planos de médico antes dos genéricos (o rótulo "semestral" aparece nos dois).
 const PLANOS: Plano[] = [
+  // Black estendida (12 a 30/11/2026, ver lib/black-novembro.ts). Só os valores que NÃO colidem
+  // com a tabela normal: o à vista do Anual da Black (R$ 3.197 / R$ 2.497) é igual ao do Anual e
+  // do Semestral Premium normais, então o plano é reconhecido pela parcela com centavos. Sem link
+  // de parcelado: prometer parcelado com link da Black escala para uma pessoa.
+  { id: "black_medico_anual",   rotulo: "Médico Legista Anual (Black)", valores: ["4.997", "493"],      nome: /legista/i,
+    slug: "black-1-ano-medico-legista-mentoria-vestigium", slugParcelado: null },
+  { id: "black_anual_material", rotulo: "Anual com material (Black)",   valores: ["315,38"],            nome: /anual com (o )?material/i,
+    slug: "blackperitoanualestrategia",    slugParcelado: null },
+  { id: "black_anual",          rotulo: "Anual (Black)",                valores: ["246,32"],            nome: /\banual\b/i,
+    slug: "blackperitoanual",              slugParcelado: null },
+  { id: "black_semestral",      rotulo: "Semestral (Black)",            valores: ["1.597", "157,54"],   nome: /semestral/i,
+    slug: "blackperitosemestral",          slugParcelado: null },
   { id: "medico_anual",     rotulo: "Médico Legista Anual",     valores: ["6.497", "641"],            nome: /m[ée]dic[oa] legista\s+anual|legista anual/i,
     slug: "mentorialegistaanual",          slugParcelado: null },
   { id: "medico_semestral", rotulo: "Médico Legista Semestral", valores: ["3.997", "394", "413"],     nome: /m[ée]dic[oa] legista/i,
@@ -76,7 +92,8 @@ export function temPrecoDePlano(texto: string): boolean {
 }
 
 // Links de checkout da seção "# PRODUTOS E LINKS" do prompt.
-const RE_LINK_PAGAMENTO = /peritowalker\.com\.br\/(mentoria|medicolegista)/i;
+// Inclui os da Black estendida (peritowalker.com.br/blackperito... e o checkout do legista na clkdmg).
+const RE_LINK_PAGAMENTO = /peritowalker\.com\.br\/(mentoria|medicolegista|blackperito)|clkdmg\.site\/pay\/black-/i;
 
 /**
  * A resposta contém um link de checkout? O guard de Kanban precisa reconhecê-lo mesmo quando a IA

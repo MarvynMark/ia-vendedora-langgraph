@@ -92,7 +92,9 @@ describe("main agent prompt", () => {
     // ao vivo em grupo e feedback mensal por relatório; a IA improvisava. ~700 caracteres.
     // 103,5k → 105k: conv 9721 (06/10/2026) — ORÇAMENTO DECLARADO: "passa do meu orçamento" vira
     // "quanto cabe por mês?" e o plano que encaixa, no lugar do boleto/PIX parcelado. ~1,3k caracteres.
-    expect(prompt.length).toBeLessThan(105000);
+    // 105k → 111k: bloco da Black estendida (lib/black-novembro.ts), só de 12/11 a 30/11/2026,
+    // ~5,5k caracteres. O teste roda com a data real; depois de 30/11 pode voltar para 105k.
+    expect(prompt.length).toBeLessThan(111000);
   });
 
   // Regressão conv 4549: médica digitou "Mediciba" (typo) → o gate por string falhou e ela

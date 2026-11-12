@@ -5,6 +5,7 @@ import { processarMensagem } from "../lib/message-processor.ts";
 import { criarGrafoAgenteClinica } from "../graphs/main-agent/graph.ts";
 import { limparFila, reivindicarMensagem } from "../db/fila.ts";
 import { motivoNaoRegistrarSaida } from "../lib/saida-externa.ts";
+import { blackNovembroAtiva } from "../lib/black-novembro.ts";
 import { motivoIgnorarPreGrupo, motivoIgnorarAtivacao, pedeGrupoDeEspera, mensagemGrupoDeEspera, mensagemEhDeMedico, respostaConfirmacaoEvento, respostaVerDetalhes, primeiroNome, BOTAO_CONVITE_BLACK, conviteBlackRecente, perguntaDaBlack, jaEscaladoBlack, publicoDoConvite, MARCA_ESCALACAO_BLACK } from "./webhook-filtros.ts";
 import { escalarParaHumano } from "../tools/escalar-humano.ts";
 import { mensagensComConviteDeDuplicatas } from "../lib/convite-duplicatas.ts";
@@ -269,7 +270,10 @@ export const webhookRouter = new Elysia()
         return { status: "ok", action: "convite_black_grupo" };
       }
 
-      if (perguntaDaBlack(content, !!convite)) {
+      // Black estendida (até 30/11): a IA vende a Black a quem não é aluno ("encerrou, mas consigo
+      // te encaixar"). Só o aluno (cupom/renovação) continua indo para o comercial.
+      const iaVendeABlack = blackNovembroAtiva() && !(convite && publicoDoConvite(convite.template).startsWith("ALUNO"));
+      if (!iaVendeABlack && perguntaDaBlack(content, !!convite)) {
         if (!jaEscaladoBlack(msgs, agora)) {
           const publico = convite ? publicoDoConvite(convite.template) : "sem convite da Black";
           await escalarParaHumano({

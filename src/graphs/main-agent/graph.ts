@@ -9,6 +9,7 @@ import { trilhaDoLead, PONTE_PRECO_SESSAO, pareceDesistirDaSessao } from "../../
 import { agendaConfigurada, buscarSessaoDoTelefone } from "../../services/google-calendar.ts";
 import { avisarComercial } from "../../lib/lembretes-sessao.ts";
 import { promocaoAtiva, leadVeioDaPromocao, removerLinksDePagamento } from "../../lib/promocao.ts";
+import { blackNovembroAtiva, trocarLinksPelaBlack } from "../../lib/black-novembro.ts";
 import { removerAnuncioDeEscalacao } from "../../lib/escalonamento-silencioso.ts";
 import { iaEstaPausada } from "../../lib/pausa-ia.ts";
 import { rotularDia, rotularHora } from "../../config/agenda.ts";
@@ -717,6 +718,16 @@ async function executarAgente(state: MainAgentStateType) {
     if (promocaoAtiva() && !ehMedico && temLinkDePagamento(outputFinal)) {
       logger.warn("main-agent", "Link de pagamento removido: promoção ativa, link vem do comercial", { idConversa: state.idConversa });
       outputFinal = removerLinksDePagamento(outputFinal);
+    }
+
+    // BLACK ESTENDIDA (até 30/11) — o prompt cita a tabela normal em vários pontos; se o modelo
+    // escapar para um link de preço cheio, o lead cai no checkout da Black do mesmo plano.
+    if (blackNovembroAtiva()) {
+      const troca = trocarLinksPelaBlack(outputFinal);
+      if (troca.trocados.length > 0) {
+        logger.warn("main-agent", "Black estendida: link de preço cheio trocado pelo da Black", { idConversa: state.idConversa, trocados: troca.trocados });
+        outputFinal = troca.texto;
+      }
     }
 
     // TRAVA DE ELEGIBILIDADE — a IA não manda embora quem ainda está cursando. O diploma é
