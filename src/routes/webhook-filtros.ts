@@ -154,7 +154,7 @@ export function respostaConfirmacaoEvento(
 // "agente-on". Disparo: src/scripts/disparo-convite-black.ts.
 
 export interface SequenciaConvite {
-  /** URL pública da arte (anexo de nota privada da conv 3896: o blob do Chatwoot não expira). */
+  /** URL pública da arte (anexo de nota privada da conv 3896: o blob do Chatwoot não expira). Vazia = sem arte. */
   imagem: string;
   /** Link do grupo; vai na última mensagem e serve para saber se a sequência já saiu. */
   link: string;
@@ -213,6 +213,19 @@ CONVITES_BLACK.lembrete_black_medicos = CONVITES_BLACK.convite_black_medicos!;
 CONVITES_BLACK.lembrete_black_leads_v2 = CONVITES_BLACK.convite_black_leads!;
 CONVITES_BLACK.lembrete_black_alunos_v2 = CONVITES_BLACK.convite_black_alunos!;
 CONVITES_BLACK.lembrete_black_medicos_v2 = CONVITES_BLACK.convite_black_medicos!;
+
+// Segunda chance (16/11/2026): cadastrados da Black que não compraram. O template já traz a arte;
+// o toque em "Quero meu acesso" manda só o texto da oferta do semestral com o link da página.
+CONVITES_BLACK.segunda_chance_black = {
+  imagem: "",
+  link: "https://lp.mentoriavestigium.com.br/black/",
+  mensagens: (nome) => [
+    nome ? `Fala, ${nome}!! Perito Walker aqui 👊🏼` : "Fala, futuro(a) perito(a)!! Perito Walker aqui 👊🏼",
+    "Sei que nem todo mundo conseguiu entrar na Black. Por isso eu abri uma *SEGUNDA CHANCE* pra você 🚨",
+    "➡️ *Mentoria Vestigium SEMESTRAL* na melhor condição do ano:\n\n✅ 6 meses de mentoria individual comigo\n✅ Plataforma de questões\n✅ Correção de discursivas\n\nTudo isso a partir de *12x de R$ 157,54* 🔥",
+    "Quer o material Premium do Estratégia Concursos junto? Também tem essa opção na página 😉\n\n⚠️ Essa condição vale só até *30/11 às 23h59*.\n\nGaranta a sua vaga aqui 👇🏻\nhttps://lp.mentoriavestigium.com.br/black/\n\nBora pra cima!! 🚀🚀",
+  ],
+};
 
 /** Texto dos botões de resposta rápida dos convites da Black. */
 export const BOTAO_CONVITE_BLACK = /^(ver detalhes|quero meu acesso)$/i;

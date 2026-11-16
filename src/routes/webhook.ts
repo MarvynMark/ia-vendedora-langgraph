@@ -208,7 +208,7 @@ export const webhookRouter = new Elysia()
       const emRespostaA = Number((payload as { content_attributes?: { in_reply_to?: number } }).content_attributes?.in_reply_to) || null;
       const r = respostaVerDetalhes(content, msgs, Date.now() / 1000, emRespostaA);
       if (r) {
-        try {
+        if (r.sequencia.imagem) try {
           const img = await fetchComTimeout(r.sequencia.imagem, { timeout: 30_000 });
           if (img.ok) {
             const enviada = await enviarArquivo(idConta, idConversa, new Uint8Array(await img.arrayBuffer()), `${r.template}.jpg`, "image/jpeg") as { id?: number };
