@@ -170,7 +170,7 @@ function listaGraduacoes(perfil: PerfilConcurso): string {
 }
 
 function nomeArea(perfil: PerfilConcurso, area: string): string {
-  return `Área ${area} (${perfil.areas[area] ?? "?"})`;
+  return `Área ${area}`;
 }
 
 /** Área lembrada do aluno; se foi salva na numeração antiga, traduz e regrava (ou pergunta de novo). */
@@ -201,13 +201,13 @@ async function irParaEnunciado(ctx: Contexto, perfil: PerfilConcurso, area: stri
       await ctx.enviar(`${prefixo}${mensagemEnunciado(q.enunciado, codigo)}`);
       return;
     }
-    prefixo += `Não encontrei a questão ${codigo} no banco${codigo.startsWith("E") ? ` da sua área (${nomeArea(perfil, area)})` : ""}.\n\n`;
+    prefixo += `Não encontrei a questão ${codigo} no banco${codigo.startsWith("E") ? ` da sua ${nomeArea(perfil, area)}` : ""}.\n\n`;
   }
   await iniciarSessao({ conversaId: ctx.conversaId, telefone: ctx.telefone, etapa: "enunciado", concurso: perfil.codigo, area, codigoQuestao: null, enunciado: null });
   const temEspecificas = perfil.banco.some((q) => q.area === area);
   const dicaBanco = temEspecificas
-    ? `Se for uma questão do nosso banco, mande só o código: por exemplo *G05* (conhecimentos gerais) ou *E03* (da sua área: ${nomeArea(perfil, area)}).`
-    : `Se for uma questão do nosso banco de conhecimentos gerais, mande só o código (de *G01* a *G20*). A sua área (${nomeArea(perfil, area)}) ainda não tem questões específicas no banco: mande o enunciado que quiser.`;
+    ? `Se for uma questão do nosso banco, mande só o código: por exemplo *G05* (conhecimentos gerais) ou *E03* (da sua ${nomeArea(perfil, area)}).`
+    : `Se for uma questão do nosso banco de conhecimentos gerais, mande só o código (de *G01* a *G20*). A sua ${nomeArea(perfil, area)} ainda não tem questões específicas no banco: mande o enunciado que quiser.`;
   await ctx.enviar(`${prefixo}Me mande o *enunciado* da questão que você respondeu (texto ou foto).\n\n${dicaBanco}\n\nPara sair a qualquer momento: /cancelar`);
 }
 
@@ -223,7 +223,7 @@ function mensagemGraduacao(texto: string, perfil: PerfilConcurso, area: string):
     ?? citada ?? (daArea.length === 1 ? daArea[0]! : null);
   return nome
     ? `Graduação: *${nome}* → você concorre na *Área ${area}* ✅`
-    : `Você concorre na *Área ${area}* (${perfil.areas[area]}) ✅`;
+    : `Você concorre na *Área ${area}* ✅`;
 }
 
 function mensagemEnunciado(enunciado: string, codigo: string | null): string {
