@@ -5,6 +5,7 @@ import {
   codigoQuestaoNoTexto,
   dividirMensagem,
   formatarNumero,
+  graduacoesDoPerfil,
   interpretarArea,
   interpretarComando,
   interpretarConcurso,
@@ -92,14 +93,44 @@ describe("concurso, área e questão do banco", () => {
     expect(interpretarConcurso("99", PERFIS)).toBeNull();
   });
 
-  test("área por código, posição ou nome — química não casa com bioquímica", () => {
-    expect(interpretarArea("103", perfilPcdf)).toBe("103");
-    expect(interpretarArea("3", perfilPcdf)).toBe("103");
-    expect(interpretarArea("sou de computação", perfilPcdf)).toBe("103");
-    expect(interpretarArea("Química", perfilPcdf)).toBe("109");
-    expect(interpretarArea("farmácia", perfilPcdf)).toBe("105");
+  test("área pela graduação — o aluno não sabe a área, sabe o curso", () => {
+    expect(interpretarArea("biomedicina", perfilPcdf)).toBe("6");
+    expect(interpretarArea("Bioquímica", perfilPcdf)).toBe("6");
+    expect(interpretarArea("sou formado em engenharia civil", perfilPcdf)).toBe("12");
+    expect(interpretarArea("sou de computação", perfilPcdf)).toBe("5");
+    expect(interpretarArea("Química", perfilPcdf)).toBe("7");
+    expect(interpretarArea("farmácia", perfilPcdf)).toBe("8");
+    expect(interpretarArea("medicina", perfilPcdf)).toBe("16");
+    expect(interpretarArea("medicina veterinária", perfilPcdf)).toBe("3");
+    expect(interpretarArea("veterinária", perfilPcdf)).toBe("3");
+    expect(interpretarArea("telecomunicações", perfilPcdf)).toBe("14");
+    expect(interpretarArea("engenharia", perfilPcdf)).toBeNull();
     expect(interpretarArea("ciências", perfilPcdf)).toBeNull();
-    expect(interpretarArea("medicina", perfilPcdf)).toBeNull();
+    expect(interpretarArea("direito", perfilPcdf)).toBeNull();
+  });
+
+  test("sinônimos soltos da graduação", () => {
+    expect(interpretarArea("sou bióloga", perfilPcdf)).toBe("6");
+    expect(interpretarArea("economia", perfilPcdf)).toBe("10");
+    expect(interpretarArea("farmacêutico", perfilPcdf)).toBe("8");
+    expect(interpretarArea("dentista", perfilPcdf)).toBe("4");
+    expect(interpretarArea("sou médico", perfilPcdf)).toBe("16");
+    expect(interpretarArea("sou médico veterinário", perfilPcdf)).toBe("3");
+    expect(interpretarArea("TI", perfilPcdf)).toBe("5");
+  });
+
+  test("número = posição na lista alfabética de graduações", () => {
+    const lista = graduacoesDoPerfil(perfilPcdf);
+    const pos = lista.findIndex((g) => g.graduacao === "Biomedicina") + 1;
+    expect(interpretarArea(String(pos), perfilPcdf)).toBe("6");
+    expect(lista[0]!.graduacao).toBe("Análise de Sistemas");
+    expect(interpretarArea(String(lista.length + 1), perfilPcdf)).toBeNull();
+  });
+
+  test("área salva na numeração de 2016 é traduzida; Engenharia pergunta de novo", () => {
+    expect(perfilPcdf.traduzirAreaAntiga?.("103")).toBe("5");
+    expect(perfilPcdf.traduzirAreaAntiga?.("101")).toBe("6");
+    expect(perfilPcdf.traduzirAreaAntiga?.("104")).toBeNull();
   });
 
   test("código no texto", () => {
@@ -110,19 +141,32 @@ describe("concurso, área e questão do banco", () => {
 
   test("específica depende da área; geral não", () => {
     expect(buscarQuestao(perfilPcdf, "G01", null)?.enunciado).toContain("concurso de pessoas");
-    expect(buscarQuestao(perfilPcdf, "E01", "103")?.enunciado).toContain("assinatura digital");
-    expect(buscarQuestao(perfilPcdf, "E01", "101")?.enunciado).toContain("PCR");
+    expect(buscarQuestao(perfilPcdf, "E01", "5")?.enunciado).toContain("assinatura digital");
+    expect(buscarQuestao(perfilPcdf, "E01", "6")?.enunciado).toContain("PCR");
+    expect(buscarQuestao(perfilPcdf, "E01", "13")?.enunciado).toContain("tensão");
+    expect(buscarQuestao(perfilPcdf, "E01", "16")).toBeNull();
     expect(buscarQuestao(perfilPcdf, "E01", null)).toBeNull();
     expect(buscarQuestao(perfilPcdf, "G99", null)).toBeNull();
   });
 });
 
 describe("perfil PCDF", () => {
-  test("banco com 20 gerais e 8 por área, e conteúdo programático de todas as áreas no prompt", () => {
+  test("16 áreas; as que herdam de 2016 têm 8 específicas e o conteúdo antigo, as novas não têm banco", () => {
+    const comLegado: Record<string, string> = {
+      "1": "106", "4": "108", "5": "103", "6": "101", "7": "109", "8": "105", "9": "102", "11": "107", "12": "104", "13": "104", "14": "104",
+    };
+    expect(Object.keys(perfilPcdf.areas)).toHaveLength(16);
     expect(perfilPcdf.banco.filter((q) => q.area === null)).toHaveLength(20);
     for (const area of Object.keys(perfilPcdf.areas)) {
-      expect(perfilPcdf.banco.filter((q) => q.area === area)).toHaveLength(8);
-      expect(perfilPcdf.promptSistema(area)).toContain(`(CÓDIGO ${area})`);
+      const prompt = perfilPcdf.promptSistema(area);
+      expect(prompt).toContain(`Área ${area} — `);
+      if (comLegado[area]) {
+        expect(perfilPcdf.banco.filter((q) => q.area === area)).toHaveLength(8);
+        expect(prompt).toContain(`(CÓDIGO ${comLegado[area]})`);
+      } else {
+        expect(perfilPcdf.banco.filter((q) => q.area === area)).toHaveLength(0);
+        expect(prompt).toContain("não existia no edital de 2016");
+      }
     }
   });
 
@@ -135,7 +179,7 @@ describe("perfil PCDF", () => {
     expect(p).not.toContain("Formato obrigatório de saída");
     expect(p).toContain("Questão 1 (101)");          // sem área: só a questão comum do padrão oficial
     expect(p).not.toContain("Questão 2 (101)");
-    expect(perfilPcdf.promptSistema("103")).toContain("Three Way Handshake"); // padrão da área do aluno
+    expect(perfilPcdf.promptSistema("5")).toContain("Three Way Handshake"); // padrão herdado da área 103 de 2016
   });
 });
 

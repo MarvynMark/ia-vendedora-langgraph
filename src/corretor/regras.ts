@@ -61,21 +61,51 @@ export function interpretarConcurso(texto: string, perfis: PerfilConcurso[]): Pe
   return perfis.find((p) => p.codigo === t || normalizar(p.nome).includes(t) && t.length >= 3) ?? null;
 }
 
-/** Resposta a "qual sua área?": código ("103"), posição na lista ("3") ou parte do nome ("computação"). */
+/** Graduações aceitas no concurso, em ordem alfabética, com a área de cada uma (lista mostrada ao aluno). */
+export function graduacoesDoPerfil(perfil: PerfilConcurso): Array<{ graduacao: string; area: string }> {
+  return Object.entries(perfil.areas)
+    .flatMap(([area, nomes]) => nomes.split(";").map((g) => ({ graduacao: g.trim(), area })))
+    .filter((g) => g.graduacao)
+    .sort((a, b) => a.graduacao.localeCompare(b.graduacao, "pt-BR"));
+}
+
+/**
+ * Resposta a "qual é a sua graduação?" → código da área. O aluno não sabe a área; sabe a graduação.
+ * Aceita a posição na lista de graduações ("3"), a graduação exata ("medicina"), uma frase que a
+ * contenha ("sou formado em engenharia civil" — vence a mais longa, para "medicina veterinária" não
+ * virar "medicina") ou uma palavra marcante que aponte para uma única área ("computação").
+ */
 export function interpretarArea(texto: string, perfil: PerfilConcurso): string | null {
-  const t = normalizar(texto).replace(/^codigo /, "");
-  const codigos = Object.keys(perfil.areas);
-  if (codigos.includes(t)) return t;
+  const t = normalizar(texto).replace(/[.!?]+$/, "");
+  const lista = graduacoesDoPerfil(perfil);
   const n = Number(t);
-  if (Number.isInteger(n) && n >= 1 && n <= codigos.length) return codigos[n - 1]!;
-  // Por nome: alguma palavra marcante da área aparece no texto ("sou de computação" → 103).
-  // Palavra inteira, para "química" não casar com "bioquímica"; "ciência(s)" não distingue nada.
+  if (Number.isInteger(n) && n >= 1 && n <= lista.length) return lista[n - 1]!.area;
+
+  const normalizadas = lista.map((g) => ({ ...g, norm: normalizar(g.graduacao) }));
+  const exata = normalizadas.find((g) => g.norm === t);
+  if (exata) return exata.area;
+
+  const contidas = normalizadas
+    .filter((g) => ` ${t.replace(/[^a-z]+/g, " ")} `.includes(` ${g.norm.replace(/[^a-z]+/g, " ")} `))
+    .sort((a, b) => b.norm.length - a.norm.length);
+  if (contidas.length) return contidas[0]!.area;
+
+  // Sinônimos ("sou bióloga", "economia", "dentista"): vence o mais longo citado.
+  const frase = ` ${t.replace(/[^a-z]+/g, " ")} `;
+  const sinonimo = Object.entries(perfil.sinonimosGraduacao ?? {})
+    .filter(([termo]) => frase.includes(` ${termo} `))
+    .sort((a, b) => b[0].length - a[0].length)[0];
+  if (sinonimo) return sinonimo[1];
+
+  // Palavra inteira, para "química" não casar com "bioquímica"; palavras genéricas não distinguem nada.
   const palavrasAluno = new Set(t.split(/[^a-z]+/).map(singular));
-  const achadas = codigos.filter((c) => normalizar(perfil.areas[c]!)
-    .split(/[^a-z]+/)
-    .filter((p) => p.length >= 5 && !p.startsWith("ciencia"))
-    .some((p) => palavrasAluno.has(singular(p))));
-  return achadas.length === 1 ? achadas[0]! : null;
+  const genericas = /^(ciencia|engenharia|analise|industrial|comunicac)/;
+  const areas = new Set(normalizadas
+    .filter((g) => g.norm.split(/[^a-z]+/)
+      .filter((p) => p.length >= 5 && !genericas.test(p))
+      .some((p) => palavrasAluno.has(singular(p))))
+    .map((g) => g.area));
+  return areas.size === 1 ? [...areas][0]! : null;
 }
 
 function singular(palavra: string): string {

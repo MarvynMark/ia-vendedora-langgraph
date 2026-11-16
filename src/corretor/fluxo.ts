@@ -29,7 +29,9 @@ import {
   formatarNumero,
   codigoQuestaoNoTexto,
   dividirMensagem,
+  graduacoesDoPerfil,
   interpretarArea,
+  normalizar,
   interpretarComando,
   interpretarConcurso,
   linhasConsideradas,
@@ -162,16 +164,30 @@ function listaConcursos(): string {
   return PERFIS.map((p, i) => `${i + 1}. ${p.nome} (/corrigir ${p.codigo})`).join("\n");
 }
 
-function listaAreas(perfil: PerfilConcurso): string {
-  return Object.entries(perfil.areas).map(([cod, nome], i) => `${i + 1}. ${nome} (${cod})`).join("\n");
+// O aluno não sabe a área do edital; sabe a graduação. A lista é de graduações e a área é deduzida.
+function listaGraduacoes(perfil: PerfilConcurso): string {
+  return graduacoesDoPerfil(perfil).map((g, i) => `${i + 1}. ${g.graduacao}`).join("\n");
+}
+
+function nomeArea(perfil: PerfilConcurso, area: string): string {
+  return `Área ${area} (${perfil.areas[area] ?? "?"})`;
+}
+
+/** Área lembrada do aluno; se foi salva na numeração antiga, traduz e regrava (ou pergunta de novo). */
+async function areaAtualDoAluno(telefone: string, perfil: PerfilConcurso): Promise<string | null> {
+  const salva = await areaDoAluno(telefone, perfil.codigo);
+  if (!salva || perfil.areas[salva]) return salva;
+  const nova = perfil.traduzirAreaAntiga?.(salva) ?? null;
+  if (nova) await salvarAreaDoAluno(telefone, perfil.codigo, nova);
+  return nova;
 }
 
 async function seguirComPerfil(ctx: Contexto, perfil: PerfilConcurso, codigo: string | null, abertura: boolean): Promise<void> {
   const cabecalho = abertura ? `📝 *Corretor de discursivas — ${perfil.nome}*\n\n` : "";
-  const area = await areaDoAluno(ctx.telefone, perfil.codigo);
+  const area = await areaAtualDoAluno(ctx.telefone, perfil);
   if (!area) {
     await iniciarSessao({ conversaId: ctx.conversaId, telefone: ctx.telefone, etapa: "area", concurso: perfil.codigo, area: null, codigoQuestao: codigo, enunciado: null });
-    await ctx.enviar(`${cabecalho}Qual é a sua área de formação para o concurso de ${perfil.nome}? Responda com o número:\n${listaAreas(perfil)}`);
+    await ctx.enviar(`${cabecalho}Qual é a sua *graduação*? (por exemplo: Biomedicina, Engenharia Civil, Ciência da Computação)`);
     return;
   }
   await irParaEnunciado(ctx, perfil, area, codigo, cabecalho);
@@ -185,10 +201,29 @@ async function irParaEnunciado(ctx: Contexto, perfil: PerfilConcurso, area: stri
       await ctx.enviar(`${prefixo}${mensagemEnunciado(q.enunciado, codigo)}`);
       return;
     }
-    prefixo += `Não encontrei a questão ${codigo} no banco${codigo.startsWith("E") ? ` da sua área (${perfil.areas[area]})` : ""}.\n\n`;
+    prefixo += `Não encontrei a questão ${codigo} no banco${codigo.startsWith("E") ? ` da sua área (${nomeArea(perfil, area)})` : ""}.\n\n`;
   }
   await iniciarSessao({ conversaId: ctx.conversaId, telefone: ctx.telefone, etapa: "enunciado", concurso: perfil.codigo, area, codigoQuestao: null, enunciado: null });
-  await ctx.enviar(`${prefixo}Me mande o *enunciado* da questão que você respondeu (texto ou foto).\n\nSe for uma questão do nosso banco, mande só o código: por exemplo *G05* (conhecimentos gerais) ou *E03* (da sua área: ${perfil.areas[area]}).\n\nPara sair a qualquer momento: /cancelar`);
+  const temEspecificas = perfil.banco.some((q) => q.area === area);
+  const dicaBanco = temEspecificas
+    ? `Se for uma questão do nosso banco, mande só o código: por exemplo *G05* (conhecimentos gerais) ou *E03* (da sua área: ${nomeArea(perfil, area)}).`
+    : `Se for uma questão do nosso banco de conhecimentos gerais, mande só o código (de *G01* a *G20*). A sua área (${nomeArea(perfil, area)}) ainda não tem questões específicas no banco: mande o enunciado que quiser.`;
+  await ctx.enviar(`${prefixo}Me mande o *enunciado* da questão que você respondeu (texto ou foto).\n\n${dicaBanco}\n\nPara sair a qualquer momento: /cancelar`);
+}
+
+/** "Graduação: *Biomedicina* → você concorre na *Área 6* ✅". */
+function mensagemGraduacao(texto: string, perfil: PerfilConcurso, area: string): string {
+  const lista = graduacoesDoPerfil(perfil);
+  const n = Number(normalizar(texto));
+  const daArea = lista.filter((g) => g.area === area).map((g) => g.graduacao);
+  const citada = daArea
+    .filter((g) => normalizar(texto).includes(normalizar(g)))
+    .sort((x, y) => y.length - x.length)[0];
+  const nome = (Number.isInteger(n) && n >= 1 && n <= lista.length ? lista[n - 1]!.graduacao : null)
+    ?? citada ?? (daArea.length === 1 ? daArea[0]! : null);
+  return nome
+    ? `Graduação: *${nome}* → você concorre na *Área ${area}* ✅`
+    : `Você concorre na *Área ${area}* (${perfil.areas[area]}) ✅`;
 }
 
 function mensagemEnunciado(enunciado: string, codigo: string | null): string {
@@ -212,11 +247,11 @@ async function etapaArea(ctx: Contexto, sessao: Sessao, texto: string): Promise<
   const perfil = buscarPerfil(sessao.concurso)!;
   const area = texto ? interpretarArea(texto, perfil) : null;
   if (!area) {
-    await ctx.enviar(`Não entendi a área. Responda só com o número:\n${listaAreas(perfil)}`);
+    await ctx.enviar(`Não consegui identificar a sua graduação. Responda com o número dela:\n${listaGraduacoes(perfil)}`);
     return "corretor:area_invalida";
   }
   await salvarAreaDoAluno(ctx.telefone, perfil.codigo, area);
-  await irParaEnunciado(ctx, perfil, area, sessao.codigoQuestao, `Área: *${perfil.areas[area]}* ✅\n\n`);
+  await irParaEnunciado(ctx, perfil, area, sessao.codigoQuestao, `${mensagemGraduacao(texto, perfil, area)}\n\n`);
   return "corretor:area";
 }
 

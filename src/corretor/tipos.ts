@@ -36,7 +36,7 @@ export interface Criterio {
 
 export interface QuestaoBanco {
   codigo: string;          // "G05" (geral) ou "E01" (específica — repete entre áreas)
-  area: string | null;     // código da área ("103") ou null para conhecimentos gerais
+  area: string | null;     // código da área ("5") ou null para conhecimentos gerais
   tema: string | null;
   enunciado: string;
 }
@@ -55,7 +55,14 @@ export interface PerfilConcurso {
   criterios: Criterio[];
   formulaTexto: string;               // como aparece na memória de cálculo
   formula: (c: { dq: number; ne: number; tl: number }) => number;
-  areas: Record<string, string>;      // "103" → "Ciência da Computação/Informática"
+  // Área → graduações que concorrem nela, separadas por "; " ("5" → "Análise de Sistemas; Ciência da
+  // Computação; …"). O aluno escolhe pela graduação; a área é deduzida.
+  areas: Record<string, string>;
+  // Área salva com a numeração antiga → nova. null = não dá para deduzir (pergunta de novo).
+  traduzirAreaAntiga?: (codigo: string) => string | null;
+  // Jeitos soltos de dizer a graduação ("bióloga", "economia", "dentista") → área. Só para entender
+  // a resposta; não aparecem na lista.
+  sinonimosGraduacao?: Record<string, string>;
   banco: QuestaoBanco[];
   aviso: string;                      // linha final da devolutiva (ex.: edital é referência histórica)
   // Espelho oficial de exemplo, para o montador do espelho calibrar a granularidade dos itens.
