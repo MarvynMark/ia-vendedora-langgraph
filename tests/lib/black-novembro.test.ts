@@ -25,8 +25,10 @@ describe("trocarLinksPelaBlack", () => {
     expect(trocarLinksPelaBlack("https://peritowalker.com.br/mentoriaperitoanualpremium").texto).toBe(L.anualMaterial);
     expect(trocarLinksPelaBlack("https://peritowalker.com.br/mentoriaperitoanual").texto).toBe(L.anual);
     expect(trocarLinksPelaBlack("https://peritowalker.com.br/mentoriaperito").texto).toBe(L.semestral);
-    expect(trocarLinksPelaBlack("https://peritowalker.com.br/mentoriaperitosemestralpremium1").texto).toBe(L.semestral);
+    expect(trocarLinksPelaBlack("https://peritowalker.com.br/mentoriaperitosemestralpremium1").texto).toBe(L.semestralMaterial);
     expect(trocarLinksPelaBlack("https://peritowalker.com.br/mentorialegistaanual").texto).toBe(L.medicoAnual);
+    expect(trocarLinksPelaBlack("https://clkdmg.site/pay/black-1-ano-medico-legista-mentoria-vestigium").texto).toBe(L.medicoAnual);
+    expect(L.medicoAnual).toBe("https://peritowalker.com.br/blackmedicosanual");
   });
 
   test("não mexe em parcelado, Trimestral nem no Semestral do Médico Legista", () => {
@@ -42,7 +44,9 @@ describe("guardas reconhecem a Black", () => {
   test("preço e link da Black contam como oferta", () => {
     expect(temPrecoDePlano("Fica em 12x de R$ 315,38 no cartão.")).toBe(true);
     expect(temPrecoDePlano("em 12x de R$ 157,54")).toBe(true);
-    expect(temPrecoDePlano("Fica em 12x de R$ 493 no cartão.")).toBe(true);
+    expect(temPrecoDePlano("Fica em 12x de R$ 492,95 no cartão.")).toBe(true);
+    expect(temPrecoDePlano("em 12x de R$ 197,00")).toBe(true);
+    expect(temLinkDePagamento(BLACK_NOVEMBRO.links.semestralMaterial)).toBe(true);
     expect(temLinkDePagamento(BLACK_NOVEMBRO.links.anual)).toBe(true);
     expect(temLinkDePagamento(BLACK_NOVEMBRO.links.medicoAnual)).toBe(true);
   });
@@ -50,6 +54,8 @@ describe("guardas reconhecem a Black", () => {
   test("o pitch da Black conta dois planos (não aciona a trava de cardápio)", () => {
     expect(planosCitados("O Anual com material fica em 12x de R$ 315,38. O Semestral, em 12x de R$ 157,54.")).toEqual(["black_anual_material", "black_semestral"]);
     expect(planosCitados("Fica em 12x de R$ 246,32 no cartão.")).toEqual(["black_anual"]);
+    expect(planosCitados("O Anual com material fica em 12x de R$ 315,38. O Semestral com material, em 12x de R$ 197,00.")).toEqual(["black_anual_material", "black_semestral_material"]);
+    expect(planosCitados("Fica em 12x de R$ 492,95 no cartão.")).toEqual(["black_medico_anual"]);
   });
 
   test("parcelado prometido com link da Black escala (não existe parcelado da Black)", () => {
@@ -62,13 +68,13 @@ describe("blocos do prompt", () => {
   test("perito: narrativa, os três preços com centavos e os links da Black", () => {
     const b = blocoBlackNovembroPerito();
     expect(b).toContain("consegui te encaixar no valor dela");
-    for (const v of ["315,38", "246,32", "157,54", BLACK_NOVEMBRO.links.anualMaterial, BLACK_NOVEMBRO.links.semestral]) expect(b).toContain(v);
+    for (const v of ["315,38", "246,32", "197,00", "157,54", BLACK_NOVEMBRO.links.anualMaterial, BLACK_NOVEMBRO.links.anual, BLACK_NOVEMBRO.links.semestralMaterial, BLACK_NOVEMBRO.links.semestral]) expect(b).toContain(v);
     expect(b).not.toContain("—");
   });
 
   test("médico: Anual do legista da Black", () => {
     const b = blocoBlackNovembroMedico();
-    expect(b).toContain("12x de R$ 493");
+    expect(b).toContain("12x de R$ 492,95");
     expect(b).toContain(BLACK_NOVEMBRO.links.medicoAnual);
     expect(b).not.toContain("—");
   });

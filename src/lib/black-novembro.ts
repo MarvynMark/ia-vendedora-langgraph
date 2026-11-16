@@ -4,11 +4,12 @@
 //
 // Decisões do Gusthavo (12/11):
 //   - vale para TODO lead, na hora do preço: a tabela normal some do pitch até 30/11;
-//   - entram o Anual com material, o Anual sem material, o Semestral e o Anual do Médico Legista;
+//   - entram o Anual e o Semestral (cada um com e sem material) e o Anual do Médico Legista;
 //   - a IA manda o link da Black direto (as ofertas ficam ativas na Guru até 30/11);
 //   - o "consegui te encaixar" vai na mesma resposta do preço, sem teatro de espera.
 // Preços e links: tarefa "Fechar oferta, bônus e meta" (perito) e "Copys do grupo de legistas"
-// (médico) no ClickUp, pasta BLACK 26 09/11.
+// (médico) no ClickUp, pasta BLACK 26 09/11. Atualização de 16/11 (comentários das duas tarefas):
+// Semestral com material ganhou link e o legista ganhou link curto, 12x de R$ 492,95.
 //
 // Módulo PURO de propósito: sem rede, para o bloco do prompt e as guardas serem testáveis.
 
@@ -21,8 +22,9 @@ export const BLACK_NOVEMBRO = {
   links: {
     anualMaterial: "https://peritowalker.com.br/blackperitoanualestrategia",
     anual: "https://peritowalker.com.br/blackperitoanual",
+    semestralMaterial: "https://peritowalker.com.br/blackperitosemestralestrategia",
     semestral: "https://peritowalker.com.br/blackperitosemestral",
-    medicoAnual: "https://clkdmg.site/pay/black-1-ano-medico-legista-mentoria-vestigium",
+    medicoAnual: "https://peritowalker.com.br/blackmedicosanual",
   },
 } as const;
 
@@ -34,14 +36,16 @@ export function blackNovembroAtiva(agora = new Date()): boolean {
 const L = BLACK_NOVEMBRO.links;
 
 // Link da tabela normal → link da Black. Se o modelo escapar para um link de preço cheio, o lead
-// ainda cai no checkout da Black do MESMO plano (ou do equivalente da Black, no Semestral). Só os
-// de cartão: parcelado da Black não existe, e o Semestral do Médico Legista não entrou na Black.
+// ainda cai no checkout da Black do MESMO plano. Só os de cartão: parcelado da Black não existe, e
+// o Semestral do Médico Legista não entrou na Black. O link antigo do legista na clkdmg leva ao
+// mesmo checkout, mas o curto é o oficial desde 16/11.
 const TROCA_DE_LINK: ReadonlyArray<[RegExp, string]> = [
   [/https?:\/\/peritowalker\.com\.br\/mentoriaperitoanualpremium(?![a-z0-9])/gi, L.anualMaterial],
   [/https?:\/\/peritowalker\.com\.br\/mentoriaperitoanual(?![a-z0-9])/gi, L.anual],
-  [/https?:\/\/peritowalker\.com\.br\/mentoriaperitosemestralpremium1?(?![a-z0-9])/gi, L.semestral],
+  [/https?:\/\/peritowalker\.com\.br\/mentoriaperitosemestralpremium1?(?![a-z0-9])/gi, L.semestralMaterial],
   [/https?:\/\/peritowalker\.com\.br\/mentoriaperito(?![a-z0-9])/gi, L.semestral],
   [/https?:\/\/peritowalker\.com\.br\/mentorialegistaanual(?![a-z0-9])/gi, L.medicoAnual],
+  [/https?:\/\/clkdmg\.site\/pay\/black-1-ano-medico-legista-mentoria-vestigium(?![a-z0-9-])/gi, L.medicoAnual],
 ];
 
 /** Troca links de cartão da tabela normal pelos da Black. Devolve o texto e o que mudou. */
@@ -91,41 +95,41 @@ export function blocoBlackNovembroPerito(): string {
 <black>
   Até 30/11 os preços dos planos abaixo NÃO são os da seção "PRODUTOS E LINKS" nem os escritos
   nas bolhas do PITCH DE PREÇO e nas objeções. Sempre que o roteiro mandar o Anual Completo, o
-  Anual, o Semestral Premium ou o Semestral, use a versão da Black:
+  Anual, o Semestral Premium ou o Semestral, use a versão da Black do MESMO plano:
 
-  | Plano da Black | 12x no cartão | PIX à vista | Link |
-  |---|---|---|---|
-  | Anual com material (mentoria + Premium do Estratégia) | 12x de R$ 315,38 | R$ 3.197 | ${L.anualMaterial} |
-  | Anual (só a mentoria) | 12x de R$ 246,32 | R$ 2.497 | ${L.anual} |
-  | Semestral (só a mentoria, SEM o material) | 12x de R$ 157,54 | R$ 1.597 | ${L.semestral} |
+  | Plano do roteiro | Plano da Black | 12x no cartão | PIX à vista | Link |
+  |---|---|---|---|---|
+  | Anual Completo | Anual com material (mentoria + Premium do Estratégia) | 12x de R$ 315,38 | R$ 3.197 | ${L.anualMaterial} |
+  | Anual | Anual (só a mentoria) | 12x de R$ 246,32 | R$ 2.497 | ${L.anual} |
+  | Semestral Premium | Semestral com material (mentoria + Premium do Estratégia) | 12x de R$ 197,00 | R$ 1.997 | ${L.semestralMaterial} |
+  | Semestral | Semestral (só a mentoria) | 12x de R$ 157,54 | R$ 1.597 | ${L.semestral} |
 
   Escreva a parcela COM os centavos, exatamente como na tabela.
 
-  **O par do pitch (a descoberta de material continua decidindo):**
-  - Lead **SEM material** → **Anual com material** (12x de R$ 315,38) + **Semestral** (12x de R$ 157,54).
-    O Semestral da Black NÃO tem o Estratégia: diga isso na bolha dele, sem esconder.
-  - Lead **COM material** → **Anual** (12x de R$ 246,32) + **Semestral** (12x de R$ 157,54).
-  > Não existe Semestral Premium na Black. Não ofereça o Semestral Premium nem o Anual Completo do
-  > preço cheio a ninguém até 30/11.
+  **O par do pitch (a descoberta de material continua decidindo, igual ao roteiro):**
+  - Lead **SEM material** → **Anual com material** (12x de R$ 315,38) + **Semestral com material** (12x de R$ 197,00). Os dois têm a Premium do Estratégia.
+  - Lead **COM material** → **Anual** (12x de R$ 246,32) + **Semestral** (12x de R$ 157,54). Os dois são só a mentoria.
+  > Nunca cruze os pares. Não ofereça nenhum plano de Perito no preço cheio a ninguém até 30/11.
 
   **Bolhas do pitch na Black (troque as do PITCH DE PREÇO por estas):**
   - Bolha 1, sem material: "A nossa Black já encerrou, mas consegui te encaixar no valor dela. Pro seu momento, o plano que eu indico é o Anual com material: 12 meses comigo te acompanhando de perto, e ainda vem com a assinatura Premium do Estratégia, então você leva de bônus o melhor preparatório do Brasil."
   - Bolha 1, com material: "A nossa Black já encerrou, mas consegui te encaixar no valor dela. Pro seu momento, o plano que eu indico é o Anual: 12 meses comigo te acompanhando de perto até a prova do [concurso]."
   - Bolha 2: "Fica em 12x de R$ 315,38 no cartão." (sem material) / "Fica em 12x de R$ 246,32 no cartão." (com material)
-  - Bolha 3, sem material: "Se preferir um prazo mais curto, tem o Semestral: a mesma mentoria em 6 meses, só que sem o material do Estratégia, em 12x de R$ 157,54."
+  - Bolha 3, sem material: "Se preferir um prazo mais curto, tem o Semestral com material: a mesma mentoria em 6 meses, também com o Estratégia, em 12x de R$ 197,00."
   - Bolha 3, com material: "Se preferir um prazo mais curto, tem o Semestral: a mesma mentoria em 6 meses, em 12x de R$ 157,54."
-  - Bolha 4: "Qual desses encaixa melhor pro seu momento, o Anual com material ou o Semestral?" (com material: "...o Anual ou o Semestral?")
+  - Bolha 4: "Qual desses encaixa melhor pro seu momento, o Anual com material ou o Semestral com material?" (com material: "...o Anual ou o Semestral?")
 
   **O que vem junto (só se o lead perguntar o que está incluso):** no Anual, as duas versões, a
   mentoria de 12 meses, a plataforma de questões, os cursos de Criminalística, Medicina Legal e
   Genética Forense do IMLC, os resumos estratégicos e a correção de discursivas (sem citar
-  quantidade); na versão com material, também a Premium do Estratégia. No Semestral: mentoria,
-  plataforma de questões e correção de discursivas.
+  quantidade). No Semestral: 6 meses de mentoria, a plataforma de questões e a correção de
+  discursivas, sem os cursos do IMLC e sem os resumos. Nas versões com material, também a Premium
+  do Estratégia.
 
   **Objeção de preço / ORÇAMENTO DECLARADO na Black:** a escada é Anual com material 315,38 →
-  Anual 246,32 (só se já tem material) → Semestral 157,54. Abaixo de R$ 157 por mês: "não agora",
-  com retorno com DATA. O Trimestral segue a regra de sempre (só depois do Semestral recusado por
-  preço), no preço normal.
+  Anual 246,32 (só se já tem material) → Semestral com material 197,00 → Semestral 157,54. Abaixo
+  de R$ 157 por mês: "não agora", com retorno com DATA. O Trimestral segue a regra de sempre (só
+  depois do Semestral recusado por preço), no preço normal.
 ${REGRAS_COMUNS}</black>
 `;
 }
@@ -141,7 +145,7 @@ export function blocoBlackNovembroMedico(): string {
 
   | Plano | 12x no cartão | PIX à vista | Link |
   |---|---|---|---|
-  | Médico Legista Anual (Black) | 12x de R$ 493 | R$ 4.997 | ${L.medicoAnual} |
+  | Médico Legista Anual (Black) | 12x de R$ 492,95 | R$ 4.997 | ${L.medicoAnual} |
 
   Inclui: 12 meses de mentoria com os mentores médicos e a Dra. Natália à frente, o material
   Premium do Estratégia Concursos, a plataforma de questões, o curso de Medicina Legal do IMLC e a
@@ -149,10 +153,10 @@ export function blocoBlackNovembroMedico(): string {
 
   **Pitch (troque o do Médico Legista Semestral por este, 3 bolhas):**
   "A Black do Médico Legista já encerrou, [Dr(a). Nome], mas consegui te encaixar no valor dela. Com base no que você me falou, o plano que eu indico é o Anual da trilha Médico Legista: 12 meses de acompanhamento focado na sua formação, já com o material do Estratégia incluído."
-  "Fica em 12x de R$ 493 no cartão."
+  "Fica em 12x de R$ 492,95 no cartão."
   "Que tal começar por esse?"
   > Se ele hesitar no preço, pode usar a âncora UMA vez: fora da Black o Anual de legista custa
-  > R$ 6.497, e na Black sai por R$ 4.997 à vista ou 12x de R$ 493.
+  > R$ 6.497, e na Black sai por R$ 4.997 à vista ou 12x de R$ 492,95.
   > Se ele quiser um prazo mais curto (prova próxima, internato): aí sim o **Médico Legista
   > Semestral** no preço normal (12x de R$ 394, link da seção PRODUTOS E LINKS). Nunca plano de
   > Perito Criminal, nunca Trimestral.
@@ -163,6 +167,6 @@ ${REGRAS_COMUNS}</black>
 /** Lembrete curto no fim do prompt (perto dos dados do lead, onde o modelo dá mais peso). */
 export function lembreteBlackNovembro(ehMedico: boolean): string {
   return ehMedico
-    ? `  **🖤 BLACK ESTENDIDA ATÉ 30/11:** o plano do médico é o Médico Legista Anual da Black (12x de R$ 493, link ${L.medicoAnual}). Ver o bloco BLACK ESTENDIDA.\n`
-    : `  **🖤 BLACK ESTENDIDA ATÉ 30/11:** os preços e links do pitch são os da Black (Anual com material 12x de R$ 315,38, Anual 12x de R$ 246,32, Semestral 12x de R$ 157,54), nunca os da tabela normal. Sem link parcelado. Ver o bloco BLACK ESTENDIDA.\n`;
+    ? `  **🖤 BLACK ESTENDIDA ATÉ 30/11:** o plano do médico é o Médico Legista Anual da Black (12x de R$ 492,95, link ${L.medicoAnual}). Ver o bloco BLACK ESTENDIDA.\n`
+    : `  **🖤 BLACK ESTENDIDA ATÉ 30/11:** os preços e links do pitch são os da Black (Anual com material 12x de R$ 315,38, Anual 12x de R$ 246,32, Semestral com material 12x de R$ 197,00, Semestral 12x de R$ 157,54), nunca os da tabela normal. Sem link parcelado. Ver o bloco BLACK ESTENDIDA.\n`;
 }

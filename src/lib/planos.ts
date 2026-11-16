@@ -17,6 +17,7 @@ export type PlanoId =
   | "medico_anual"
   | "black_anual_material"
   | "black_anual"
+  | "black_semestral_material"
   | "black_semestral"
   | "black_medico_anual";
 
@@ -40,12 +41,15 @@ const PLANOS: Plano[] = [
   // com a tabela normal: o à vista do Anual da Black (R$ 3.197 / R$ 2.497) é igual ao do Anual e
   // do Semestral Premium normais, então o plano é reconhecido pela parcela com centavos. Sem link
   // de parcelado: prometer parcelado com link da Black escala para uma pessoa.
-  { id: "black_medico_anual",   rotulo: "Médico Legista Anual (Black)", valores: ["4.997", "493"],      nome: /legista/i,
-    slug: "black-1-ano-medico-legista-mentoria-vestigium", slugParcelado: null },
+  { id: "black_medico_anual",   rotulo: "Médico Legista Anual (Black)", valores: ["4.997", "492,95", "493"], nome: /legista/i,
+    slug: "blackmedicosanual",             slugParcelado: null },
   { id: "black_anual_material", rotulo: "Anual com material (Black)",   valores: ["315,38"],            nome: /anual com (o )?material/i,
     slug: "blackperitoanualestrategia",    slugParcelado: null },
   { id: "black_anual",          rotulo: "Anual (Black)",                valores: ["246,32"],            nome: /\banual\b/i,
     slug: "blackperitoanual",              slugParcelado: null },
+  // 12x de R$ 197,00: os centavos separam do Semestral normal (12x de R$ 197).
+  { id: "black_semestral_material", rotulo: "Semestral com material (Black)", valores: ["197,00"], nome: /semestral com (o )?material/i,
+    slug: "blackperitosemestralestrategia", slugParcelado: null },
   { id: "black_semestral",      rotulo: "Semestral (Black)",            valores: ["1.597", "157,54"],   nome: /semestral/i,
     slug: "blackperitosemestral",          slugParcelado: null },
   { id: "medico_anual",     rotulo: "Médico Legista Anual",     valores: ["6.497", "641"],            nome: /m[ée]dic[oa] legista\s+anual|legista anual/i,
@@ -93,7 +97,7 @@ export function temPrecoDePlano(texto: string): boolean {
 
 // Links de checkout da seção "# PRODUTOS E LINKS" do prompt.
 // Inclui os da Black estendida (peritowalker.com.br/blackperito... e o checkout do legista na clkdmg).
-const RE_LINK_PAGAMENTO = /peritowalker\.com\.br\/(mentoria|medicolegista|blackperito)|clkdmg\.site\/pay\/black-/i;
+const RE_LINK_PAGAMENTO = /peritowalker\.com\.br\/(mentoria|medicolegista|blackperito|blackmedicos)|clkdmg\.site\/pay\/black-/i;
 
 /**
  * A resposta contém um link de checkout? O guard de Kanban precisa reconhecê-lo mesmo quando a IA
