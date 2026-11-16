@@ -226,6 +226,15 @@ CONVITES_BLACK.segunda_chance_black = {
     "Quer o material Premium do Estratégia Concursos junto? Também tem essa opção na página 😉\n\n⚠️ Essa condição vale só até *30/11 às 23h59*.\n\nGaranta a sua vaga aqui 👇🏻\nhttps://lp.mentoriavestigium.com.br/black/\n\nBora pra cima!! 🚀🚀",
   ],
 };
+// v2 (MARKETING): a oferta já vai no corpo do template; o toque manda só o link.
+CONVITES_BLACK.segunda_chance_black_v2 = {
+  imagem: "",
+  link: "https://lp.mentoriavestigium.com.br/black/",
+  mensagens: (nome) => [
+    nome ? `Aqui está, ${nome}!! 👊🏼` : "Aqui está!! 👊🏼",
+    "Escolha a sua opção e garanta a sua vaga 👇🏻\nhttps://lp.mentoriavestigium.com.br/black/\n\nQuer o material Premium do Estratégia Concursos junto? Também tem essa opção na página 😉\n\n⚠️ Só até *30/11 às 23h59*. Bora pra cima!! 🚀🚀",
+  ],
+};
 
 /** Texto dos botões de resposta rápida dos convites da Black. */
 export const BOTAO_CONVITE_BLACK = /^(ver detalhes|quero meu acesso)$/i;
