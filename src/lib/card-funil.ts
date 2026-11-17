@@ -29,6 +29,32 @@ export function escolherConversaDoFunil<T extends ConversaComCard>(
   );
 }
 
+// Qual contato o webhook de pagamento usa quando a busca acha MAIS DE UM para a mesma pessoa.
+//
+// 16/11/2026 (Léia Sartori, Black Médico Legista): a LP da Black criou um contato novo com o
+// telefone COM o 9º dígito (+5534988417380), sem conversa nem inbox, enquanto o contato real
+// (com card no funil) estava salvo SEM o 9º (+553488417380). O webhook busca primeiro a variante
+// com o 9º, pegou o duplicado, o fallback não conseguiu criar conversa para um contato sem
+// vínculo de WhatsApp e a venda não chegou nem ao grupo nem ao card.
+//
+// Preferência: 1º quem tem card no funil → 2º quem tem alguma conversa → 3º o primeiro achado
+// (que cai no fallback de criar conversa + card, como antes).
+export interface CandidatoContato<C> {
+  contato: C;
+  conversas: ConversaComCard[];
+}
+
+export function escolherContatoDoPagamento<C>(
+  candidatos: CandidatoContato<C>[],
+  boardIdFunil: number,
+): CandidatoContato<C> | undefined {
+  return (
+    candidatos.find((c) => escolherConversaDoFunil(c.conversas, boardIdFunil)) ??
+    candidatos.find((c) => c.conversas.length > 0) ??
+    candidatos[0]
+  );
+}
+
 // Quem tem card no quadro de renovação já é aluno — a rotina de retenção da Central só cria card
 // ali para aluno com plano ativo/vencendo. A compra dele é RENOVAÇÃO mesmo quando o card do funil
 // não mostra isso: card antigo sem "boas-vindas: enviado" (Leandra Rosique, 08/11) ou nenhum card

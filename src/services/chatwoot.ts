@@ -740,10 +740,19 @@ export async function atualizarAtributosConversa(
   return res.json();
 }
 
-export async function buscarContatoPorQuery(
+export interface ContatoBusca {
+  id: number;
+  name: string;
+  phone_number?: string;
+  email?: string;
+  custom_attributes?: Record<string, unknown>;
+}
+
+/** Todos os contatos que a busca do Chatwoot devolve para a query (pode haver duplicados da mesma pessoa). */
+export async function buscarContatosPorQuery(
   accountId: string | number,
   query: string,
-): Promise<{ id: number; name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> } | null> {
+): Promise<ContatoBusca[]> {
   const url = `${urlConta(accountId)}/contacts/search?q=${encodeURIComponent(query)}&include_contacts=true`;
   const res = await fetchComTimeout(url, { method: "GET", headers: headers() });
 
@@ -752,8 +761,15 @@ export async function buscarContatoPorQuery(
     throw new Error(`[chatwoot] buscarContatoPorQuery falhou (${res.status}): ${text}`);
   }
 
-  const data = await res.json() as { payload: Array<{ id: number; name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> }> };
-  return data.payload?.[0] ?? null;
+  const data = await res.json() as { payload: ContatoBusca[] };
+  return data.payload ?? [];
+}
+
+export async function buscarContatoPorQuery(
+  accountId: string | number,
+  query: string,
+): Promise<ContatoBusca | null> {
+  return (await buscarContatosPorQuery(accountId, query))[0] ?? null;
 }
 
 export async function buscarConversasDoContato(

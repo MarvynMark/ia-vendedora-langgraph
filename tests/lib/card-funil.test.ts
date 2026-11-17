@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { escolherConversaDoFunil, temCardDeRenovacao } from "../../src/lib/card-funil.ts";
+import { escolherConversaDoFunil, escolherContatoDoPagamento, temCardDeRenovacao } from "../../src/lib/card-funil.ts";
 
 const FUNIL = 1;
 const RENOVACAO = 14;
@@ -53,5 +53,45 @@ describe("temCardDeRenovacao", () => {
 
   test("só card do funil → não é renovação por este critério", () => {
     expect(temCardDeRenovacao([{ id: 1, inbox_id: 11, kanban_task: { id: 1, board_id: FUNIL } }], RENOVACAO)).toBe(false);
+  });
+});
+
+describe("escolherContatoDoPagamento", () => {
+  test("contato duplicado sem conversa perde para o que tem card no funil (caso Léia, 16/11)", () => {
+    const candidatos = [
+      { contato: { id: 57936 }, conversas: [] },
+      {
+        contato: { id: 56600 },
+        conversas: [
+          { id: 17447, inbox_id: 13 },
+          { id: 10417, inbox_id: 11, kanban_task: { id: 7945, board_id: FUNIL } },
+        ],
+      },
+    ];
+    expect(escolherContatoDoPagamento(candidatos, FUNIL)?.contato.id).toBe(56600);
+  });
+
+  test("sem card em ninguém, prefere quem tem alguma conversa", () => {
+    const candidatos = [
+      { contato: { id: 1 }, conversas: [] },
+      { contato: { id: 2 }, conversas: [{ id: 9, inbox_id: 11 }] },
+    ];
+    expect(escolherContatoDoPagamento(candidatos, FUNIL)?.contato.id).toBe(2);
+  });
+
+  test("card só no quadro de renovação não conta como card do funil", () => {
+    const candidatos = [
+      { contato: { id: 1 }, conversas: [{ id: 5, inbox_id: 15, kanban_task: { id: 3, board_id: RENOVACAO } }] },
+      { contato: { id: 2 }, conversas: [{ id: 6, inbox_id: 11, kanban_task: { id: 4, board_id: FUNIL } }] },
+    ];
+    expect(escolherContatoDoPagamento(candidatos, FUNIL)?.contato.id).toBe(2);
+  });
+
+  test("um só contato, sem nada: devolve ele (vai para o fallback que cria conversa + card)", () => {
+    expect(escolherContatoDoPagamento([{ contato: { id: 7 }, conversas: [] }], FUNIL)?.contato.id).toBe(7);
+  });
+
+  test("lista vazia → undefined", () => {
+    expect(escolherContatoDoPagamento([], FUNIL)).toBeUndefined();
   });
 });

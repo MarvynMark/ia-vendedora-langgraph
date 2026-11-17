@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { criarGrafoFollowUp } from "../graphs/follow-up/graph.ts";
 import {
-  buscarContatoPorQuery,
+  buscarContatosPorQuery,
   buscarConversasDoContato,
   atualizarKanbanTask,
   buscarKanbanBoard,
@@ -12,6 +12,7 @@ import {
   reabrirConversa,
   criarConversa,
   criarKanbanTask,
+  type ContatoBusca,
 } from "../services/chatwoot.ts";
 import { env } from "../config/env.ts";
 import { logger } from "../lib/logger.ts";
@@ -19,7 +20,12 @@ import { registrarWebhook } from "../lib/webhook-logger.ts";
 import { tentarAdquirirLock, liberarLock } from "../db/lock.ts";
 import { montarChaveIdempotenciaPagamento } from "../lib/idempotencia-pagamento.ts";
 import { montarMensagemNovoAluno } from "../lib/alerta-novo-aluno.ts";
-import { escolherConversaDoFunil, temCardDeRenovacao } from "../lib/card-funil.ts";
+import {
+  escolherConversaDoFunil,
+  escolherContatoDoPagamento,
+  temCardDeRenovacao,
+  type CandidatoContato,
+} from "../lib/card-funil.ts";
 import { enviarAvisoGrupo } from "../services/aviso-grupo.ts";
 import { classificarCompra, descricaoAposCompra } from "../lib/renovacao.ts";
 import { enviarRoteiroVideoCompra } from "../services/roteiro-video-compra.ts";
@@ -153,6 +159,11 @@ export interface PagamentoAprovadoDados {
   nomeOferta: string;
   /** Plataforma de origem da venda. Ausente = DMGuru. */
   origem?: "dmguru" | "tmb";
+  /**
+   * Reprocessamento manual quando o time JÁ mandou as boas-vindas na mão: faz o resto (card, grupo,
+   * roteiro, etiquetas) sem mandar a mensagem ao aluno de novo. Nunca vem dos webhooks.
+   */
+  pularBoasVindas?: boolean;
 }
 
 // Lógica de processamento agnóstica de plataforma de pagamento (DMGuru, TMB, ...):
@@ -192,7 +203,7 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
 
   // Localizar contato no Chatwoot — prioriza telefone (múltiplos formatos) e email.
   // Nome é propositalmente excluído: pode estar diferente entre DMG e Chatwoot.
-  let contato: { id: number; name: string; phone_number?: string; email?: string; custom_attributes?: Record<string, unknown> } | null = null;
+  let contato: ContatoBusca;
 
   // Gerar variantes do telefone para aumentar chance de match
   const variantesTelefone: string[] = [];
@@ -207,31 +218,45 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
 
   const tentativas = [...new Set([...variantesTelefone, dados.email].filter(Boolean))] as string[];
 
+  // Junta TODOS os contatos achados por todas as variantes: a mesma pessoa pode estar duplicada
+  // (ex.: um com e outro sem o 9º dígito) e só um deles tem o card (lib/card-funil.ts).
+  const achados = new Map<number, ContatoBusca>();
   for (const query of tentativas) {
     try {
-      contato = await buscarContatoPorQuery(accountId, query);
-      if (contato) {
-        logger.info("pagamento", "Contato encontrado via query", { query, id: contato.id });
-        break;
+      for (const c of await buscarContatosPorQuery(accountId, query)) {
+        if (!achados.has(c.id)) achados.set(c.id, c);
       }
     } catch (e) {
       logger.warn("pagamento", "Falha ao buscar contato com query", { query, erro: String(e) });
     }
   }
 
-  if (!contato) {
+  if (achados.size === 0) {
     logger.error("pagamento", "Contato não encontrado no Chatwoot", { tentativas, nome: dados.nome, email: dados.email, telefone: dados.telefone });
     return;
   }
 
-  // Buscar conversas do contato para encontrar o Kanban task
-  let conversas: Array<{ id: number; inbox_id: number; kanban_task?: Record<string, unknown> }> = [];
-  try {
-    conversas = await buscarConversasDoContato(accountId, contato.id);
-  } catch (e) {
-    logger.error("pagamento", "Erro ao buscar conversas do contato:", e);
+  // Conversas de cada candidato (no máximo 5: a busca por email/telefone raramente acha mais).
+  const candidatos: CandidatoContato<ContatoBusca>[] = [];
+  for (const c of [...achados.values()].slice(0, 5)) {
+    try {
+      candidatos.push({ contato: c, conversas: await buscarConversasDoContato(accountId, c.id) });
+    } catch (e) {
+      logger.warn("pagamento", "Erro ao buscar conversas do contato:", { id: c.id, erro: String(e) });
+    }
+  }
+
+  const escolhido = escolherContatoDoPagamento(candidatos, env.KANBAN_BOARD_ID);
+  if (!escolhido) {
+    logger.error("pagamento", "Erro ao buscar conversas dos contatos encontrados", { ids: [...achados.keys()] });
     return;
   }
+  contato = escolhido.contato;
+  const conversas = escolhido.conversas;
+  logger.info("pagamento", "Contato escolhido", {
+    id: contato.id,
+    candidatos: candidatos.map((c) => c.contato.id),
+  });
 
   // Pegar a conversa mais recente com card NO FUNIL — o card do quadro de renovação não tem
   // "Ganho" e abortava antes de avisar o grupo (lib/card-funil.ts).
@@ -334,7 +359,7 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
   try {
     await atualizarKanbanTask(accountId, task.id, {
       board_step_id: etapaGanho.id,
-      ...(renovacao ? {} : { due_date: agora.toISOString() }),
+      ...(renovacao || dados.pularBoasVindas ? {} : { due_date: agora.toISOString() }),
       description: descricaoAtual,
     });
     logger.info("pagamento", renovacao ? "Renovação registrada no card. TaskId:" : "Card movido para Ganho. TaskId:", task.id);
@@ -395,6 +420,10 @@ async function processarPagamentoAprovadoInterno(dados: PagamentoAprovadoDados) 
 
   // Quem renovou já fez o onboarding: o grupo foi avisado e o time segue daqui.
   if (renovacao) return;
+  if (dados.pularBoasVindas) {
+    logger.info("pagamento", "Boas-vindas puladas (reprocessamento manual, time já enviou)", { taskId: task.id });
+    return;
+  }
 
   // Disparar grafo de follow-up com tipo boas_vindas diretamente (não depender do webhook overdue)
   const telefone = dados.telefone ?? contato.phone_number ?? contato.email ?? String(contato.id);
