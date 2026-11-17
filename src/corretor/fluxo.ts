@@ -204,11 +204,9 @@ async function irParaEnunciado(ctx: Contexto, perfil: PerfilConcurso, area: stri
     prefixo += `Não encontrei a questão ${codigo} no banco${codigo.startsWith("E") ? ` da sua ${nomeArea(perfil, area)}` : ""}.\n\n`;
   }
   await iniciarSessao({ conversaId: ctx.conversaId, telefone: ctx.telefone, etapa: "enunciado", concurso: perfil.codigo, area, codigoQuestao: null, enunciado: null });
-  const temEspecificas = perfil.banco.some((q) => q.area === area);
-  const dicaBanco = temEspecificas
-    ? `Se for uma questão do nosso banco, mande só o código: por exemplo *G05* (conhecimentos gerais) ou *E03* (da sua ${nomeArea(perfil, area)}).`
-    : `Se for uma questão do nosso banco de conhecimentos gerais, mande só o código (de *G01* a *G20*). A sua ${nomeArea(perfil, area)} ainda não tem questões específicas no banco: mande o enunciado que quiser.`;
-  await ctx.enviar(`${prefixo}Me mande o *enunciado* da questão que você respondeu (texto ou foto).\n\n${dicaBanco}\n\nPara sair a qualquer momento: /cancelar`);
+  // Sem dica de código do banco (G05/E03): confundia quem não conhece o banco. O código continua
+  // aceito em silêncio para quem já usa.
+  await ctx.enviar(`${prefixo}Me mande o *enunciado* da questão que você respondeu (texto ou foto).\n\nPara sair a qualquer momento: /cancelar`);
 }
 
 /** "Graduação: *Biomedicina* → você concorre na *Área 6* ✅". */
@@ -276,7 +274,7 @@ async function etapaEnunciado(ctx: Contexto, sessao: Sessao, texto: string, anex
     return "corretor:enunciado_banco";
   }
   if (texto.length < 20) {
-    await ctx.enviar("Me mande o enunciado completo da questão (o comando, com os subitens), ou o código dela no banco, como *G05*.");
+    await ctx.enviar("Me mande o enunciado completo da questão (o comando, com os subitens), em texto ou foto.");
     return "corretor:enunciado_curto";
   }
   await atualizarSessao(ctx.conversaId, { etapa: "resposta", enunciado: texto }, "enunciado");
